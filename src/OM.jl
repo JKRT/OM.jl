@@ -1,5 +1,12 @@
 module OM
 
-greet() = print("Hello World!")
+import Absyn
+import SCode
+import DAE
+#= Frontend stuff =#
+import HybridDAEParser
+import OMBackend
+
+greet() = print("Fix me!")
 
 end # module
