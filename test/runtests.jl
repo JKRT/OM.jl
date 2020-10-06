@@ -1,15 +1,27 @@
 module Test_OM
 
+import Absyn
+import SCode
+import DAE
+import HybridDAEParser
+import OMBackend.jl
 using MetaModelica
 using Test
 
 @testset "MetaModelica" begin
   @testset "@Module test" begin
-    import Absyn
-    import SCode
-    import DAE
-    import HybridDAEParser
-    import OMBackend.jl
+    @test begin
+      try
+        import Absyn
+        import SCode
+        import DAE
+        import HybridDAEParser
+        import OMBackend.jl
+        @test true
+      catch
+        @test false
+      end
+    end
   end
 
 
