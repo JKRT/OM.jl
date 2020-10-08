@@ -13,6 +13,7 @@ function runModel(modelName::String, modelFile::String)
   (dae, cache) = HybridDAEParser.instantiateSCodeToDAE("HelloWorld", scodeProgram)
   @show dae
   OMBackend.translate(dae)
+  OMBackend.simulateModel(modelName)
 end
 
 # runModel("HelloWorld", "test/HelloWorld.mo")
