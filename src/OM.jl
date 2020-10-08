@@ -6,6 +6,7 @@ import DAE
 #= Frontend stuff =#
 import HybridDAEParser
 import OMBackend
+import Plots
 
 function runModel(modelName::String, modelFile::String)
   p = HybridDAEParser.parseFile(modelFile)
@@ -13,7 +14,7 @@ function runModel(modelName::String, modelFile::String)
   (dae, cache) = HybridDAEParser.instantiateSCodeToDAE(modelName, scodeProgram)
   @show dae
   OMBackend.translate(dae)
-  OMBackend.simulateModel(modelName)
+  Plots.plot(OMBackend.simulateModel(modelName))
 end
 
 # runModel("HelloWorld", "test/HelloWorld.mo")
