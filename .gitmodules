@@ -13,3 +13,6 @@
 [submodule "DAE.jl"]
 	path = DAE.jl
 	url = git@github.com:JKRT/DAE.jl.git
+[submodule "OMBackend.jl"]
+	path = OMBackend.jl
+	url = git@github.com:JKRT/OMBackend.jl.git
