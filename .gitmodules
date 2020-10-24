@@ -22,3 +22,6 @@
 [submodule "ListUtil.jl"]
 	path = ListUtil.jl
 	url = git@github.com:JKRT/ListUtil.jl.git
+[submodule "ArrayUtil.jl"]
+	path = ArrayUtil.jl
+	url = git@github.com:JKRT/ArrayUtil.jl.git
