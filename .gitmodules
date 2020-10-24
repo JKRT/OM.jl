@@ -19,3 +19,6 @@
 [submodule "OpenModelicaParser.jl"]
 	path = OpenModelicaParser.jl
 	url = git@github.com:adrpo/OpenModelicaParser.jl.git
+[submodule "ListUtil.jl"]
+	path = ListUtil.jl
+	url = git@github.com:JKRT/ListUtil.jl.git
