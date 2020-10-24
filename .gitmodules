@@ -16,3 +16,6 @@
 [submodule "OMBackend.jl"]
 	path = OMBackend.jl
 	url = git@github.com:JKRT/OMBackend.jl.git
+[submodule "OpenModelicaParser.jl"]
+	path = OpenModelicaParser.jl
+	url = git@github.com:adrpo/OpenModelicaParser.jl.git
