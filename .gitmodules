@@ -25,3 +25,6 @@
 [submodule "ArrayUtil.jl"]
 	path = ArrayUtil.jl
 	url = git@github.com:JKRT/ArrayUtil.jl.git
+[submodule "ImmutableList.jl"]
+	path = ImmutableList.jl
+	url = git@github.com:OpenModelica/ImmutableList.jl.git
