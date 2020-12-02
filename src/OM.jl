@@ -17,7 +17,7 @@ end
 function runModel(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0)
   (dae, cache) = flatten(modelName, modelFile)
   OMBackend.translate(dae)
-  OMBackend.simulateModel(modelName, (startTime, stopTime))
+  OMBackend.simulateModel(modelName, tspan=(startTime, stopTime))
 end
 
 
