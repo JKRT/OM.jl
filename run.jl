@@ -5,7 +5,7 @@ using OM
 @time OM.flatten("VanDerPol", "test/VanDerPol.mo")
 @time OM.flatten("LotkaVolterra", "test/LotkaVolterra.mo")
 @time OM.flatten("BouncingBall", "test/BouncingBall.mo");
-
+@time OM.flatten("SimpleMechanicalSystem", "test/SimpleMechanicalSystem.mo")
 
 @time OM.runModel("HelloWorld", "test/HelloWorld.mo")
 @time OM.runModel("VanDerPol", "test/VanDerPol.mo")
