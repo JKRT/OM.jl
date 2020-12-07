@@ -6,7 +6,7 @@ model BouncingBallReals
 equation 
   der(h) = v;
   der(v) = -g;  
-  when h <= 0 then
+  when 0 >= h then
     reinit(v, -e*pre(v));
   end when;
 end BouncingBallReals;
