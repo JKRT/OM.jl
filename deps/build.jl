@@ -37,5 +37,3 @@ end
 
 buildDeps()
 @info("OM: Finished build script. Printing Log")
-
-open(f->read(f, String), "build.log")
