@@ -2,3 +2,6 @@ name = "OM"
 uuid = "2f925a0b-2436-437b-858e-49aee461894b"
 authors = ["JKRT "]
 version = "0.1.0"
+
+[deps]
+Absyn = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
