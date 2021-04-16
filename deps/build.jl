@@ -31,7 +31,7 @@ function buildDeps()
   Pkg.add("DoubleEnded")
   Pkg.add("DAE")
   Pkg.add("OpenModelicaParser")
-  @info "Installed the parser
+  @info "Installed the parser"
   @info("Build all dependencies succesfull")
 end
 
