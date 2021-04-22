@@ -25,3 +25,6 @@
 [submodule "ImmutableList.jl"]
 	path = ImmutableList.jl
 	url = git@github.com:OpenModelica/ImmutableList.jl.git
+[submodule "OMFrontend"]
+	path = OMFrontend
+	url = git@github.com:JKRT/OMFrontend.jl.git
