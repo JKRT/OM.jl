@@ -13,7 +13,7 @@ using OM
 
 @time OM.flatten("BouncingBallReals", "test/BouncingBallReals.mo");
 @time OM.flatten("SimpleMechanicalSystem", "test/SimpleMechanicalSystem.mo")
-@time OM.flatten("SimpleCirquit", "test/SimpleCirquit.mo")
+#@time OM.flatten("SimpleCirquit", "test/SimpleCirquit.mo")
 
 
 #= Simple Hybrid DAE systems. No hybrid-discrete behaviour=#
@@ -22,13 +22,13 @@ using OM
 @time OM.runModel("VanDerPol", "test/VanDerPol.mo")
 @time OM.runModel("LotkaVolterra", "test/LotkaVolterra.mo")
 
-@time OM.runModel("SimpleCirquit", "test/SimpleCirquit.mo")
-@time OM.runModel("SimpleMechanicalSystem", "test/SimpleMechanicalSystem.mo")
+#@time OM.runModel("SimpleCirquit", "test/SimpleCirquit.mo")
+#@time OM.runModel("SimpleMechanicalSystem", "test/SimpleMechanicalSystem.mo")
 
 #= Simple hybrid systems =#
 @info "Running simple hybrid systems"
-@time OM.runModel("BouncingBallReals", "test/BouncingBallReals.mo", stopTime = 5)
+#@time OM.runModel("BouncingBallReals", "test/BouncingBallReals.mo", stopTime = 5)
 #using Plots How to plot for instancehanicalSystem.mo"))
-@time OM.flatten("SimpleMechanicalSystem", "test/SimpleMechanicalSystem.mo")
+#@time OM.flatten("SimpleMechanicalSystem", "test/SimpleMechanicalSystem.mo")
 
 

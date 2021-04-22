@@ -1,6 +1,3 @@
-[submodule "HybridDAEParser"]
-	path = HybridDAEParser
-	url = git@github.com:JKRT/HybridDAEParser.git
 [submodule "MetaModelica.jl"]
 	path = MetaModelica.jl
 	url = git@github.com:OpenModelica/MetaModelica.jl.git
@@ -28,3 +25,6 @@
 [submodule "ImmutableList.jl"]
 	path = ImmutableList.jl
 	url = git@github.com:OpenModelica/ImmutableList.jl.git
+[submodule "OMFrontend.jl"]
+	path = OMFrontend.jl
+	url = git@github.com:JKRT/OMFrontend.jl.git

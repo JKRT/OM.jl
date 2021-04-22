@@ -23,13 +23,17 @@ function buildDeps()
   Pkg.add("MacroTools")
   #= This packages are available using the OpenModelica Julia registry=#
   Pkg.add("ImmutableList")
+  @info "Installed ImmutableList"
   Pkg.add("MetaModelica")
+  @info "Installed MetaModelica"
   Pkg.add("Absyn")
   Pkg.add("SCode")
   Pkg.add("DoubleEnded")
   Pkg.add("DAE")
+  Pkg.add("OpenModelicaParser")
+  @info "Installed the parser"
   @info("Build all dependencies succesfull")
 end
 
 buildDeps()
-@info("OM: Finished build script")
+@info("OM: Finished build script. Printing Log")
