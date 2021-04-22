@@ -1,6 +1,3 @@
-[submodule "OMFrontend"]
-	path = OMFrontend.jl
-	url = git@github.com:JKRT/OMFrontend.git
 [submodule "MetaModelica.jl"]
 	path = MetaModelica.jl
 	url = git@github.com:OpenModelica/MetaModelica.jl.git
