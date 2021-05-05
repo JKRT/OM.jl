@@ -4,14 +4,14 @@ import Absyn
 import SCode
 import DAE
 #= Frontend stuff =#
-import HybridDAEParser
+import OMFrontend
 import OMBackend
 import Plots
 
 function flatten(modelName::String, modelFile::String)
-  p = HybridDAEParser.parseFile(modelFile)
-  scodeProgram = HybridDAEParser.translateToSCode(p)
-  (dae, cache) = HybridDAEParser.instantiateSCodeToDAE(modelName, scodeProgram)
+  p = OMFrontend.parseFile(modelFile)
+  scodeProgram = OMFrontend.translateToSCode(p)
+  (dae, cache) = OMFrontend.instantiateSCodeToDAE(modelName, scodeProgram)
 end
 
 function runModel(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0)
