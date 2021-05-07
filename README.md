@@ -13,6 +13,7 @@ Using same procedure as above for:
   - ArrayUtil.jl 
   - ListUtil.jl
 Once this is done develop SCode and last but not least the DAE.
+
 ## Core modules
 	- Develop the OpenModelicaParser.jl
 	- Develop OMFrontend.jl
