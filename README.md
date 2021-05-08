@@ -22,6 +22,13 @@ Once this is done develop SCode and last but not least the DAE.
 
 Since this is currently work in progress expect some warnings:) 
 
+## TL;TR
+```julia
+julia> include("install.jl")
+```
+
+---
+
 Make sure that all submodules are on master
 
 ```
