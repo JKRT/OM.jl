@@ -1,6 +1,7 @@
 #=
   Simple test file
 =#
+import OMBackend
 using Revise
 using OM
 @info "Running flatten test:"
