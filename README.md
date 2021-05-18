@@ -1,18 +1,22 @@
 # OM.jl
 A Modelica Compiler in Julia
 
-
 ## Developer instructions 
 
-
+Start by cloning recursivly:  
+```
+git clone --recursive git@github.com:JKRT/OM.jl.git
+```
 ---
-
 Make sure that all submodules are on master
 
 ```
-git submodule foreach "git checkout master && git pull --recursive"
+git submodule foreach "git checkout master && git pull"
 ```
-## Install manually be developing the subpackages
+
+When this is done one can either run the installation script or proceed with the manual installation below.
+
+## Install manually by developing the subpackages
 
   - Go to ImmutableList.jl 
   - Dev it using the Julia package manager
