@@ -28,3 +28,5 @@ end
 
 @info "Running tests again (but much faster)"
 @time include("run.jl")
+
+#= Make sure to build both OMBackend and OMParser =#
