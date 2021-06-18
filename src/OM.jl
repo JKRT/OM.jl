@@ -25,10 +25,9 @@ function runModelAndPlot(modelName::String, modelFile::String; startTime=0.0, st
   Plots.plot(runModel(modelName, modelFile; tspan = (startTime = 0.0, stopTime = 1.0)))
 end
 
-
-"
+"""
     Turns on debug prints
-"
+"""
 function turnOnLogging()
   ENV["JULIA_DEBUG"] = "OMBackend"
 end

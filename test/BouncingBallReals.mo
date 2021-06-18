@@ -8,5 +8,5 @@ equation
   der(v) = -g;  
   when h <= 0 then
     reinit(v, -e*pre(v));
-   end when;
+  end when;
 end BouncingBallReals;
