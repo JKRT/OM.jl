@@ -28,7 +28,6 @@ simpleModelsSorting = ["SimpleMechanicalSystem", "SimpleCircuit"]
 simpleHybridModels = ["BouncingBallReals", "IfEquationDer"]
 
 @info "Running flatten test:"
-
 @info "Models that require no sorting"
 flatten(simpleModelsNoSorting)
 @info "Models that require sorting"
@@ -48,3 +47,5 @@ runModels(simpleHybridModels)
 @info "Running simple hybrid systems"
 #@time OM.runModel("BouncingBallReals", "test/BouncingBallReals.mo", stopTime = 5)
 #using Plots How to plot for instancehanicalSystem.mo"))
+
+#= Running MTK tests=#

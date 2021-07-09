@@ -4,9 +4,9 @@ model IfEquationDer
   parameter Real uMin = 2;
   Real y;
 equation
-  if time > uMax then
+  if uMax < time then
     der(y) = uMax;
-  elseif time < uMin then
+  elseif uMin < time then
     der(y) = uMin;
   else
     der(y) = u;
