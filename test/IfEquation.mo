@@ -4,9 +4,9 @@ model IfEquation
   parameter Real uMin = 2;
   Real y;
 equation
-  if u > uMax then
+  if time > uMax then
     y = uMax;
-  elseif u < uMin then
+  elseif time < uMin then
     y = uMin;
   else
     y = u;
