@@ -19,7 +19,7 @@ function flatten(modelName::String, modelFile::String)
 end
 
 """
-
+ Runs a model given a model name and a model file.
 """
 function runModel(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE)
   (dae, cache) = flatten(modelName, modelFile)
@@ -28,6 +28,7 @@ function runModel(modelName::String, modelFile::String; startTime=0.0, stopTime=
 end
 
 """
+ Runs a model given a DAE representation of said model.
 """
 function runModel(dae::DAE_T; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE) where {DAE_T}
   OMBackend.translate(dae)
@@ -35,6 +36,7 @@ function runModel(dae::DAE_T; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_
 end
 
 """
+  Run and plots a model, otherwise similar to runModel
 """
 function runModelAndPlot(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0)
   Plots.plot(runModel(modelName, modelFile; tspan = (startTime = 0.0, stopTime = 1.0)))
@@ -58,17 +60,17 @@ function translateToSCode(modelName::String, modelFile::String)
 end
 
 """
-    Turns on debug print for backend
+  Turns on debugging for the backend
 """
 function LogBackend()
   ENV["JULIA_DEBUG"] = "OMBackend"
 end
 
 """
-  Turns on debug print for the frontend
+  Turns on debugging for the frontend
 """
 function LogFrontend()
-  ENV["JULIA_DEBUG"] = "OMBackend"
+  ENV["JULIA_DEBUG"] = "OMFrontend"
 end
 
 

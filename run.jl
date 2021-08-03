@@ -25,7 +25,7 @@ end
 systemsWithoutDifferentials = ["HelloWorldWithoutDer"]
 simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
 simpleModelsSorting = ["SimpleMechanicalSystem", "SimpleCircuit"]
-simpleHybridModels = ["BouncingBallReals", "IfEquationDer"]
+simpleHybridModels = ["BouncingBallReals", "IfEquationDer", "BouncingBallsReal", "ManyEvents5"]
 
 @info "Running flatten test:"
 @info "Models that require no sorting"
