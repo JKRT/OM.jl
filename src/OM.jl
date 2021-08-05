@@ -9,8 +9,8 @@ import OMBackend
 import Plots
 
 """
- Given the name of a model and a specified file. 
- Flattens the model and return a Tuple of the DAE and the function cache
+ Given the name of a model and a specified file.
+ Flattens the model and return a Tuple of the DAE and the function cache.
 """
 function flatten(modelName::String, modelFile::String)
   p = OMFrontend.parseFile(modelFile)
@@ -23,8 +23,8 @@ end
 """
 function runModel(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE)
   (dae, cache) = flatten(modelName, modelFile)
-  OMBackend.translate(dae)
-  OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
+  OMBackend.translate(dae; BackendMode = mode)
+  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
 end
 
 """
@@ -36,7 +36,7 @@ function runModel(dae::DAE_T; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_
 end
 
 """
-  Run and plots a model, otherwise similar to runModel
+  Run and plots a model, otherwise similar to runModel.
 """
 function runModelAndPlot(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0)
   Plots.plot(runModel(modelName, modelFile; tspan = (startTime = 0.0, stopTime = 1.0)))
@@ -50,28 +50,33 @@ function translateModel(modelName::String, modelFile::String; mode = OMBackend.D
   OMBackend.translate(dae; BackendMode = mode)
 end
 
+"""
+"""
 function translateModelFromSCode(modelName, scodeProgram::SCode.Program)
   (dae, cache) = OMFrontend.instantiateSCodeToDAE(modelName, scodeProgram)
 end
 
+"""
+Given the name of a model as a string and the file of said model as a string.
+Translate the model to the SCode representation.
+"""
 function translateToSCode(modelName::String, modelFile::String)
   p = OMFrontend.parseFile(modelFile)
   scodeProgram = OMFrontend.translateToSCode(p)
 end
 
 """
-  Turns on debugging for the backend
+  Turns on debugging for the backend.
 """
 function LogBackend()
   ENV["JULIA_DEBUG"] = "OMBackend"
 end
 
 """
-  Turns on debugging for the frontend
+  Turns on debugging for the frontend.
 """
 function LogFrontend()
   ENV["JULIA_DEBUG"] = "OMFrontend"
 end
-
 
 end # module

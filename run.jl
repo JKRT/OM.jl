@@ -22,10 +22,17 @@ function runModels(models)
   end
 end
 
+function runModelsMTK(models)
+  for model in models
+    @info "Running : $model"
+    @time OM.runModel(model, "test/$(model).mo", mode = OMBackend.MTK_MODE)
+  end
+end
+
 systemsWithoutDifferentials = ["HelloWorldWithoutDer"]
 simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
 simpleModelsSorting = ["SimpleMechanicalSystem", "SimpleCircuit"]
-simpleHybridModels = ["BouncingBallReals", "IfEquationDer", "BouncingBallsReal", "ManyEvents5"]
+simpleHybridModels = ["BouncingBallReals", "IfEquationDer", "BouncingBallsReal"#=, "ManyEvents5" Currently issues with sundials=#]
 
 @info "Running flatten test:"
 @info "Models that require no sorting"
@@ -49,3 +56,10 @@ runModels(simpleHybridModels)
 #using Plots How to plot for instancehanicalSystem.mo"))
 
 #= Running MTK tests=#
+ @info "Testing MTK backend.."
+ @info "Running the simple models with MTK"
+runModelsMTK(simpleModelsNoSorting)
+@info "Running more advanced models with MTK"
+runModelsMTK(simpleModelsSorting)
+@info "Testing hybrid systems with MTK"
+runModelsMTK(simpleHybridModels)

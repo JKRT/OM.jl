@@ -1,13 +1,13 @@
 model ManyEvents5 "Model with many events in when clauses"
   parameter Integer N = 5 "Number of states and event-generating functions";
   parameter Integer M = N "Number of events that are actually triggered";
-  Real x[N](each start = 0, each fixed = true);
-  Real e[N](each start = 0, each fixed = true);
+  Real x[N](each start = 0.0, each fixed = true);
+  Real e[N](each start = 0.0, each fixed = true);
 equation
   for i in 1:N loop
     der(x[i]) = M/(N+1-i);
     when x[i] > 1 then
-      e[i] = 1.;
+      e[i] = 1.0;
     end when;
   end for;
 annotation(
