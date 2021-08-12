@@ -60,7 +60,7 @@ end
 Given the name of a model as a string and the file of said model as a string.
 Translate the model to the SCode representation.
 """
-function translateToSCode(modelName::String, modelFile::String)
+function translateToSCode(modelFile::String)
   p = OMFrontend.parseFile(modelFile)
   scodeProgram = OMFrontend.translateToSCode(p)
 end

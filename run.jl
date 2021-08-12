@@ -18,7 +18,7 @@ end
 """
   Like flatten but tries to flatten several model in for instance a package
 """
-function flatten(models,file)
+function flatten(models, file)
   local scode = OM.translateToSCode("test/$(file).mo")
   @info "We have Scode in flatten"
   for model in models
@@ -58,7 +58,6 @@ flatten(simpleModelsSorting)
 flatten(simpleHybridModels)
 @info "Trying to flatten models in a package (Here we have inheritance)"
 compoundModels = ["Models.ManyEvents", "Models.ManyEventsManyConditions"]
-
 flatten(compoundModels, "ManyEventsPackage")
 #= Simple Hybrid DAE systems. No hybrid-discrete behaviour=#
 function runOriginalBackend()
