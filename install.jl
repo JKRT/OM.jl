@@ -16,12 +16,19 @@ subPkgs = joinpath.(
     "OMBackend.jl",
   ])
 
+
 for pkg in subPkgs
   Pkg.develop(path=pkg)
 end
 
 @info "Developing OM.jl"
 @time Pkg.develop(path=pwd())
+
+@info "The parser needs some external libraries. Build the parser"
+@time Pkg.build("OpenModelicaParser")
+
+@info "Installing auxilary dependencies"
+@time Pkg.add("Revise")
 
 @info "precompiling and running tests"
 @time include("run.jl")
