@@ -42,12 +42,13 @@ end
 
 systemsWithoutDifferentials = ["HelloWorldWithoutDer"]
 simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
-simpleModelsSorting = ["SimpleMechanicalSystem", "SimpleCircuit"]
+simpleModelsSorting = ["SimpleMechanicalSystem"]
 simpleHybridModels = ["BouncingBallReals",
                       "IfEquationDer",
                       "BouncingBallsReal"
                       #=, "ManyEvents5" Currently issues with sundials=#
                       ]
+modelsJustForFlattenTests = ["Influenza", "ElectricalComponentTest"]
 
 @info "Running flatten test:"
 @info "Models that require no sorting"
@@ -59,10 +60,12 @@ flatten(simpleHybridModels)
 @info "Trying to flatten models in a package (Here we have inheritance)"
 compoundModels = ["Models.ManyEvents", "Models.ManyEventsManyConditions"]
 flatten(compoundModels, "ManyEventsPackage")
+@info "Models that we flatten but are still unable to simulate"
+flatten(modelsJustForFlattenTests)
 #= Simple Hybrid DAE systems. No hybrid-discrete behaviour=#
 function runOriginalBackend()
   runModels(systemsWithoutDifferentials)
-  @info "Simulating Simple Hybrid-DAE systems. No hybrid-discrete behavior:"
+  @info "Simulating Simple Hybrid-DAE systems. No hy  brid-discrete behavior:"
   runModels(simpleModelsNoSorting)
   runModels(simpleModelsSorting)
   @info "Simulating Systems with hybrid behaviour:"
@@ -85,3 +88,5 @@ function runMTKBackend()
   @info "Testing hybrid systems with MTK"
   runModelsMTK(simpleHybridModels)
  end
+
+runMTKBackend()
