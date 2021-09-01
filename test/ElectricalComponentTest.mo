@@ -1,7 +1,7 @@
 model ElectricalComponentTest
   //Without voltage for now
-  //type Voltage=Real(unit="V");
-  //type Real=Real(unit="A");
+//  type Voltage=Real(unit="V");
+//  type Real=Real(unit="A");
   connector Pin
     Real v;
     flow Real i;
@@ -51,7 +51,9 @@ model ElectricalComponentTest
   equation
     p.v = 0;
   end Ground;
+
 //Equation for the serial RLC circuit.
+model SimpleCircuit
   Resistor R1(R=10);
   Capacitor C(C=0.01);
   Resistor R2(R=100);
@@ -66,4 +68,15 @@ equation
   connect(R2.n, L.p); // Wire 5
   connect(L.n, C.n); // Wire 6
   connect(AC.n, G.p); // 7, Ground
+end SimpleCircuit;
+
+model ResistorCircuit0
+  Resistor R1(R=100);
+  Resistor R2(R=200);
+//  Resistor R3(R=300);
+equation
+  connect(R1.p, R2.p);
+//  connect(R1.p, R3.p);
+end ResistorCircuit0;
+
 end ElectricalComponentTest;
