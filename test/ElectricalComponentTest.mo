@@ -73,10 +73,10 @@ end SimpleCircuit;
 model ResistorCircuit0
   Resistor R1(R=100);
   Resistor R2(R=200);
-//  Resistor R3(R=300);
+  Resistor R3(R=300);
 equation
   connect(R1.p, R2.p);
-//  connect(R1.p, R3.p);
+  connect(R1.p, R3.p);
 end ResistorCircuit0;
 
 end ElectricalComponentTest;
