@@ -53,30 +53,38 @@ model ElectricalComponentTest
   end Ground;
 
 //Equation for the serial RLC circuit.
-model SimpleCircuit
-  Resistor R1(R=10);
-  Capacitor C(C=0.01);
-  Resistor R2(R=100);
-  Inductor L(L=0.1);
-  Source AC(A = 1., w = 1.);
-  Ground G;
-equation
-  connect(AC.p, R1.p); // 1, Capacitor circuit
-  connect(R1.n, C.p); // Wire 2
-  connect(C.n, AC.n); // Wire 3
-  connect(R1.p, R2.p); // 2, Inductor circuit
-  connect(R2.n, L.p); // Wire 5
-  connect(L.n, C.n); // Wire 6
-  connect(AC.n, G.p); // 7, Ground
-end SimpleCircuit;
+  model SimpleCircuit
+    Resistor R1(R=10);
+    Capacitor C(C=0.01);
+    Resistor R2(R=100);
+    Inductor L(L=0.1);
+    Source AC(A = 1., w = 1.);
+    Ground G;
+  equation
+    connect(AC.p, R1.p); // 1, Capacitor circuit
+    connect(R1.n, C.p); // Wire 2
+    connect(C.n, AC.n); // Wire 3
+    connect(R1.p, R2.p); // 2, Inductor circuit
+    connect(R2.n, L.p); // Wire 5
+    connect(L.n, C.n); // Wire 6
+    connect(AC.n, G.p); // 7, Ground
+  end SimpleCircuit;
 
+//Some examples of resistors below
 model ResistorCircuit0
+  Resistor R1(R=100);
+  Resistor R2(R=200);
+equation
+  connect(R1.p, R2.p);
+end ResistorCircuit0;
+
+model ResistorCircuit1
   Resistor R1(R=100);
   Resistor R2(R=200);
   Resistor R3(R=300);
 equation
   connect(R1.p, R2.p);
   connect(R1.p, R3.p);
-end ResistorCircuit0;
+end ResistorCircuit1;
 
 end ElectricalComponentTest;

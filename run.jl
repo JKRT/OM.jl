@@ -8,6 +8,7 @@ using OM
 
 #= This import is needed =#
 import OMBackend
+import OMFrontend
 
 function flatten(models)
   for model in models
@@ -21,9 +22,17 @@ end
 function flatten(models, file)
   local scode = OM.translateToSCode("test/$(file).mo")
   local res
-  @info "We have Scode in flatten"
   for model in models
-    res = OM.OMFrontend.instantiateSCodeToDAE(model, scode)
+    @time res = OM.OMFrontend.instantiateSCodeToDAE(model, scode)
+  end
+  return res
+end
+
+function flattenFM(models, file)
+  local scode = OM.translateToSCode("test/$(file).mo")
+  local res
+  for model in models
+    @time res = OMFrontend.instantiateSCodeToFM(model, scode)
   end
   return res
 end
@@ -46,6 +55,17 @@ function runModelsMTK(models, file)
   for model in models
     @info "Running : $model"
     @time OM.runModel(model, "test/$(file).mo", mode = OMBackend.MTK_MODE)
+  end
+end
+
+function dumpModelsMTK(models, file)
+  local res
+  #= Get the simulation code =#
+  local scode = OM.translateToSCode("test/$(file).mo")
+  for model in models
+    @info "Dumping : $model"
+    res = OM.OMFrontend.instantiateSCodeToDAE(model, scode)
+    OMBackend.printInitialSystem(res[1])
   end
 end
 
@@ -106,26 +126,71 @@ function runMTKBackend()
   runModelsMTK(simpleHybridModels)
 end
 
-function flattenAdvancedModels()
-  tst = ["ElectricalComponentTest.ResistorCircuit0"#=, "ElectricalComponentTest.SimpleCircuit"=#]
+
+function flattenAdvancedModelsC()
+  tst = ["ElectricalComponentTest.Resistor0", "ElectricalComponentTest.Resistor1", "ElectricalComponentTest.SimpleCircuit"]
   F = "ElectricalComponentTest"
-  tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
-  F = "HelloWorld"
-  oldRes = flatten(tst, F)
-  for i in 1:100
-    res = flatten(tst, F)
-    if res != oldRes
-      println("Error!")
+  #tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
+  # F = "HelloWorld"  
+  for _ in 1:100
+    newRes = flatten(tst, F);
+    res = newRes
+    if res == newRes
+      println("No error!")
+      res = flatten(tst, F);
     else
-      println("No error")
-      oldRes = res
+      println("we have an error")
     end
   end
-  
-  #runModelsMTK(tst, F)
+  #  @info oldRes
+#  OMBackend.turnOnLogging()
+#  runModelsMTK(tst, F)
+  0
 end
 
-flattenSimpleModels()
-flattenAdvancedModels()
+
+function flattenAdvancedModels()
+  local tst = ["ElectricalComponentTest.ResistorCircuit0",
+               "ElectricalComponentTest.ResistorCircuit1",
+               "ElectricalComponentTest.SimpleCircuit"]
+  local F = "ElectricalComponentTest"
+  #tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
+  # F = "HelloWorld"  
+  #  @info oldRes
+  @info "Flatten"  
+  oldRes = flatten(tst, F)
+  @info "Dumping the models"
+  dumpModelsMTK(tst, F)
+  #=lets try to run=#
+  runModelsMTK(tst, F)
+  0
+end
+
+
+function flattenConnectTest()
+  local tst = ["Connect5"]
+  local F = "Connect5"
+  #tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
+  # F = "HelloWorld"  
+  #  @info oldRes
+  @info "Flatten"  
+  local oldRes = flattenFM(tst, F)[1]
+  @info "Dumping the models"
+  res =OMFrontend.toString(oldRes)
+  @info "Dumping the model:"
+  println(res)
+  
+  #  dumpModelsMTK(tst, F)
+  #=lets try to run=#
+#  runModelsMTK(tst, F)
+  0
+end
+
+#flattenSimpleModels()
+#for _ in 1:100
+#runMTKBackend()
+#flattenAdvancedModels()
+flattenConnectTest()
+#end
 #runMTKBackend()
 #runAdvancedModels()
