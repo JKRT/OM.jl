@@ -148,6 +148,20 @@ function flattenAdvancedModelsC()
   0
 end
 
+function flattenFlatSimpleCircuit()
+  local tst = ["SimpleCircuit"]
+  local F = "FlattenSimpleCircuit"
+  #tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
+  # F = "HelloWorld"  
+  #  @info oldRes
+  @info "Flatten"  
+  oldRes = flatten(tst, F)
+  @info "Dumping the models"
+  dumpModelsMTK(tst, F)
+  #=lets try to run=#
+  runModelsMTK(tst, F)
+  0
+end
 
 function flattenAdvancedModels()
   local tst = ["ElectricalComponentTest.ResistorCircuit0",
@@ -179,18 +193,19 @@ function flattenConnectTest()
   res =OMFrontend.toString(oldRes)
   @info "Dumping the model:"
   println(res)
-  
   #  dumpModelsMTK(tst, F)
   #=lets try to run=#
 #  runModelsMTK(tst, F)
   0
 end
 
-#flattenSimpleModels()
-#for _ in 1:100
+
+#flattenFlatSimpleCircuit()
 #runMTKBackend()
 #flattenAdvancedModels()
-flattenConnectTest()
+#for _ in 1:100
+#runMTKBackend()
+#flattenConnectTest()
 #end
 #runMTKBackend()
 #runAdvancedModels()
