@@ -10,7 +10,7 @@ A Modelica Compiler in Julia
 Make sure that all submodules are on master
 
 ```
-git submodule foreach "git checkout master && git pull --recursive"
+git submodule foreach --recursive "git checkout master && git pull"
 ```
 ## Install manually be developing the subpackages
 
