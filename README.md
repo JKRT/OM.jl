@@ -42,7 +42,7 @@ registry add https://github.com/JKRT/OpenModelicaRegistry.git
 ```
 This will add this additional registry. 
 
-## TL;TR
+## TL;DR
 ```julia
 julia> include("install.jl")
 ```
