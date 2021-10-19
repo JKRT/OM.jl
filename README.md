@@ -33,6 +33,15 @@ Once this is done develop SCode and last but not least the DAE.
 
 Since this is currently work in progress expect some warnings:) 
 
+## Adding the OpenModelicRegistry
+To work with the package manager and manage dependencies of these packages 
+you also need to add the OpenModelicaRegistry. 
+To do this issue: 
+```
+registry add https://github.com/JKRT/OpenModelicaRegistry.git
+```
+This will add this additional registry. 
+
 ## TL;TR
 ```julia
 julia> include("install.jl")
