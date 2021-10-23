@@ -40,21 +40,21 @@ end
 function runModels(models)
   for model in models
     @info "Running : $model"
-    @time OM.runModelDAE(model, "test/$(model).mo")
+    @time OM.runModel(model, "test/$(model).mo")
   end
 end
 
 function runModelsMTK(models)
   for model in models
     @info "Running : $model"
-    @time OM.runModelDAE(model, "test/$(model).mo", mode = OMBackend.MTK_MODE)
+    @time OM.runModel(model, "test/$(model).mo", mode = OMBackend.MTK_MODE)
   end
 end
 
 function runModelsMTK(models, file)
   for model in models
     @info "Running : $model"
-    @time OM.runModelDAE(model, "test/$(file).mo", mode = OMBackend.MTK_MODE)
+    @time OM.runModel(model, "test/$(file).mo", mode = OMBackend.MTK_MODE)
   end
 end
 
