@@ -173,7 +173,6 @@ function flattenAdvancedModels()
   #  @info oldRes
   @info "Flatten"  
   oldRes = flatten(tst, F)
-  @info "Dumping the models"
   dumpModelsMTK(tst, F)
   #=lets try to run=#
   runModelsMTK(tst, F)
@@ -200,7 +199,7 @@ function flattenConnectTest()
 end
 
 
-#flattenFlatSimpleCircuit()
+flattenFlatSimpleCircuit()
 #runMTKBackend()
 #flattenAdvancedModels()
 #for _ in 1:100
