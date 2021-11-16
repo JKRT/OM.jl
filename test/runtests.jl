@@ -1,23 +1,136 @@
+#=
+  This is the integration tests for the OpenModelica.jl suite of packages.
+=#
+using Revise
 import Absyn
-import SCode
 import DAE
-import HybridDAEParser
-import OMBackend.jl
+import OM
+import OMBackend
+import OMFrontend
+import SCode
 using MetaModelica
 using Test
-#= Testar testar=#
+
+simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
+systemsWithoutDifferentials = ["HelloWorldWithoutDer"]
+simpleModelsSorting = ["SimpleMechanicalSystem"]
+simpleHybridModels = ["BouncingBallReals",
+                      "IfEquationDer",
+                      "BouncingBallsReal"
+                      #=, "ManyEvents5" Currently issues with sundials=#
+                      ]
+
+function flatten(models)
+  for model in models
+    @time OM.flatten(model, "Models/$(model).mo")
+  end
+end
+
+"""
+Like flatten but calls flat Modelica instead
+"""
+function flattenFM(models, file)
+  local scode = OM.translateToSCode("Models/$(file).mo")
+  local res
+  for model in models
+    @time res = OMFrontend.instantiateSCodeToFM(model, scode)
+  end
+  return res
+end
+
+"""
+Runs models using the ModelingToolkit
+backend
+"""
+function runModelsMTK(models)
+  for model in models
+    @info "Running : $model"
+    @time OM.runModel(model, "Models/$(model).mo", mode = OMBackend.MTK_MODE)
+  end
+end
+
+"""
+Given a set of models and a file  run the models in the file.
+"""
+function runModelsMTK(models, file)
+  for model in models
+    @info "Running : $model"
+    @time OM.runModel(model, "Models/$(file).mo", mode = OMBackend.MTK_MODE)
+  end
+end
+
+function dumpModelsMTK(models, file)
+  local res
+  #= Get the simulation code =#
+  local scode = OM.translateToSCode("Models/$(file).mo")
+  for model in models
+    @info "Dumping : $model"
+    res = OM.OMFrontend.instantiateSCodeToDAE(model, scode)
+    OMBackend.printInitialSystem(res[1])
+  end
+end
+
+@testset "Frontend tests" begin
 
 @testset "Flatten simple models" begin 
 
 @test true == begin
   @info "Running flatten test:"
-  @time OM.flatten("HelloWorld", "test/HelloWorld.mo")
-  @time OM.flatten("VanDerPol", "test/VanDerPol.mo")
-  @time OM.flatten("LotkaVolterra", "test/LotkaVolterra.mo")
-  @time OM.flatten("BouncingBall", "test/BouncingBall.mo");
-  @time OM.flatten("SimpleMechanicalSystem", "test/SimpleMechanicalSystem.mo")
+  @time OM.flatten("HelloWorld", "Models/HelloWorld.mo")
+  @time OM.flatten("VanDerPol", "Models/VanDerPol.mo")
+  @time OM.flatten("LotkaVolterra", "Models/LotkaVolterra.mo")
+  @time OM.flatten("BouncingBall", "Models/BouncingBall.mo");
+  @time OM.flatten("SimpleMechanicalSystem", "Models/SimpleMechanicalSystem.mo")
   true
 end
 
+end
+
+@testset "Flatten Advanced Models:" begin
+  @test true == begin
+    local tst = ["ElectricalComponentTest.ResistorCircuit0",
+               "ElectricalComponentTest.ResistorCircuit1",
+                 "ElectricalComponentTest.SimpleCircuit"]
+    local F = "ElectricalComponentTest"
+    oldRes = flattenFM(tst, F)
+    dumpModelsMTK(tst, F)
+    true
+  end
+  
+end
+  
+end
+
+@testset "Run some simple Modelica models using the MTK backend" begin
+  @test true == begin
+    simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
+    runModelsMTK(simpleModelsNoSorting)
+    true
+  end
+  @test true == begin
+    simpleModelsSorting = ["SimpleMechanicalSystem", "CellierCirc"]
+    runModelsMTK(simpleModelsSorting)
+    true
+  end
+  @test true == begin
+    simpleHybridModels = ["BouncingBallReals",
+                          "BouncingBallsReal"
+                          #=, "ManyEvents5" Currently issues with sundials=#
+                          ]    
+    runModelsMTK(simpleHybridModels)
+    true
+  end
+end
+
+#= Runs some advanced models. Does not check the results=#
+@testset "Run Advanced Models:" begin
+@test true == begin
+    local tst = ["ElectricalComponentTest.SimpleCircuit"]
+  local F = "ElectricalComponentTest"
+  runModelsMTK(tst, F)
+  true
+end
+
+  #= Runs some advanced models and checks the result=#
 
 end

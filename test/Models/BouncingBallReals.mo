@@ -1,9 +1,9 @@
 model BouncingBallReals
-  parameter Real e=0.7;
+  parameter Real e=0.3;
   parameter Real g=9.81;
-  Real h(start=1);
-  Real v;
-equation 
+  Real h(start = 1);
+  Real v(start = 0);
+equation
   der(h) = v;
   der(v) = -g;  
   when h <= 0 then
