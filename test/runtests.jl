@@ -27,9 +27,9 @@ function flatten(models)
 end
 
 """
-Like flatten but calls flat Modelica instead
+  Like flatten but calls flat Modelica instead.
 """
-function flattenFM(models, file)
+function flattenModelsToFlatModelica(models, file)
   local scode = OM.translateToSCode("Models/$(file).mo")
   local res
   for model in models
@@ -39,13 +39,14 @@ function flattenFM(models, file)
 end
 
 """
-Runs models using the ModelingToolkit
-backend
+ Runs a set of models using the ModelingToolkit.
+ backend. The file is assumed to have the same name as the model.
+ That is <filename>.mo where fileName=modelName.
 """
 function runModelsMTK(models)
   for model in models
     @info "Running : $model"
-    @time OM.runModel(model, "Models/$(model).mo", mode = OMBackend.MTK_MODE)
+    @time OM.runModelFM(model, "Models/$(model).mo", mode = OMBackend.MTK_MODE)
   end
 end
 
@@ -55,7 +56,7 @@ Given a set of models and a file  run the models in the file.
 function runModelsMTK(models, file)
   for model in models
     @info "Running : $model"
-    @time OM.runModel(model, "Models/$(file).mo", mode = OMBackend.MTK_MODE)
+    @time OM.runModelFM(model, "Models/$(file).mo", mode = OMBackend.MTK_MODE)
   end
 end
 
@@ -72,65 +73,64 @@ end
 
 @testset "Frontend tests" begin
 
-@testset "Flatten simple models" begin 
-
-@test true == begin
-  @info "Running flatten test:"
-  @time OM.flatten("HelloWorld", "Models/HelloWorld.mo")
-  @time OM.flatten("VanDerPol", "Models/VanDerPol.mo")
-  @time OM.flatten("LotkaVolterra", "Models/LotkaVolterra.mo")
-  @time OM.flatten("BouncingBall", "Models/BouncingBall.mo");
-  @time OM.flatten("SimpleMechanicalSystem", "Models/SimpleMechanicalSystem.mo")
-  true
-end
-
-end
-
-@testset "Flatten Advanced Models:" begin
-  @test true == begin
-    local tst = ["ElectricalComponentTest.ResistorCircuit0",
-               "ElectricalComponentTest.ResistorCircuit1",
-                 "ElectricalComponentTest.SimpleCircuit"]
-    local F = "ElectricalComponentTest"
-    oldRes = flattenFM(tst, F)
-    dumpModelsMTK(tst, F)
-    true
+  @testset "Flatten simple models" begin     
+    @test true == begin
+      @info "Running flatten test:"
+      @time OM.flattenFM("HelloWorld", "Models/HelloWorld.mo")
+      @time OM.flattenFM("VanDerPol", "Models/VanDerPol.mo")
+      @time OM.flattenFM("LotkaVolterra", "Models/LotkaVolterra.mo")
+      @time OM.flattenFM("BouncingBall", "Models/BouncingBall.mo");
+      @time OM.flattenFM("SimpleMechanicalSystem", "Models/SimpleMechanicalSystem.mo")
+      true
+    end
+    
   end
   
-end
+  @testset "Flatten Advanced Models:" begin
+    @test true == begin
+      local tst = ["ElectricalComponentTest.ResistorCircuit0",
+                   "ElectricalComponentTest.ResistorCircuit1",
+                   "ElectricalComponentTest.SimpleCircuit"]
+      local F = "ElectricalComponentTest"
+      oldRes = flattenModelsToFlatModelica(tst, F)
+      dumpModelsMTK(tst, F)
+      true
+    end  
+  end
   
-end
-
-@testset "Run some simple Modelica models using the MTK backend" begin
-  @test true == begin
-    simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
-    runModelsMTK(simpleModelsNoSorting)
-    true
+  @testset "Run some simple Modelica models using the MTK backend" begin
+    @test true == begin
+      simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
+      runModelsMTK(simpleModelsNoSorting)
+      true
+    end
+    @test true == begin
+      simpleModelsSorting = ["SimpleMechanicalSystem", "CellierCirc"]
+      runModelsMTK(simpleModelsSorting)
+      true
+    end
+    @test true == begin
+      simpleHybridModels = ["BouncingBallReals",
+                            "BouncingBallsReal"
+                            #=, "ManyEvents5" Currently issues with sundials=#
+                            ]    
+      runModelsMTK(simpleHybridModels)
+      true
+    end
   end
-  @test true == begin
-    simpleModelsSorting = ["SimpleMechanicalSystem", "CellierCirc"]
-    runModelsMTK(simpleModelsSorting)
-    true
+  
+  #= Runs some advanced models. Does not check the results=#
+  @testset "Run Advanced Models:" begin
+    @test true == begin
+      local tst = ["ElectricalComponentTest.SimpleCircuit"]
+      local F = "ElectricalComponentTest"
+      runModelsMTK(tst, F)
+      true
+    end
   end
-  @test true == begin
-    simpleHybridModels = ["BouncingBallReals",
-                          "BouncingBallsReal"
-                          #=, "ManyEvents5" Currently issues with sundials=#
-                          ]    
-    runModelsMTK(simpleHybridModels)
-    true
-  end
-end
-
-#= Runs some advanced models. Does not check the results=#
-@testset "Run Advanced Models:" begin
-@test true == begin
-    local tst = ["ElectricalComponentTest.SimpleCircuit"]
-  local F = "ElectricalComponentTest"
-  runModelsMTK(tst, F)
-  true
-end
-
-  #= Runs some advanced models and checks the result=#
+  #=
+  Runs some advanced models and checks the result.
+  We check the result by inspecting the values of some variable in the system.
+  =#
 
 end

@@ -22,7 +22,7 @@ end
  Given the name of a model and a specified file.
  Flattens the model and return a Tuple of Flat Modelica and the function cache.
 """
-function flattenToFM(modelName::String, modelFile::String)::Tuple
+function flattenFM(modelName::String, modelFile::String)::Tuple
   p = OMFrontend.parseFile(modelFile)
   scodeProgram = OMFrontend.translateToSCode(p)
   (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, scodeProgram)
@@ -54,13 +54,6 @@ end
 function runModel(dae::DAE_T; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE) where {DAE_T}
   OMBackend.translate(dae)
   OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
-end
-
-"""
-  Run and plots a model, otherwise similar to runModel.
-"""
-function runModelAndPlot(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0)
-  Plots.plot(runModel(modelName, modelFile; tspan = (startTime = 0.0, stopTime = 1.0)))
 end
 
 """
