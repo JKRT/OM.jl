@@ -1,4 +1,4 @@
-# OM.jl
+# OM.jl [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
 A Modelica Compiler in Julia
 
 
