@@ -3,15 +3,20 @@ A Modelica Compiler in Julia
 
 
 ## Developer instructions 
-
-
 ---
+
+Fetch all submodules:
+
+```
+git submodule update --init --recursive
+```
 
 Make sure that all submodules are on master
 
 ```
 git submodule foreach "git checkout master && git pull --recursive"
 ```
+
 ## Install manually be developing the subpackages
 
   - Go to ImmutableList.jl 
