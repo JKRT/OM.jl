@@ -51,3 +51,16 @@ This will add this additional registry.
 ```julia
 julia> include("install.jl")
 ```
+
+## Example run
+Navigate to the test directory.
+```
+cd test
+```
+
+```julia
+using Plots
+import OM
+res = OM.runModel(HelloWorld, "Models/HelloWorld.mo", mode = OMBackend.MTK_MODE)
+plot(res)
+```
