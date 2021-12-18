@@ -11,7 +11,7 @@ subPkgs = joinpath.(
     "DAE.jl",
     "ArrayUtil.jl",
     "ListUtil.jl",
-    "OpenModelicaParser.jl",
+    "OMParser.jl",
     "OMFrontend.jl",
     "OMBackend.jl",
   ])
@@ -25,7 +25,7 @@ end
 @time Pkg.develop(path=pwd())
 
 @info "The parser needs some external libraries. Build the parser"
-@time Pkg.build("OpenModelicaParser")
+@time Pkg.build("OMParser")
 
 @info "Installing auxilary dependencies"
 @time Pkg.add("Revise")

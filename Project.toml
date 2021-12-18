@@ -1,11 +1,12 @@
 name = "OM"
 uuid = "2f925a0b-2436-437b-858e-49aee461894b"
-authors = ["JKRT "]
-version = "0.1.0"
+authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
+version = "0.2.0"
 
 [deps]
 Absyn = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
 DAE = "0174eeea-c361-11e9-3d0d-a9ca8048aff6"
-OpenModelicaParser = "3cc3926e-259e-5855-988e-4819684349c8"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 SCode = "350d45b0-c210-11e9-3b9e-fdad65bb3d46"
+[compat]
+julia = "1.7"

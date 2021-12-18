@@ -56,6 +56,24 @@ function runModel(dae::DAE_T; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_
   OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
 end
 
+
+"""
+  Resimulates an already compiled model.
+  If no compiled model with the specific name it throws an error.
+"""
+function resimulateModel(modelName; startTime = 0.0,  stopTime = 1.0, mode = OMBackend.MTK_MODE)
+  OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
+end
+
+"""
+  Resimulates and plots an already compiled model.
+  If no compiled model with the specific name it throws an error.
+"""
+function resimulateModelAndPlot(modelName; startTime = 0.0, stopTime = 1.0, mode = OMBackend.MTK_MODE)
+  OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
+  Plots.plot(runModel(modelName, modelFile; tspan = (startTime = startTime, stopTime = stopTime)))
+end
+
 """
   Run and plots a model, otherwise similar to runModel.
 """
@@ -72,11 +90,15 @@ function translateModel(modelName::String, modelFile::String; mode = OMBackend.D
 end
 
 """
+  Produces the DAE representation given a modelName and a scodeProgram.
 """
 function translateModelFromSCode(modelName, scodeProgram::SCode.Program)
   (dae, cache) = OMFrontend.instantiateSCodeToDAE(modelName, scodeProgram)
 end
 
+"""
+  Plots the Modelica equations like a directed acyclic graph
+"""
 function plotEquationGraph(b)
   @info "Test"
   OMBackend.plotGraph(b)

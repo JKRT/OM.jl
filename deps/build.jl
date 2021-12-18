@@ -30,7 +30,12 @@ function buildDeps()
   Pkg.add("SCode")
   Pkg.add("DoubleEnded")
   Pkg.add("DAE")
-  Pkg.add("OpenModelicaParser")
+  Pkg.add("OMParser")
+  Pkg.build("OMParser")
+  Pkg.add("OMFrontend")
+  Pkg.build("OMFrontend")
+  Pkg.add("git@github.com:JKRT/OMBackend.jl.git")
+  Pkg.build("OMBackend")
   @info "Installed the parser"
   @info("Build all dependencies succesfull")
 end
