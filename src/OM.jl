@@ -105,6 +105,13 @@ function plotEquationGraph(b)
 end
 
 """
+  Parse a Modelica file
+"""
+function parseFile(file)
+  OMFrontend.parseFile(file)
+end
+
+"""
 Given the name of a model as a string and the file of said model as a string.
 Translate the model to the SCode representation.
 """
