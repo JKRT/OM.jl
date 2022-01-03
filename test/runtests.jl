@@ -164,8 +164,7 @@ end
         runModelsMTK(tst, F)
         true
       end
-    end  
-    
+    end
     @testset "Run some simple VSS model (OMFrontend.jl extension)" begin
       @test true == try
         flatten("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
@@ -185,22 +184,24 @@ end
     end
     @info "Frontend passed for OMFrontend extensions"
     @info "Testing backend translation..."
-  @test true == begin
-    flattenAndPrintModel("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
-    flattenAndPrintModel("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
-    runModelMTK("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
-    runModelMTK("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
-    true
-  end
-
-    # @test true == begin
-    #   runModelMTK("BreakingPendulum", "./Models/VSS/BreakingPendulum.mo")
-    #   true
-    # end
+    @test true == begin
+      flattenAndPrintModel("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
+      runModelMTK("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
+      true
+    end    
+    @test true == begin
+      flattenAndPrintModel("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
+      runModelMTK("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
+      true
+    end
     
+    @test true == begin
+      runModelMTK("BreakingPendulum", "./Models/VSS/BreakingPendulum.mo")
+      true
+    end    
     #=
-    Runs some advanced models and checks the result.
+      Runs some advanced models and checks the result.
     We check the result by inspecting the values of some variable in the system.
-  =#
+    =#
   end
 end

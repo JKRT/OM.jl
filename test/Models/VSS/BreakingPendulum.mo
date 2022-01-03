@@ -17,7 +17,6 @@ equation
   end when;
 end BouncingBall;
 
-
 model Pendulum
   parameter Real x0 = 10;
   parameter Real y0 = 10;
@@ -39,16 +38,10 @@ equation
   y = -L * cos(phi);
   der(phid) =  -g / L * sin(phi);
 end Pendulum;
-
-/* Common variables */
-Real x;
-Real y;
-Real vx;
-Real vy;
 structuralmode Pendulum pendulum;
 structuralmode BouncingBall bouncingBall;
 /* Required? */
 equation
   initialStructuralState(pendulum);
-  structuralTransistion(/* From */ pendulum, /* To */bouncingBall, time - 5 <= 0 /*Condition*/);
+  structuralTransistion(/* From */ pendulum, /* To */bouncingBall, time - 5.0 <= 0 /*Condition*/);
 end BreakingPendulum;
