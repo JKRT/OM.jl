@@ -29,6 +29,36 @@ function flattenFM(modelName::String, modelFile::String)::Tuple
   return FM, cache
 end
 
+
+"""
+ Given the name of a model and a specified file and a library
+ Flattens the model and return a Tuple of Flat Modelica and the function cache.
+"""
+function flattenFM(modelName::String, modelFile::String, library::String)::Tuple
+  local p = OMFrontend.parseFile(modelFile)
+  if !haskey(OMFrontend.LIBRARY_CACHE, library)
+    throw("Library not loaded", library)
+  end
+  local libraryAsScoded = OMFrontend.LIBRARY_CACHE[library]
+  scodeProgram = OMFrontend.translateToSCode(p)
+  listAppend(libraryAsScoded, scodeProgram)
+  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, scodeProgram)
+  return FM, cache
+end
+
+"""
+  This functions flattens a model in a library assuming the library has been loaded
+"""
+function flattenModelInLibraryFM(modelName::String, library::String)
+  if !haskey(OMFrontend.LIBRARY_CACHE, library)
+    throw("Library not loaded", library)
+  end
+  local libraryAsScoded = OMFrontend.LIBRARY_CACHE[library]
+  #= After we have loaded the library call the Frontend =#
+  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, libraryAsScoded)
+  return FM, cache
+end
+
 """
  Runs a model given a model name and a model file. Using DAE
 """
@@ -100,7 +130,6 @@ end
   Plots the Modelica equations like a directed acyclic graph
 """
 function plotEquationGraph(b)
-  @info "Test"
   OMBackend.plotGraph(b)
 end
 
@@ -118,6 +147,10 @@ Translate the model to the SCode representation.
 function translateToSCode(modelFile::String)
   p = OMFrontend.parseFile(modelFile)
   scodeProgram = OMFrontend.translateToSCode(p)
+end
+
+function toString(flatModel)
+  return OMFrontend.toString(flatModel)
 end
 
 """
