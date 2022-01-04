@@ -165,6 +165,7 @@ end
         true
       end
     end
+    
     @testset "Run some simple VSS model (OMFrontend.jl extension)" begin
       @test true == try
         flatten("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
