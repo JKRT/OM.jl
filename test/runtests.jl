@@ -20,6 +20,10 @@ simpleHybridModels = ["BouncingBallReals",
                       #=, "ManyEvents5" Currently issues with sundials=#
                       ]
 
+if pwd() != @__DIR__
+  error("Working directory incorrect. Change it to $(@__DIR__)")
+end
+
 function flatten(models::Vector)
   for model in models
     @time OM.flattenFM(model, "Models/$(model).mo")
