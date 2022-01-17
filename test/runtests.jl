@@ -206,7 +206,15 @@ end
     end    
     #=
       Runs some advanced models and checks the result.
-    We check the result by inspecting the values of some variable in the system.
+      We check the result by inspecting the values of some variable in the system.
     =#
+    @test true == begin
+      flattenAndPrintModel("ArrayGrow", "./Models/VSS/ArrayGrow.mo")
+      true
+    end
+    @test true == begin
+      runModelMTK("ArrayGrow", "./Models/VSS/ArrayGrow.mo")
+      true
+    end
   end
 end
