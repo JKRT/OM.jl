@@ -4,7 +4,7 @@
   the ammount of equations are increased by 10. 
 */
 model ArrayGrow
-   parameter Integer N = 100;
+   parameter Integer N = 10;
    Real x[N](start = {i for i in 1:N});
 equation
   for i in 1:N loop
@@ -16,6 +16,6 @@ equation
       the name of this function is the subject of change.
       What is changed depends on the argument passed to this function.
     */
-    recompilation(N /*What we are changing*/, 150 /*The Value of the change*/);
+    recompilation(N /*What we are changing*/, 20 /*The Value of the change*/);
   end when;
 end ArrayGrow;

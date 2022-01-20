@@ -1,3 +1,4 @@
+/* Similar to bouncing ball but simulates several balls instead of just one */
 model BouncingBallsReal
   parameter Real e = 0.7;
   parameter Real g = 9.81;

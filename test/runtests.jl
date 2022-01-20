@@ -90,6 +90,11 @@ function runModelMTK(model, file)
   @time OM.runModelFM(model, file, mode = OMBackend.MTK_MODE)
 end
 
+function runModelMTK(model, file; timeSpan = (0.0, 1.0))
+  @info "Running : " model
+  @time OM.runModelFM(model, file, mode = OMBackend.MTK_MODE, startTime = first(timeSpan), stopTime = last(timeSpan))
+end
+
 function dumpModelsMTK(models, file)
   local res
   #= Get the simulation code =#
@@ -201,7 +206,7 @@ end
     end
     
     @test true == begin
-      runModelMTK("BreakingPendulum", "./Models/VSS/BreakingPendulum.mo")
+      runModelMTK("BreakingPendulum", "./Models/VSS/BreakingPendulum.mo"; timeSpan=(0.0, 7.0))
       true
     end    
     #=
