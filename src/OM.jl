@@ -7,7 +7,8 @@ import DAE
 import OMFrontend
 import OMBackend
 import Plots
-
+#= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
+using DifferentialEquations
 """
  Given the name of a model and a specified file.
  Flattens the model and return a Tuple of the DAE and the function cache.
@@ -72,9 +73,12 @@ end
  Runs a model given a model name and a model file. Using Flat Modelica
 """
 function runModelFM(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE)
-  (dae, cache) = flattenFM(modelName, modelFile)
-  OMBackend.translate(dae; BackendMode = mode)
-  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
+  println("Generating FlatModelica")
+  @time (dae, cache) = flattenFM(modelName, modelFile)
+  println("Generating backend code")
+  @time OMBackend.translate(dae; BackendMode = mode)
+  println("Compiling to LLVM + Simulating the model")
+  @time OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
 end
 
 
