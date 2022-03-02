@@ -6,7 +6,9 @@ version = "0.2.0"
 [deps]
 Absyn = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
 DAE = "0174eeea-c361-11e9-3d0d-a9ca8048aff6"
+OMFrontend = "b10394b5-f439-4073-a0c5-e09cb00cf46c"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 SCode = "350d45b0-c210-11e9-3b9e-fdad65bb3d46"
+
 [compat]
 julia = "1.7"

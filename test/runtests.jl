@@ -31,12 +31,21 @@ function flatten(models::Vector)
 end
 
 """
-Flattens and prints a model. Only for debugging
+  Flattens and prints a model. Only for debugging
 """
 function flattenAndPrintModel(model, file)
   res = OM.flattenFM(model, file)
   res2 = OM.toString(first(res))
   println(res2)
+end
+
+"""
+  Flattens and prints a model. Using the MSL only for debugging.
+"""
+function flattenAndPrintModelMSL(model, file)
+  res = OMFrontend.flattenModelWithMSL(model, file)
+  res = OMFrontend.toString(first(res))
+  println(res)
 end
 
 
@@ -85,8 +94,24 @@ end
 """
   Given a model and a file run the model in the file.
 """
+function runModelMTK(model, file;
+                     MSL = false,
+                     timeSpan = (0.0, 1.0))
+  @info "Running : " model
+  @time OM.translate(model, file; MSL = MSL)
+  @time OM.simulate(model;
+                    startTime = first(timeSpan),
+                    stopTime = last(timeSpan),
+                    MSL = MSL,
+                    mode = OMBackend.MTK_MODE)
+end
+
+"""
+  Given a mode, file and lib run the model in the file.
+"""
 function runModelMTK(model, file)
   @info "Running : " model
+  res = OMFrontend.flattenModelWithMSL(model, file)
   @time OM.runModelFM(model, file, mode = OMBackend.MTK_MODE)
 end
 
@@ -113,10 +138,10 @@ function dumpModelMTK(model, filePath)
   res = OM.flattenFM(model, filePath)
   OMBackend.printInitialSystem(res[1])
 end
-
+ 
 @testset "OM tests" begin
   @testset "Frontend tests" begin
-    @testset "Flatten simple models" begin     
+    @testset "Flatten simple models" begin
       @test true == begin
         @info "Running flatten test:"
         @time OM.flattenFM("HelloWorld", "Models/HelloWorld.mo")
@@ -126,9 +151,9 @@ end
         @time OM.flattenFM("SimpleMechanicalSystem", "Models/SimpleMechanicalSystem.mo")
         true
       end
-      
+
     end
-    
+
     @testset "Flatten Advanced Models:" begin
       @test true == begin
         local tst = ["ElectricalComponentTest.ResistorCircuit0",
@@ -138,9 +163,9 @@ end
         oldRes = flattenModelsToFlatModelica(tst, F)
         dumpModelsMTK(tst, F)
         true
-      end  
+      end
     end
-    
+
     @testset "Run some simple Modelica models using the MTK backend" begin
       @test true == begin
         simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
@@ -156,7 +181,7 @@ end
         simpleHybridModels = ["BouncingBallReals",
                               "BouncingBallsReal"
                               #=, "ManyEvents5" Currently issues with sundials=#
-                              ]    
+                              ]
         runModelsMTK(simpleHybridModels)
         true
       end
@@ -174,7 +199,7 @@ end
         true
       end
     end
-    
+
     @testset "Run some simple VSS model (OMFrontend.jl extension)" begin
       @test true == try
         flatten("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
@@ -198,17 +223,31 @@ end
       flattenAndPrintModel("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
       runModelMTK("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
       true
-    end    
+    end
     @test true == begin
       flattenAndPrintModel("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
       runModelMTK("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
       true
     end
-    
+    @testset "Run clock with recompilation test" begin
+      @test true == begin
+        runModelMTK("SimpleClock", "./Models/VSS/SimpleClock.mo"; timeSpan=(0.0, 1.0))
+        true
+      end
+      @test true == begin
+        runModelMTK("SimpleClockParameter", "./Models/VSS/SimpleClockParameter.mo"; timeSpan=(0.0, 1.0))
+        true
+      end
+      @test true == begin
+        runModelMTK("SimpleClockArrayGrow", "./Models/VSS/SimpleClockArrayGrow.mo"; timeSpan=(0.0, 1.0))
+        true
+      end
+    end
+
     @test true == begin
       runModelMTK("BreakingPendulum", "./Models/VSS/BreakingPendulum.mo"; timeSpan=(0.0, 7.0))
       true
-    end    
+    end
     #=
       Runs some advanced models and checks the result.
       We check the result by inspecting the values of some variable in the system.
@@ -220,6 +259,18 @@ end
     @test true == begin
       runModelMTK("ArrayGrow", "./Models/VSS/ArrayGrow.mo")
       true
+    end
+
+    @testset "Simulating models using MSL components" begin
+      @test true == begin
+        flattenAndPrintModelMSL("ElectricalTest.SimpleCircuit", "../OMFrontend.jl/test/MSL_Use/SimpleCircuitMSL.mo")
+#        runModelMTK("ElectricalTest.SimpleCircuit", "../OMFrontend.jl/test/MSL_Use/SimpleCircuitMSL.mo"; timeSpan=(0.0, 1.0), MSL = true)
+        true
+      end
+      @test true == begin
+        flattenAndPrintModelMSL("TransmissionLine", "../OMFrontend.jl/test/MSL_Use/TransmissionLine.mo")
+        true
+      end
     end
   end
 end

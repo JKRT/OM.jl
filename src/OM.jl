@@ -9,6 +9,25 @@ import OMBackend
 import Plots
 #= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
 using DifferentialEquations
+using DiffEqBase
+
+
+function printWelcomeMessage()
+  printstyled(" \n\nWelcome to ", color=:white)
+  printstyled("Open", bold=true, color=:light_blue)
+  printstyled("Modelica", bold=true, color=:white)
+  printstyled(".jl", bold=false, color=:pink)
+  println()
+  println("For help run OM.help()")
+end
+
+printWelcomeMessage()
+
+function help()
+  println("Some useful information for users...")
+end
+
+
 """
  Given the name of a model and a specified file.
  Flattens the model and return a Tuple of the DAE and the function cache.
@@ -73,12 +92,9 @@ end
  Runs a model given a model name and a model file. Using Flat Modelica
 """
 function runModelFM(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE)
-  println("Generating FlatModelica")
-  @time (dae, cache) = flattenFM(modelName, modelFile)
-  println("Generating backend code")
-  @time OMBackend.translate(dae; BackendMode = mode)
-  println("Compiling to LLVM + Simulating the model")
-  @time OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
+  (fm, cache) = flattenFM(modelName, modelFile)
+  OMBackend.translate(fm; BackendMode = mode)
+  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
 end
 
 
@@ -90,13 +106,66 @@ function runModel(dae::DAE_T; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_
   OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
 end
 
+"""
+  Simulates a model.
+"""
+function simulate(modelName::String,
+                  modelFile::String;
+                  startTime=0.0,
+                  stopTime=1.0,
+                  MSL = false,
+                  solver = Rodas5(),
+                  mode = OMBackend.MTK_MODE)
+  translate(modelName, modelFile; MSL = MSL, mode = mode)
+  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime), solver = solver)
+end
+
+"""
+  Simulates a model that has been translated.
+  This function assumes that translate has been called sometime prior s.t the model is compiled.
+"""
+function simulate(modelName::String;
+                  startTime=0.0,
+                  stopTime=1.0,
+                  solver = Rodas5(),
+                  mode = OMBackend.MTK_MODE)
+  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime), solver = solver)
+end
+
+"""
+  Translates a model and load it in memory.
+  The model can be simulated at a later stage by calling simulate with the name of the model.
+"""
+function translate(modelName::String,
+                   modelFile::String;
+                   MSL = false,
+                   mode = OMBackend.MTK_MODE)
+  (dae, cache) = if mode == OMBackend.MTK_MODE
+    if MSL
+      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String)
+    else
+      flattenFM(modelName, modelFile)
+    end    
+  else
+    if MSL
+      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String)
+    else
+      flattenDAE(modelName, modelFile)
+    end
+  end
+  OMBackend.translate(dae; BackendMode = mode)
+end
 
 """
   Resimulates an already compiled model.
   If no compiled model with the specific name it throws an error.
 """
-function resimulateModel(modelName; startTime = 0.0,  stopTime = 1.0, mode = OMBackend.MTK_MODE)
-  OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
+function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(), mode = OMBackend.MTK_MODE)
+  try
+    OMBackend.resimulateModel(modelName, tspan = (startTime, stopTime), solver = solver)
+  catch
+    println("Failed to resimulate: {" * modelName * "} make sure that the model is compiled by calling 'translate'")
+  end
 end
 
 """
