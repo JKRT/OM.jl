@@ -9,6 +9,8 @@ DAE = "0174eeea-c361-11e9-3d0d-a9ca8048aff6"
 OMFrontend = "b10394b5-f439-4073-a0c5-e09cb00cf46c"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 SCode = "350d45b0-c210-11e9-3b9e-fdad65bb3d46"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 
 [compat]
 julia = "1.7"
