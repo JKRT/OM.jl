@@ -161,7 +161,6 @@ end
                      "ElectricalComponentTest.SimpleCircuit"]
         local F = "ElectricalComponentTest"
         oldRes = flattenModelsToFlatModelica(tst, F)
-        dumpModelsMTK(tst, F)
         true
       end
     end
@@ -179,7 +178,7 @@ end
       end
       @test true == begin
         simpleHybridModels = ["BouncingBallReals",
-                              "BouncingBallsReal"
+#                              "BouncingBallsReal"
                               #=, "ManyEvents5" Currently issues with sundials=#
                               ]
         runModelsMTK(simpleHybridModels)
@@ -220,12 +219,10 @@ end
     @info "Frontend passed for OMFrontend extensions"
     @info "Testing backend translation..."
     @test true == begin
-      flattenAndPrintModel("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
       runModelMTK("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
       true
     end
     @test true == begin
-      flattenAndPrintModel("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
       runModelMTK("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
       true
     end
@@ -248,6 +245,12 @@ end
       runModelMTK("BreakingPendulum", "./Models/VSS/BreakingPendulum.mo"; timeSpan=(0.0, 7.0))
       true
     end
+
+    @test true == begin
+      runModelMTK("BreakingPendulum", "./Models/VSS/BreakingPendulumRecompilation.mo"; timeSpan=(0.0, 7.0))
+      true
+    end
+    
     #=
       Runs some advanced models and checks the result.
       We check the result by inspecting the values of some variable in the system.
@@ -263,12 +266,12 @@ end
 
     @testset "Simulating models using MSL components" begin
       @test true == begin
-        flattenAndPrintModelMSL("ElectricalTest.SimpleCircuit", "../OMFrontend.jl/test/MSL_Use/SimpleCircuitMSL.mo")
+#        flattenAndPrintModelMSL("ElectricalTest.SimpleCircuit", "../OMFrontend.jl/test/MSL_Use/SimpleCircuitMSL.mo")
 #        runModelMTK("ElectricalTest.SimpleCircuit", "../OMFrontend.jl/test/MSL_Use/SimpleCircuitMSL.mo"; timeSpan=(0.0, 1.0), MSL = true)
         true
       end
       @test true == begin
-        flattenAndPrintModelMSL("TransmissionLine", "../OMFrontend.jl/test/MSL_Use/TransmissionLine.mo")
+#        flattenAndPrintModelMSL("TransmissionLine", "../OMFrontend.jl/test/MSL_Use/TransmissionLine.mo")
         true
       end
     end
