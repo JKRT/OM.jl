@@ -31,17 +31,16 @@ model Pendulum
   Real phi(start = 1., fixed = true);
   Real phid;
 equation
+  x = L * sin(phi);
+  y = -L * cos(phi);
   der(phi) = phid;
   der(x) = vx;
   der(y) = vy;
-  x = L * sin(phi);
-  y = -L * cos(phi);
   der(phid) =  -g / L * sin(phi);
 end Pendulum;
 structuralmode Pendulum pendulum;
 structuralmode BouncingBall bouncingBall;
-/* Required? */
 equation
   initialStructuralState(pendulum);
-  structuralTransistion(/* From */ pendulum, /* To */bouncingBall, time - 5.0 <= 0 /*Condition*/);
+  structuralTransition(/* From */ pendulum, /* To */bouncingBall, time - 5.0 <= 0 /*Condition*/);
 end BreakingPendulum;
