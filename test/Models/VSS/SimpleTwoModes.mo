@@ -22,5 +22,5 @@ structuralmode HybridSingle secondMode;
 equation
   /* We start in this first mode */
   initialStructuralState(firstMode);
-  structuralTransistion(firstMode, secondMode, time  >=  0.7);
+  structuralTransition(firstMode, secondMode, time  >=  0.7);
 end SimpleTwoModes;
