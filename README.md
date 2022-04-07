@@ -1,6 +1,10 @@
 # OM.jl [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
 A Modelica Compiler in Julia
 
+## How to get the backend
+The backend is not currently publically available. 
+However, it is possible to gain access. 
+If so, please email me at the email located here [LiU-page](https://liu.se/en/employee/johti17)
 
 ## Developer instructions 
 ---
