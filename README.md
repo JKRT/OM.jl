@@ -3,10 +3,7 @@ A Modelica Compiler in Julia.
 
 Please leave a star or make an issue to support the repository!
 
-## How to get the backend
-The backend is not currently publically available. 
-However, it is possible to gain access. 
-If so, please email me at the email located here [LiU-page](https://liu.se/en/employee/johti17)
+* Note that this package is still under development
 
 ## Developer instructions 
 ---
@@ -70,3 +67,5 @@ import OM
 res = OM.runModel(HelloWorld, "Models/HelloWorld.mo", mode = OMBackend.MTK_MODE)
 plot(res)
 ```
+## Collaboration & Contact
+Please email me at the email located here [LiU-page](https://liu.se/en/employee/johti17)
