@@ -19,18 +19,31 @@ model Pendulum
   parameter Real y0 = 10;
   parameter Real g = 9.81;
   parameter Real L = sqrt(x0^2 + y0^2);
+<<<<<<< HEAD
   // Common variables
+=======
+/* Common variables */
+>>>>>>> More test files
   Real x(start = x0);
   Real y(start = y0);
   Real vx;
   Real vy;
+<<<<<<< HEAD
   // Model specific variables
+=======
+/* Model specific variables */
+>>>>>>> More test files
   Real phi(start = 1., fixed = true);
   Real phid;
 equation
   der(phi) = phid;
+<<<<<<< HEAD
   der(x) = vx;
   der(y) = vy;
+=======
+  vx = der(x);
+  vy = der(y);
+>>>>>>> More test files
   x = L * sin(phi);
   y = -L * cos(phi);
   der(phid) =  -g / L * sin(phi);
