@@ -34,7 +34,7 @@ function buildDeps()
   Pkg.build("OMParser")
   Pkg.add("OMFrontend")
   Pkg.build("OMFrontend")
-  Pkg.add("git@github.com:JKRT/OMBackend.jl.git")
+  Pkg.add("OMBackend")
   Pkg.build("OMBackend")
   @info "Installed the parser"
   @info("Build all dependencies succesfull")
