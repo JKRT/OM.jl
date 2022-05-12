@@ -1,7 +1,9 @@
 #=
   This is the integration tests for the OpenModelica.jl suite of packages.
 =#
-using Revise
+
+#= TODO: Fix the structure.=#
+#using Revise uncomment this for fast reconfiguration
 import Absyn
 import DAE
 import OM
@@ -180,6 +182,7 @@ end
         simpleHybridModels = ["BouncingBallReals",
 #                              "BouncingBallsReal"
                               #=, "ManyEvents5" Currently issues with sundials=#
+                              "IfEquationDer"
                               ]
         runModelsMTK(simpleHybridModels)
         true
