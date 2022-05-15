@@ -1,9 +1,9 @@
 @info("OM: Starting build script")
 
-push!(LOAD_PATH, "@v#.#", "@stdlib")
-@info("Current loadpath: $LOAD_PATH")
+#push!(LOAD_PATH, "@v#.#", "@stdlib")
+#@info("Current loadpath: $LOAD_PATH")
 
-using Pkg
+import Pkg; Pkg.add("Pkg")
 
 function buildDeps()
   Pkg.add("ExportAll")
@@ -16,27 +16,28 @@ function buildDeps()
   Pkg.add("GraphPlot")
   Pkg.add("Cairo")
   Pkg.add("Compose")
-  Pkg.add("LightGraphs")
   Pkg.add("MetaGraphs")
   Pkg.add("JuliaFormatter")
-  Pkg.add("Reduce")
+  Pkg.add("Revise")
   Pkg.add("MacroTools")
-  #= This packages are available using the OpenModelica Julia registry=#
+  #= This packages are available using the OpenModelica-Julia registry =#
   Pkg.add("ImmutableList")
   @info "Installed ImmutableList"
   Pkg.add("MetaModelica")
   @info "Installed MetaModelica"
+  #= Intermediate representations =#
   Pkg.add("Absyn")
   Pkg.add("SCode")
   Pkg.add("DoubleEnded")
   Pkg.add("DAE")
+  #= Frontend =#
   Pkg.add("OMParser")
   Pkg.build("OMParser")
   Pkg.add("OMFrontend")
   Pkg.build("OMFrontend")
+  #= Backend =#
   Pkg.add("OMBackend")
   Pkg.build("OMBackend")
-  @info "Installed the parser"
   @info("Build all dependencies succesfull")
 end
 

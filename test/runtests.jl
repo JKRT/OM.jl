@@ -4,13 +4,14 @@
 
 #= TODO: Fix the structure.=#
 #using Revise uncomment this for fast reconfiguration
+using MetaModelica
 import Absyn
 import DAE
 import OM
 import OMBackend
 import OMFrontend
+import OMParser
 import SCode
-using MetaModelica
 using Test
 
 simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
@@ -182,7 +183,7 @@ end
         simpleHybridModels = ["BouncingBallReals",
 #                              "BouncingBallsReal"
                               #=, "ManyEvents5" Currently issues with sundials=#
-                              "IfEquationDer"
+#                              "IfEquationDer"
                               ]
         runModelsMTK(simpleHybridModels)
         true
