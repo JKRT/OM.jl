@@ -4,15 +4,21 @@
 
 #= TODO: Fix the structure.=#
 #using Revise uncomment this for fast reconfiguration
+
+import Pkg
+Pkg.resolve()
+
 using MetaModelica
-import Absyn
-import DAE
-import OM
-import OMBackend
-import OMFrontend
-import OMParser
-import SCode
 using Test
+
+import Absyn
+import SCode
+import DAE
+import OMParser
+import OMFrontend
+import OMBackend
+import OM
+
 
 simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
 systemsWithoutDifferentials = ["HelloWorldWithoutDer"]
