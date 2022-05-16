@@ -1,8 +1,8 @@
 @info("OM: Starting build script")
+import Pkg; Pkg.add("Pkg")
 
 #push!(LOAD_PATH, "@v#.#", "@stdlib")
 #@info("Current loadpath: $LOAD_PATH")
-import Pkg
 function buildDeps()
   Pkg.add("ExportAll")
   Pkg.add("Sundials")
