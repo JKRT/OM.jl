@@ -14,7 +14,6 @@ using DiffEqBase
 using ImmutableList
 using MetaModelica
 
-
 function printWelcomeMessage()
   printstyled(" \n\nWelcome to ", color=:white)
   printstyled("Open", bold=true, color=:light_blue)
