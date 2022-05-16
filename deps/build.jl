@@ -29,7 +29,7 @@ function buildDeps()
   Pkg.add("DoubleEnded")
   Pkg.add("DAE")
   #= Frontend =#
-  Pkg.add("OMParser")
+  Pkg.add(url="https://github.com/OpenModelica/OMParser.jl.git")
   Pkg.build("OMParser")
   Pkg.add("OMFrontend")
   Pkg.build("OMFrontend")
@@ -37,6 +37,8 @@ function buildDeps()
   Pkg.add("OMBackend")
   Pkg.build("OMBackend")
   @info("Build all dependencies succesfull")
+  @info "Resolving packages"
+  Pkg.resolve()
 end
 
 buildDeps()
