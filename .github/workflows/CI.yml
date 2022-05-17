@@ -12,12 +12,16 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - '1.7'
-        os:
-          - ubuntu-latest
-        arch:
-          - x64
+        include:
+          - os: windows-latest
+            arch: 'x64'
+            version: '1.7'
+          - os: ubuntu-latest
+            arch: 'x64's
+            version: '1.7'
+          - os: macos-latest
+            arch: 'x64'
+            version: '1.7'
     steps:
       - uses: actions/checkout@v2
 
