@@ -1,16 +1,29 @@
 name = "OM"
 uuid = "2f925a0b-2436-437b-858e-49aee461894b"
 authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
-version = "0.2.0"
+version = "0.3.0"
 
 [deps]
 Absyn = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
 DAE = "0174eeea-c361-11e9-3d0d-a9ca8048aff6"
+DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+MetaModelica = "9d7f2a79-07b5-5542-8b19-c0100dda6b06"
+OMBackend = "9400bd5f-7561-42f6-8760-03756753da50"
 OMFrontend = "b10394b5-f439-4073-a0c5-e09cb00cf46c"
+ImmutableList = "4a558cac-c1ed-11e9-20da-3584bcd8709a"
+OMParser = "11f87224-cae7-4e99-a924-e50d12f62c59"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 SCode = "350d45b0-c210-11e9-3b9e-fdad65bb3d46"
-DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
-DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
+ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
+Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+
+[extras]
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
 julia = "1.7"
+
+[targets]
+test = ["Test"]

@@ -10,14 +10,18 @@ jobs:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     runs-on: ${{ matrix.os }}
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
-        version:
-          - '1.7'
-        os:
-          - ubuntu-latest
-        arch:
-          - x64
+        include:
+          - os: windows-latest
+            arch: 'x64'
+            version: '1.7'
+          - os: ubuntu-latest
+            arch: 'x64'
+            version: '1.7'
+          - os: macos-latest
+            arch: 'x64'
+            version: '1.7'
     steps:
       - uses: actions/checkout@v2
 
@@ -39,7 +43,7 @@ jobs:
       - name: Build
         # Use bash always to avoid having to escape quotes for Windows
         shell: bash
-        run: julia --compiled-modules=no --color=yes --project -e 'import Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/JKRT/OpenModelicaRegistry.git")); Pkg.build(;verbose = true);'
+        run: julia --compiled-modules=no --color=yes --project -e 'import Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/JKRT/OpenModelicaRegistry.git")); Pkg.build(;verbose = true);Pkg.resolve()'
 
       - name: Test
         uses: julia-actions/julia-runtest@v1

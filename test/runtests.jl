@@ -4,14 +4,21 @@
 
 #= TODO: Fix the structure.=#
 #using Revise uncomment this for fast reconfiguration
-import Absyn
-import DAE
-import OM
-import OMBackend
-import OMFrontend
-import SCode
+
+import Pkg
+Pkg.resolve()
+
 using MetaModelica
 using Test
+
+import Absyn
+import SCode
+import DAE
+import OMParser
+import OMFrontend
+import OMBackend
+import OM
+
 
 simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
 systemsWithoutDifferentials = ["HelloWorldWithoutDer"]
@@ -182,7 +189,7 @@ end
         simpleHybridModels = ["BouncingBallReals",
 #                              "BouncingBallsReal"
                               #=, "ManyEvents5" Currently issues with sundials=#
-                              "IfEquationDer"
+#                              "IfEquationDer"
                               ]
         runModelsMTK(simpleHybridModels)
         true

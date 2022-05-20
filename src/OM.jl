@@ -10,7 +10,9 @@ import Plots
 #= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
 using DifferentialEquations
 using DiffEqBase
-
+#= Utility packages =#
+using ImmutableList
+using MetaModelica
 
 function printWelcomeMessage()
   printstyled(" \n\nWelcome to ", color=:white)
@@ -145,7 +147,7 @@ function translate(modelName::String,
       OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String)
     else
       flattenFM(modelName, modelFile)
-    end    
+    end
   else
     if MSL
       OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String)
