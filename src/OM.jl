@@ -113,8 +113,8 @@ end
 """
 function simulate(modelName::String,
                   modelFile::String;
-                  startTime=0.0,
-                  stopTime=1.0,
+                  startTime= 0.0,
+                  stopTime= 1.0,
                   MSL = false,
                   solver = Rodas5(),
                   mode = OMBackend.MTK_MODE)
@@ -166,7 +166,9 @@ function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5
   try
     OMBackend.resimulateModel(modelName, tspan = (startTime, stopTime), solver = solver)
   catch
-    println("Failed to resimulate: {" * modelName * "} make sure that the model is compiled by calling 'translate'")
+    @error("Failed to resimulate: {" * modelName * "} make sure that the model is compiled by calling 'translate'")
+    println("Available models are:\n")
+    println(availableModels())
   end
 end
 
@@ -226,6 +228,13 @@ end
 
 function toString(flatModel)
   return OMFrontend.toString(flatModel)
+end
+
+"""
+  Returns the flat Modelica representation as a String.
+"""
+function generateFlatModelica(modelName::String, file::String)
+  toString(first(flattenFM(modelName, file)))
 end
 
 """
