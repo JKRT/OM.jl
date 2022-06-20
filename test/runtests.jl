@@ -286,4 +286,25 @@ end
       end
     end
   end
-end
+
+  @testset "Initial example test" begin
+    @test true == begin
+      OM.translate("HelloWorld", "./Models/HelloWorld.mo");
+      sol = OM.simulate("HelloWorld");
+      retcode = :Success == sol.retcode
+      lastsol = first(sol.u[5]) ≈ 0.3678794866
+      @info lastsol
+      @info retcode
+      #= Resimulate the same model, from 0.0 to 2.0 =#
+      sol = OM.resimulate("HelloWorld"; startTime = 0.0, stopTime = 2.0)
+      retcode && lastsol
+    end
+    @test begin
+      flatModelica = OM.generateFlatModelica("Influenza", "./Models/Influenza.mo")
+      #= Should be 71 equations / assignments in the model. =#
+      count("=", flatModelica) == 71
+    end
+  end
+
+  
+end #= End OM tests =#
