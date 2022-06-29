@@ -233,8 +233,12 @@ end
 """
   Returns the flat Modelica representation as a String.
 """
-function generateFlatModelica(modelName::String, file::String)
-  toString(first(flattenFM(modelName, file)))
+function generateFlatModelica(modelName::String, file::String; MSL = true)
+  if MSL
+    toString(first(OMFrontend.flattenModelWithMSL(modelName, file)))
+  else
+    toString(first(flattenFM(modelName, file)))
+  end
 end
 
 """
