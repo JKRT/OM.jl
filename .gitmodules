@@ -1,30 +1,30 @@
 [submodule "MetaModelica.jl"]
 	path = MetaModelica.jl
-	url = git@github.com:OpenModelica/MetaModelica.jl.git
+	url = http://github.com/OpenModelica/MetaModelica.jl.git
 [submodule "Absyn.jl"]
 	path = Absyn.jl
-	url = git@github.com:OpenModelica/Absyn.jl.git
+	url = http://github.com/OpenModelica/Absyn.jl.git
 [submodule "SCode.jl"]
 	path = SCode.jl
-	url = git@github.com:OpenModelica/SCode.jl.git
+	url = http://github.com/OpenModelica/SCode.jl.git
 [submodule "DAE.jl"]
 	path = DAE.jl
-	url = git@github.com:JKRT/DAE.jl.git
+	url = http://github.com/JKRT/DAE.jl.git
 [submodule "OMBackend.jl"]
 	path = OMBackend.jl
-	url = git@github.com:JKRT/OMBackend.jl.git
+	url = http://github.com/JKRT/OMBackend.jl.git
 [submodule "ListUtil.jl"]
 	path = ListUtil.jl
-	url = git@github.com:JKRT/ListUtil.jl.git
+	url = http://github.com/JKRT/ListUtil.jl.git
 [submodule "ArrayUtil.jl"]
 	path = ArrayUtil.jl
-	url = git@github.com:JKRT/ArrayUtil.jl.git
+	url = http://github.com/JKRT/ArrayUtil.jl.git
 [submodule "ImmutableList.jl"]
 	path = ImmutableList.jl
-	url = git@github.com:OpenModelica/ImmutableList.jl.git
+	url = http://github.com/OpenModelica/ImmutableList.jl.git
 [submodule "OMFrontend.jl"]
 	path = OMFrontend.jl
-	url = git@github.com:JKRT/OMFrontend.jl.git
+	url = http://github.com/JKRT/OMFrontend.jl.git
 [submodule "OMParser.jl"]
 	path = OMParser.jl
-	url = https://github.com/OpenModelica/OMParser.jl.git
+	url = http://github.com/OpenModelica/OMParser.jl.git
