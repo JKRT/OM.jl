@@ -3,7 +3,7 @@ module OM
 import Absyn
 import SCode
 import DAE
-#= Frontend stuff =#
+#= Frontend Components =#
 import OMFrontend
 import OMBackend
 import Plots
@@ -13,6 +13,10 @@ using DiffEqBase
 #= Utility packages =#
 using ImmutableList
 using MetaModelica
+
+#= Auxilary Julia packages =#
+#import DataFrames
+#import CSV
 
 function printWelcomeMessage()
   printstyled(" \n\nWelcome to ", color=:white)
@@ -29,6 +33,47 @@ function help()
   println("Some useful information for users...")
 end
 
+"""
+  Exports the csv of the simulation s.t it can be used by OMEdit.
+  To use the exported solution in OMEdit click
+  File in the top left corner then select Open Result(s) file.
+TODO:
+Add an option to write the file to a specific file path
+"""
+# function exportCSV(modelName, sol)
+#   local df1 = DataFrames.DataFrame(sol)
+#   DataFrames.rename!(df1, Dict(:timestamp => "time"))
+#   local modelName = replace(modelName, "."=>"_")
+#   local finalFileName = string(modelName,"_res.csv")
+#   CSV.write(finalFileName, df1)
+# end
+
+"""
+  Exports the csv of the simulation s.t it can be used by OMEdit.
+To use the exported solution in OMEdit click File in the top left corner then select Open Result(s) file.
+TODO:
+  Add an option to write the file to a specific file path
+"""
+# function exportCSV(modelName, sol::Vector)
+#   @assert length(sol) == 2 "Export csv currently only works on solution vectors of size 2."
+#   df1 = DataFrames.DataFrame(sol[1])
+#   df2 = DataFrames.DataFrame(sol[2])
+#   DataFrames.rename!(df1, Dict(:timestamp=> "time"))
+#   DataFrames.rename!(df2, Dict(:timestamp => "time"))
+#   modelName = replace(modelName, "."=>"_")
+#   finalFileName = string(modelName,"_res.csv")
+#   CSV.write(finalFileName, df1)
+#   CSV.write("part2.csv", df2)
+#   open("part2.csv") do input
+#     readuntil(input, '\n')
+#     write("part2.csv", read(input))
+#   end
+#   open(finalFileName, "a") do f
+#     write(f, read("part2.csv"))
+#   end
+#   println(string("Wrote to:", modelName))
+# end
+
 
 """
  Given the name of a model and a specified file.
@@ -44,40 +89,26 @@ end
  Given the name of a model and a specified file.
  Flattens the model and return a Tuple of Flat Modelica and the function cache.
 """
-function flattenFM(modelName::String, modelFile::String)::Tuple
+function flattenFM(modelName::String, modelFile::String; scalarize = true)::Tuple
   p = OMFrontend.parseFile(modelFile)
   scodeProgram = OMFrontend.translateToSCode(p)
-  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, scodeProgram)
+  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, scodeProgram, scalarize = scalarize)
   return FM, cache
 end
 
-
 """
- Given the name of a model and a specified file and a library
+ Given the name of a model,  a specified file and a library
  Flattens the model and return a Tuple of Flat Modelica and the function cache.
 """
-function flattenFM(modelName::String, modelFile::String, library::String)::Tuple
+function flattenFM(modelName::String, modelFile::String, library::String; scalarize = true)::Tuple
   local p = OMFrontend.parseFile(modelFile)
   if !haskey(OMFrontend.LIBRARY_CACHE, library)
-    throw("Library not loaded", library)
+    throw("Library $(library) not loaded")
   end
-  local libraryAsScoded = OMFrontend.LIBRARY_CACHE[library]
-  scodeProgram = OMFrontend.translateToSCode(p)
-  listAppend(libraryAsScoded, scodeProgram)
-  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, scodeProgram)
-  return FM, cache
-end
-
-"""
-  This functions flattens a model in a library assuming the library has been loaded
-"""
-function flattenModelInLibraryFM(modelName::String, library::String)
-  if !haskey(OMFrontend.LIBRARY_CACHE, library)
-    throw("Library not loaded", library)
-  end
-  local libraryAsScoded = OMFrontend.LIBRARY_CACHE[library]
-  #= After we have loaded the library call the Frontend =#
-  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, libraryAsScoded)
+  local libAsSCode = OMFrontend.LIBRARY_CACHE[library]
+  local scodeProgram = OMFrontend.translateToSCode(p)
+  scodeProgram = listAppend(libAsSCode, scodeProgram)
+  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, scodeProgram; scalarize = scalarize)
   return FM, cache
 end
 
@@ -116,14 +147,15 @@ function simulate(modelName::String,
                   startTime= 0.0,
                   stopTime= 1.0,
                   MSL = false,
+                  MSL_VERSION = "MSL_3_2_3",
                   solver = Rodas5(),
                   mode = OMBackend.MTK_MODE)
-  translate(modelName, modelFile; MSL = MSL, mode = mode)
+  translate(modelName, modelFile; MSL = MSL, mode = mode, MSL_VERSION = MSL_VERSION,)
   OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime), solver = solver)
 end
 
 """
-  Simulates a model that has been translated.
+  Simulates a model that has already been translated.
   This function assumes that translate has been called sometime prior s.t the model is compiled.
 """
 function simulate(modelName::String;
@@ -137,10 +169,13 @@ end
 """
   Translates a model and load it in memory.
   The model can be simulated at a later stage by calling simulate with the name of the model.
+Note if MSL = true is specified the compiler will use MSL_3_2_3 by default.
+To translate a model using another version of the MSL please specify that by providing a keyword argument.
 """
 function translate(modelName::String,
                    modelFile::String;
                    MSL = false,
+                   MSL_VERSION = "MSL_3_2_3",
                    mode = OMBackend.MTK_MODE)
   (dae, cache) = if mode == OMBackend.MTK_MODE
     if MSL
@@ -148,7 +183,7 @@ function translate(modelName::String,
     else
       flattenFM(modelName, modelFile)
     end
-  else
+  else # This branch is for the old DAE mode.
     if MSL
       OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String)
     else
@@ -191,8 +226,8 @@ end
 """
   Same as flatten but also return a backend representation of the given model.
 """
-function translateModel(modelName::String, modelFile::String; mode = OMBackend.DAE_MODE)
-  (dae, cache) = flatten(modelName, modelFile)
+function translateModel(modelName::String, modelFile::String; mode = OMBackend.DAE_MODE, MSL = false)
+  (dae, cache) = translate(modelName, modelFile; mode = mode, MSL = MSL)
   OMBackend.translate(dae; BackendMode = mode)
 end
 
@@ -253,6 +288,16 @@ end
 """
 function LogFrontend()
   ENV["JULIA_DEBUG"] = "OMFrontend"
+end
+
+"""
+Loads the specified MSL version.
+Supported versions are:
+  MSL_3_2_3,
+  MSL_4_0_0
+"""
+function loadMSL(;MSL_Version)
+  OMFrontend.loadMSL(MSL_Version = MSL_Version)
 end
 
 end # module

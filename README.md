@@ -34,10 +34,10 @@ Using same procedure as above for:
 Once this is done develop SCode and last but not least the DAE.
 
 ## Core modules
-	- Develop the OpenModelicaParser.jl
-	- Develop OMFrontend.jl
-	- Develop OMBackend.jl
-	- Develop the OM package
+    - Develop the OpenModelicaParser.jl
+    - Develop OMFrontend.jl
+    - Develop OMBackend.jl
+    - Develop the OM package
 
 Since this is currently work in progress expect some warnings:)
 
@@ -179,6 +179,15 @@ To export this model to flat Modelica. Execute the following command:
 flatModelica = OM.generateFlatModelica("Influenza", "./Models/Influenza.mo")
 print(modelName)
 ```
+## Using different versions of the Modelica Standard Library
+Different versions of the MSL can be used by executing the following commands:
+
+```
+jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_VERSION = "MSL_4_0_0.mo")
+```
+
+The library is currently a part of the the frontend, and new libraries to the lib folder to include more.
+
 
 ## Collaboration & Contact
 Please email me at the email located here [LiU-page](https://liu.se/en/employee/johti17)

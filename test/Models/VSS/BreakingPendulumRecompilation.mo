@@ -3,7 +3,7 @@ model BreakingPendulum
 model FreeFall
   parameter Real e=0.7;
   parameter Real g=9.81;
-  Real x;   
+  Real x;
   Real y;
   Real vx;
   Real vy;
@@ -11,9 +11,9 @@ equation
   der(x) = vx;
   der(y) = vy;
   der(vy) = -g;
-  der(vx) = 0.0;  
+  der(vx) = 0.0;
 end FreeFall;
-	
+
 model Pendulum
   parameter Real x0 = 10;
   parameter Real y0 = 10;
