@@ -7,7 +7,7 @@ equation
   if uMax < time then
     der(y) = uMax;
   elseif uMin < time then
-    der(y) = uMin;
+    der(y) = uMin;  
   else
     der(y) = u;
   end if;

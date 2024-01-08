@@ -1,4 +1,4 @@
-model ModelA1
+model ModelA2
   parameter Real alpha = 0.5; //(start = 0.5);
   parameter Real beta = 1.0; //(start = 1.0);
   parameter Real dpdach = 0.1; //(start = 0.1);
@@ -60,5 +60,5 @@ equation
   der(w) = (-1) * muFw * l + l * lambda_1 + (-1) * l * lambda_2;
   0 = (-1) * cH * p + l * w + (-1) * (-1) * lambda_2;
   0 = cH * p + (-1) * l * w + (-1) * 2 * muHmH * (mHdach + (-1) * mH) + (-1) * lambda_1;
-  0 = (-1) * cH + (-1) * dpdach * k + beta * k ^ (1 + (-1) * alpha) * l ^ alpha + (-1) * ((1 + (-1) * alpha) * beta * muFk * k ^ ((-1) * alpha) * l ^ alpha * p + (-1) * lambda_3) + (-1) * (2 * muFs * (sdach + (-1) * s) + (-1) * lambda_3);
-end ModelA1;
+  0 = (-1) * cH + (-1) * dpdach * k + beta * k ^ (1 + (-1) * alpha) * l ^ alpha + (-1) * der(k) + (-1) * der(s);
+end ModelA2;
