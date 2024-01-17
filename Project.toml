@@ -17,6 +17,8 @@ Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 SCode = "350d45b0-c210-11e9-3b9e-fdad65bb3d46"
 ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 
 [extras]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"

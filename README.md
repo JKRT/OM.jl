@@ -1,8 +1,7 @@
-# OM.jl [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
-A Modelica Compiler in Julia.
+# OpenModelicaJL (OM.jl) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
+A Modelica Environment in Julia.
 
 Please leave a star or make an issue to support the repository!
-
 * Note that this package is still under development
 
 ## Developer instructions
@@ -39,7 +38,7 @@ Once this is done develop SCode and last but not least the DAE.
     - Develop OMBackend.jl
     - Develop the OM package
 
-Since this is currently work in progress expect some warnings:)
+(Since this is currently work in progress expect some warnings)
 
 ## Adding the OpenModelicRegistry
 To work with the package manager and manage dependencies of these packages
@@ -179,14 +178,42 @@ To export this model to flat Modelica. Execute the following command:
 flatModelica = OM.generateFlatModelica("Influenza", "./Models/Influenza.mo")
 print(modelName)
 ```
-## Using different versions of the Modelica Standard Library
-Different versions of the MSL can be used by executing the following commands:
+### Using different versions of the Modelica Standard Library
+Currently two versions of the MSL can be used by executing the following commands:
 
-```
+```julia
 jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_VERSION = "MSL_4_0_0.mo")
 ```
 
-The library is currently a part of the the frontend, and new libraries to the lib folder to include more.
+Or if you would like to use the old 3.2.3
+
+```julia
+jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_VERSION = "MSL_4_0_0.mo")
+```
+
+These libraries are currently a part of this package.
+It is possible to include more libraries by adding them to the lib folder in the frontend submodule.
+
+### Additional notes
+There are some code examples in the test folder at the root of the repository `OM/test/runtests.jl`
+To run the test and get more ideas on how to use this package you can run the test and see how the code is defined there.
+
+```julia
+include("runtests.jl")
+```
+
+## How do I export my simulation result to OpenModelica?
+To export your simulation result you can use the exportCSV function.
+For more information about the function type `julia>? OM.exportCSV` in your terminal.
+
+Example:
+```julia
+julia> OM.translate("HelloWorld", "./Models/HelloWorld.mo");
+julia> sol = OM.simulate("HelloWorld");
+julia> OM.exportCSV("HelloWorld", sol)
+"HelloWorld_res.csv"
+```
+You can then open `HelloWorld_res.csv` using OMEdit and view the simulation results.
 
 
 ## Collaboration & Contact
