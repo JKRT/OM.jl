@@ -4,8 +4,8 @@ import Absyn
 import SCode
 import DAE
 #= Frontend Components =#
-import OMFrontend
 import OMBackend
+import OMFrontend
 import Plots
 #= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
 using DifferentialEquations
@@ -15,12 +15,11 @@ using ImmutableList
 using MetaModelica
 
 #= Auxilary Julia packages =#
-
-#import DataFrames
-#import CSV
+import CSV
+import DataFrames
 
 function printWelcomeMessage()
-  printstyled(" \n\nWelcome to ", color=:white)
+  printstyled("Starting ", bold=true, color=:white)
   printstyled("Open", bold=true, color=:light_blue)
   printstyled("Modelica", bold=true, color=:white)
   printstyled(".jl", bold=false, color=:pink)
@@ -38,43 +37,82 @@ end
   Exports the csv of the simulation s.t it can be used by OMEdit.
   To use the exported solution in OMEdit click
   File in the top left corner then select Open Result(s) file.
-TODO:
-Add an option to write the file to a specific file path
 """
-# function exportCSV(modelName, sol)
-#   local df1 = DataFrames.DataFrame(sol)
-#   DataFrames.rename!(df1, Dict(:timestamp => "time"))
-#   local modelName = replace(modelName, "."=>"_")
-#   local finalFileName = string(modelName,"_res.csv")
-#   CSV.write(finalFileName, df1)
-# end
+function exportCSV(modelName, sol; filePath = nothing)
+  local df1 = DataFrames.DataFrame(sol)
+  local finalDf
+  vals = Any[]
+  #= Get algebraic variables that have been removed by optimization. =#
+  try
+    for v in sol.prob.f.observed.obs.contents
+      name = String(v.lhs)
+      valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
+      push!(vals, (name => valVec))
+    end
+    DataFrames.rename!(df1, Dict(:timestamp => "time"))
+    finalDf = hcat(df1, DataFrames.DataFrame(vals))
+  catch
+    finalDf = df1
+  end
+  modelName = replace(modelName, "."=>"_")
+  local finalFileName = if filePath === nothing
+    string(modelName,"_res.csv")
+  else
+    string(filePath,"_res.csv")
+  end
+  CSV.write(finalFileName, finalDf)
+end
 
 """
   Exports the csv of the simulation s.t it can be used by OMEdit.
-To use the exported solution in OMEdit click File in the top left corner then select Open Result(s) file.
-TODO:
-  Add an option to write the file to a specific file path
+  In some cases several solutions will be generated.
+  In this case we currently generate one csv file for each subsolution.
+  To use the exported solution in OMEdit click File in the top left corner then select Open Result(s) file(s).
 """
-# function exportCSV(modelName, sol::Vector)
-#   @assert length(sol) == 2 "Export csv currently only works on solution vectors of size 2."
-#   df1 = DataFrames.DataFrame(sol[1])
-#   df2 = DataFrames.DataFrame(sol[2])
-#   DataFrames.rename!(df1, Dict(:timestamp=> "time"))
-#   DataFrames.rename!(df2, Dict(:timestamp => "time"))
-#   modelName = replace(modelName, "."=>"_")
-#   finalFileName = string(modelName,"_res.csv")
-#   CSV.write(finalFileName, df1)
-#   CSV.write("part2.csv", df2)
-#   open("part2.csv") do input
-#     readuntil(input, '\n')
-#     write("part2.csv", read(input))
-#   end
-#   open(finalFileName, "a") do f
-#     write(f, read("part2.csv"))
-#   end
-#   println(string("Wrote to:", modelName))
-# end
-
+function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false)
+  local dfs = Any[]
+  for sol in sols
+    df = DataFrames.DataFrame(sol)
+    DataFrames.rename!(df, Dict(:timestamp=> "time"))
+    local vals = Any[]
+    #= Get algebraic variables that have been removed by optimization. =#
+    for v in sol.prob.f.observed.obs.contents
+      name = String(v.lhs)
+      valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
+      push!(vals, (name => valVec))
+    end
+    push!(dfs, hcat(df, DataFrames.DataFrame(vals)))
+  end
+  modelName = replace(modelName, "."=>"_")
+  local finalFileName = if( filePath === nothing)
+    string(modelName,"_res.csv")
+  else
+    filePath
+  end
+  CSV.write(finalFileName, first(dfs))
+  for (i, df) in enumerate(dfs)
+    CSV.write("$(modelName)_part$(i).csv", df)
+    println("Wrote $(modelName)_part$(i).csv")
+  end
+  if coalesce
+    for (i, df) in enumerate(dfs[1:end])
+      open("$(modelName)_part$(i).csv") do input
+        readuntil(input, '\n')
+        write("part$(i).csv", read(input))
+      end
+    end
+    for (i, df) in enumerate(dfs[1:end])
+      open(finalFileName, "a") do f
+        write(f, read("part$(i).csv"))
+      end
+    end
+    for i in 1:length(dfs)
+      rm("part$(i).csv")
+    end
+    println(string("Wrote coalesced CSV to:", finalFileName))
+  end
+  println(string("Wrote CSV to $(length(dfs)) file(s):"))
+end
 
 """
  Given the name of a model and a specified file.

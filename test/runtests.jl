@@ -134,13 +134,13 @@ function runModelMTK(model,
                      solver = Rodas5())
   @info "Running : " model
   OM.translate(model, file; MSL = MSL)
-  OM.simulate(model,
-                    file;
-                    startTime = first(timeSpan),
-                    stopTime = last(timeSpan),
-                    MSL = MSL,
-                    mode = OMBackend.MTK_MODE,
-                    solver = solver)
+  return OM.simulate(model,
+              file;
+              startTime = first(timeSpan),
+              stopTime = last(timeSpan),
+              MSL = MSL,
+              mode = OMBackend.MTK_MODE,
+              solver = solver)
 end
 
 function dumpModelsMTK(models, file)
