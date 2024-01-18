@@ -19,7 +19,6 @@ import CSV
 import DataFrames
 
 function printWelcomeMessage()
-  printstyled("Starting ", bold=true, color=:white)
   printstyled("Open", bold=true, color=:light_blue)
   printstyled("Modelica", bold=true, color=:white)
   printstyled(".jl", bold=false, color=:pink)
@@ -29,6 +28,10 @@ end
 
 printWelcomeMessage()
 
+"""
+TODO:
+Provide a helpful info message
+"""
 function help()
   println("Some useful information for users...")
 end
@@ -58,7 +61,7 @@ function exportCSV(modelName, sol; filePath = nothing)
   local finalFileName = if filePath === nothing
     string(modelName,"_res.csv")
   else
-    string(filePath,"_res.csv")
+    filePath
   end
   CSV.write(finalFileName, finalDf)
 end
@@ -179,14 +182,26 @@ function runModel(dae::DAE_T; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_
 end
 
 """
+```
+  simulate(modelName::String,
+                  modelFile::String;
+                  startTime= 0.0,
+                  stopTime= 1.0,
+                  MSL = false,
+                  MSL_VERSION = "MSL:3.2.3",
+                  solver = Rodas5(),
+                  mode = OMBackend.MTK_MODE)
+```
   Simulates a model.
+Calls `translate` internally.
+By Default no library is used.
 """
 function simulate(modelName::String,
                   modelFile::String;
                   startTime= 0.0,
                   stopTime= 1.0,
                   MSL = false,
-                  MSL_VERSION = "MSL_3_2_3",
+                  MSL_VERSION = "MSL:3.2.3",
                   solver = Rodas5(),
                   mode = OMBackend.MTK_MODE)
   translate(modelName, modelFile; MSL = MSL, mode = mode, MSL_VERSION = MSL_VERSION,)
@@ -214,7 +229,7 @@ To translate a model using another version of the MSL please specify that by pro
 function translate(modelName::String,
                    modelFile::String;
                    MSL = false,
-                   MSL_VERSION = "MSL_3_2_3",
+                   MSL_VERSION = "MSL:3.2.3",
                    mode = OMBackend.MTK_MODE)
   (dae, cache) = if mode == OMBackend.MTK_MODE
     if MSL
