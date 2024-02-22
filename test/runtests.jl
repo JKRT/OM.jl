@@ -20,23 +20,20 @@ using Test
 using DifferentialEquations
 using Logging
 
+#Comment this out to log to file --John
+
 #= Log the results of the tests =#
-struct TestLogger <: Logging.AbstractLogger
-    io::IO
-end
-
-Logging.shouldlog(::TestLogger, level, _module, group, id) = true
-Logging.min_enabled_level(::TestLogger) = Logging.Debug
-
-function Logging.handle_message(logger::TestLogger, level, message, _module, group, id, file, line; kwargs...)
-  println(logger.io, "[$level | $(_module) | $group | $id]: \n $message:")
-end
-
-Base.close(logger::TestLogger) = close(logger.io)
-
-file = open("test.log", "a")
-logger = TestLogger(file)
-#Comment this out to log to file.
+# struct TestLogger <: Logging.AbstractLogger
+#     io::IO
+# end
+# Logging.shouldlog(::TestLogger, level, _module, group, id) = true
+# Logging.min_enabled_level(::TestLogger) = Logging.Debug
+# function Logging.handle_message(logger::TestLogger, level, message, _module, group, id, file, line; kwargs...)
+#   println(logger.io, "[$level | $(_module) | $group | $id]: \n $message:")
+# end
+# Base.close(logger::TestLogger) = close(logger.io)
+# file = open("test.log", "a")
+# logger = TestLogger(file)
 #global_logger(logger)
 
 import Absyn
@@ -179,6 +176,16 @@ function testResultRetCodeSuccess(sol;
   return retcodeIsSuccess && lastSolEqualsReference
 end
 
+function testResultRetCodeSuccess(sol;
+                                  symbol::Symbol,
+                                  expectedValue,
+                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success)
+  local retcodeIsSuccess = expectedRetCode == sol.retcode
+  #= Quite high tolerance for now =#
+  local lastSolEqualsReference = isapprox(expectedValue, last(sol[symbol]); rtol = 0.001)
+  return retcodeIsSuccess && lastSolEqualsReference
+end
+
 function testResultRetCodeSuccess(sols::Vector;
                                   solutionIndex,
                                   symbol,
@@ -203,6 +210,7 @@ end
 
 try
   @testset "OM tests" begin
+    @info "Starting frontend santity tests"
     @testset "Frontend tests" begin
       @testset "Flatten simple models" begin
         @test true == begin
@@ -226,7 +234,7 @@ try
           true
         end
       end
-
+      @info "Starting Backend Sanity Tests"
       @testset "Simulate Simple Modelica models using the MTK backend" begin
         @testset "Test models that do not require tearing/sorting" begin
           @test true == begin
@@ -255,15 +263,24 @@ try
         @testset "Test models that have hybrid/discrete behavior" begin
           @test true == begin
             simpleHybridModels = ["BouncingBallReals",
-                                  #                              "BouncingBallsReal"
                                   "IfEquationDer"
                                   ]
             runModelsMTK(simpleHybridModels)
             true
           end
+          @test true == begin
+            try
+              OM.translate("BrakeSystem", "./Models/BrakeSystemOM.mo")
+              true
+            catch
+              false
+            end
+          end
         end
       end
     end
+
+    @info "Starting Library Use Sanity Test"
 
     @testset "Libraries and extensions" begin
       #= Runs some "advanced" models. Does not check the results =#
@@ -278,20 +295,18 @@ try
 
       @testset "Simulating a model using MSL components" begin
         @test true == begin
+          #= Check if it passes through the frontend =#
           flattenAndPrintModelMSL("ElectricalComponentTestMSL.SimpleCircuit",
-                                  "./MSL_Use/ElectricalComponentsMSL.mo")
-          runModelMTK("ElectricalComponentTestMSL.SimpleCircuit",
-                      "./MSL_Use/ElectricalComponentsMSL.mo"
-                      ; MSL = true,
+                                  "./Models/MSL/ElectricalComponentTest.mo")
+          runModelMTK("ElectricalComponentTestMSL.SimpleCircuit"
+                      ,"./Models/MSL/ElectricalComponentTest.mo"
+                      ;MSL = true,
                       timeSpan=(0.0, 1.0))
-          true
-        end
-        @test true == begin
-          flattenAndPrintModelMSL("TransmissionLine", "../OMFrontend.jl/test/MSL_Use/TransmissionLine.mo")
           true
         end
       end #= MSL Components=#
 
+      @info "Starting Extension Sanity Tests"
       @testset "Test extension in the frontend" begin
         @test true == try
           flatten("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
@@ -363,14 +378,14 @@ try
         @test true == begin
           OM.translate("HelloWorld", "./Models/HelloWorld.mo");
           sol = OM.simulate("HelloWorld");
-          testResultRetCodeSuccess(sol, variableIndex = 1, expectedValue = 0.006738051637)
+          testResultRetCodeSuccess(sol, symbol = :x, expectedValue = 0.006738051637)
         end
 
       end
       @test true == begin
         OM.translate("IfEquationDer", "./Models/IfEquationDer.mo");
         sol = OM.simulate("IfEquationDer", startTime = 0.0, stopTime = 20.0);
-        testResultRetCodeSuccess(sol, variableIndex = 3, expectedValue = 124)
+        testResultRetCodeSuccess(sol, symbol = :y, expectedValue = 124)
       end
       @test true == begin
         flatModelica = OM.generateFlatModelica("InfluenzaTest.Influenza", "./Models/Influenza.mo")
@@ -379,72 +394,15 @@ try
       end
     end
     @testset "Hybrid Systems" begin
+      @test true == begin
+        sol = OM.simulate("BrakeSystem", "./Models/BrakeSystemOM.mo"; startTime = 0.0, stopTime = 20.0)
+        testResultRetCodeSuccess(sol, symbol = :vehicleSpeed , expectedValue = 1.1977088848134451e-15)
+      end
     end
     @testset "Library use" begin
+      include("mslTests.jl")
     end
-    @testset "VSS Extensions" begin
-      @testset "Static transitions" begin
-        @test true == begin
-          OM.translate("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo");
-          sols = OM.simulate("SimpleTwoModes"; solver = FBDF());
-          testResultRetCodeSuccess(sols[2];
-                                   expectedValue = 7.19073,
-                                   variableIndex = 1,
-                                   expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Default)
-        end
-        #= Testing Pendulums both static and dynamic variants =#
-        @test true == begin
-          OM.translate("VariablePowerSourcePackage.PowerSource", "./Models/VSS/VariablePowerSource.mo");
-          sols = OM.simulate("VariablePowerSourcePackage.PowerSource"; startTime = 0.0, stopTime = 24.0, solver = FBDF());
-          x1 = testResultRetCodeSuccess(sols,
-                                        solutionIndex = 1,
-                                        symbol = :outputPower,
-                                        expectedValue = 128.0,
-                                        expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Default)
-
-          x2 = testResultRetCodeSuccess(sols,
-                                        solutionIndex = 2,
-                                        symbol = :outputPower,
-                                        expectedValue = 300,
-                                        expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Default)
-
-          x3 = testResultRetCodeSuccess(sols,
-                                        solutionIndex = 3,
-                                        symbol = :outputPower,
-                                        expectedValue = 128.0,
-                                        expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Default)
-
-          x1 && x1 && x3
-        end
-        @test true == begin
-          sols::Vector = runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumStatic", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())
-          testResultRetCodeSuccess(sols[2],
-                                   variableIndex = 2,
-                                   expectedValue = -19.62 ,
-                                   expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Default)
-        end
-
-        @test true == begin
-          sols::Vector = runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumStaticBouncingBall", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())
-          testResultRetCodeSuccess(sols,
-                                   solutionIndex = 2,
-                                   symbol = :bouncingBall_y,
-                                   expectedValue = 3.469,
-                                   expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Default)
-        end
-
-      end
-      @testset "Dynamic Transitions" begin
-        @test true == begin
-        sols::Vector = runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumDynamicBouncingBall", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())
-        testResultRetCodeSuccess(sols,
-                                 solutionIndex = 2,
-                                 symbol = :bouncingBall_y,
-                                 expectedValue = 3.3856, #Take note there is a numeric difference here
-                                 expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success)
-        end
-      end
-    end
+    include("vssTests.jl")
   end #= End OM tests =#
   #= End logging =#
   close(logger)

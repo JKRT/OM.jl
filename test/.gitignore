@@ -1,3 +1,5 @@
 scratch.jl
 test.log
 *.log
+*.csv
+alloc-profile.pb.gz

@@ -1,0 +1,3 @@
+loadModel(ScalableTestSuite);
+setCommandLineOptions("--baseModelica -d=nonfScalarize,arrayConnect,combineSubscripts,evaluateAllParameters,vectorizeBindings");
+writeFile("TransmissionLine_N_10.mo", instantiateModel(ScalableTestSuite.Electrical.TransmissionLine.ScaledExperiments.TransmissionLineModelica_N_10));

@@ -17,16 +17,27 @@ using MetaModelica
 #= Auxilary Julia packages =#
 import CSV
 import DataFrames
+import Pkg
 
 function printWelcomeMessage()
   printstyled("Open", bold=true, color=:light_blue)
   printstyled("Modelica", bold=true, color=:white)
   printstyled(".jl", bold=false, color=:pink)
   println()
+  print("Running ")
+  Pkg.status("OM")
   println("For help run OM.help()")
 end
 
 printWelcomeMessage()
+
+"""
+  List models that are currently available for direct simulation.
+"""
+function listAvailableModels()
+  println("Lists currently compiled modules...")
+  println(OMBackend.availableModels())
+end
 
 """
 TODO:
@@ -233,13 +244,13 @@ function translate(modelName::String,
                    mode = OMBackend.MTK_MODE)
   (dae, cache) = if mode == OMBackend.MTK_MODE
     if MSL
-      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String)
+      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String; MSL_Version = MSL_VERSION)
     else
       flattenFM(modelName, modelFile)
     end
   else # This branch is for the old DAE mode.
     if MSL
-      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String)
+      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String, MSL_Version = MSL_VERSION)
     else
       flattenDAE(modelName, modelFile)
     end
@@ -322,9 +333,12 @@ end
 """
   Returns the flat Modelica representation as a String.
 """
-function generateFlatModelica(modelName::String, file::String; MSL = true)
+function generateFlatModelica(modelName::String,
+                              file::String;
+                              MSL = false,
+                              MSL_Version = "MSL:4.0.0")
   if MSL
-    toString(first(OMFrontend.flattenModelWithMSL(modelName, file)))
+    toString(first(OMFrontend.flattenModelWithMSL(modelName, file; MSL_Version = MSL_Version)))
   else
     toString(first(flattenFM(modelName, file)))
   end
