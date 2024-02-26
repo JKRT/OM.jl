@@ -33,8 +33,10 @@ using Logging
 # end
 # Base.close(logger::TestLogger) = close(logger.io)
 # file = open("test.log", "a")
-# logger = TestLogger(file)
+#logger = TestLogger(file)
 #global_logger(logger)
+
+#= Check the bottom of the file to make sure the logger is closed if you use it. =#
 
 import Absyn
 import SCode
@@ -405,7 +407,7 @@ try
     include("vssTests.jl")
   end #= End OM tests =#
   #= End logging =#
-  close(logger)
+  #close(logger)
 catch
-  close(logger)
+  #close(logger)
 end

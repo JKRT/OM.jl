@@ -5,6 +5,7 @@
     flatModelica = OM.generateFlatModelica("ElectricalComponentTestMSL.SimpleCircuit",
                                            "./Models/MSL/ElectricalComponentTest.mo";
                                            MSL = true, MSL_Version = "MSL:3.2.3")
+
     flatModelica = OM.generateFlatModelica("MechanicsExamples.EngineTest",
                                            "./Models/MSL/Mechanics.mo";
                                            MSL = true, MSL_Version = "MSL:3.2.3")
