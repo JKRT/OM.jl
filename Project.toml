@@ -1,7 +1,7 @@
 name = "OM"
 uuid = "2f925a0b-2436-437b-858e-49aee461894b"
 authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
-version = "0.3.2"
+version = "0.4.3"
 
 [deps]
 Absyn = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
@@ -19,13 +19,14 @@ ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
 
 [extras]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [compat]
-julia = "1.7"
+julia = "1.10"
 
 [targets]
 test = ["Test"]
