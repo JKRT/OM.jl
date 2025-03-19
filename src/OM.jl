@@ -13,7 +13,6 @@ using DiffEqBase
 #= Utility packages =#
 using ImmutableList
 using MetaModelica
-
 #= Auxilary Julia packages =#
 import CSV
 import DataFrames
@@ -183,7 +182,6 @@ function runModelFM(modelName::String, modelFile::String; startTime=0.0, stopTim
   OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
 end
 
-
 """
  Runs a model given a DAE representation of said model.
 """
@@ -331,16 +329,47 @@ function toString(flatModel)
 end
 
 """
+```
+generateFlatModelica(modelName::String,
+                              file::String;
+                              printBindingTypes = false,
+                              MSL = false,
+                              MSL_Version = "MSL:4.0.0")
+```
   Returns the flat Modelica representation as a String.
+- The print binding types option should only be used for debugging.
+- scalarize enables or disables scalarization. Note that the omc of which this is based does not scalarize flat Modelica. Hence, running it with scalarization disabled might result in incorrect code.
 """
 function generateFlatModelica(modelName::String,
                               file::String;
+                              printBindingTypes = false,
                               MSL = false,
-                              MSL_Version = "MSL:4.0.0")
-  if MSL
-    toString(first(OMFrontend.flattenModelWithMSL(modelName, file; MSL_Version = MSL_Version)))
-  else
-    toString(first(flattenFM(modelName, file)))
+                              MSL_Version = "MSL:4.0.0",
+                              scalarize = false)
+
+  try
+    OMFrontend.Frontend.Flags.NF_SCALARIZE
+    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, scalarize)
+    fmStr = if MSL
+      local fmAndFuncs = OMFrontend.flattenModelWithMSL(modelName,
+                                                        file;
+                                                        MSL_Version = MSL_Version,
+                                                        scalarize = scalarize,
+                                                        )
+      OMFrontend.toFlatModelica(fmAndFuncs,
+                                printBindingTypes = printBindingTypes)
+    else
+      local fmAndFuncs = OMFrontend.flattenModel(modelName, file,
+                                                 scalarize = scalarize)
+      OMFrontend.toFlatModelica(fmAndFuncs,
+                                printBindingTypes = printBindingTypes)
+      return fmStr
+    end
+  catch e
+    #= Reset the scalarization flag =#
+    @info "Generating Flat Modelica Failed"
+    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
+    throw(e)
   end
 end
 
@@ -367,5 +396,49 @@ Supported versions are:
 function loadMSL(;MSL_Version)
   OMFrontend.loadMSL(MSL_Version = MSL_Version)
 end
+
+"""
+```
+removeQuotesFromFlatModelica(flatModelicaStr::String)
+```
+This function postprocesses a flat modelica model represented as a string.
+It does so by removing quoted variables and expressions where possible.
+This function should be used on models that has ascii characters only.
+This can be useful if you wish to remove redundant clutter from flat models.
+
+  NOTE: Not exhaustively tested for all models.
+"""
+function removeQuotesFromFlatModelica(fmStr::String)
+  local buffer::IOBuffer = IOBuffer()
+  if ! isascii(fmStr)
+    @info "The model contains characters not in the ascii character encoding format.\nThe string was not modified."
+    return fmStr
+  end
+  local strs = split(fmStr, "\n")
+  for str in strs
+    local matchedStr::Option{RegexMatch}
+    local replaced = false
+    local mstr = str
+    if (contains(mstr, "'"))
+      matchedStrings = eachmatch(r"'[^']*'",  mstr)
+      for matchedString in matchedStrings
+        local underscoresReplaced = replace(matchedString.match, "." => "_")
+        if ! contains(matchedString.match, "[")
+          strWithQuotesAndUnderscoresReplaced = replace(underscoresReplaced, "'" => "")
+          mstr = replace(mstr, matchedString.match => strWithQuotesAndUnderscoresReplaced)
+        else
+          mstr = replace(mstr, matchedString.match => underscoresReplaced)
+        end
+      end
+      println(buffer, mstr)
+    else
+      println(buffer, mstr)
+    end
+  end
+  return String(take!(buffer))
+end
+
+#= Precompilation script=#
+include("precompilation.jl")
 
 end # module
