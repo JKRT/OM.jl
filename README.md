@@ -231,5 +231,18 @@ plot(f.time, f.x)
 end
 ```
 
+## Other useful commands
+```julia
+#Lists compiled models
+OM.OMBackend.availableModels()
+#Prints a compiled model
+OM.OMBackend.printModel(<model name>)
+#Write a model to file with redundant begin blocks and comments removed.
+OM.OMBackend.writeModelToFile("model", "model.jl"; keepComments = true, keepBeginBlocks=false)
+# Plotting a specific variable from an obtained solution if you are using Plots.jl
+using Plots
+plot(sol[:t], sol[:x])
+```
+
 ## Collaboration & Contact
 Please email me at the email located here [LiU-page](https://liu.se/en/employee/johti17)

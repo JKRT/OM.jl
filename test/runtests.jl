@@ -131,8 +131,9 @@ function runModelMTK(model,
                      MSL = false,
                      timeSpan = (0.0, 1.0),
                      solver = Rodas5())
-  @info "Running : " model
+  @info "Translating : " model
   OM.translate(model, file; MSL = MSL)
+  @info "Simulating:"
   return OM.simulate(model,
               file;
               startTime = first(timeSpan),
@@ -162,6 +163,12 @@ function dumpModelMTK(model, filePath)
 end
 
 
+function valueErrorMsg(valueMatched::Bool, valueWas, expectedValue)
+  if !(valueMatched)
+    println("Expected value was:", string(expectedValue),  string(" but the value was:", valueWas))
+  end
+end
+
 """
 Helper function for the result tests returns true if the value at the last position of the solution vector sol.u is ≈ valueToCompare
 ```julia
@@ -171,20 +178,28 @@ Helper function for the result tests returns true if the value at the last posit
 function testResultRetCodeSuccess(sol;
                                   variableIndex,
                                   expectedValue,
-                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success)
+                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
+                                  rtol = 1.0e-6,
+                                  atol = 1.0e-6)
   local retcodeIsSuccess = expectedRetCode == sol.retcode
   #= Quite high tolerance for now =#
-  local lastSolEqualsReference = isapprox(expectedValue, last(sol.u)[variableIndex]; rtol = 0.001)
+  local valueWas = last(sol.u)[variableIndex];
+  local lastSolEqualsReference = isapprox(expectedValue,  valueWas, rtol = rtol, atol = atol)
+  valueErrorMsg(lastSolEqualsReference, valueWas, expectedValue)
   return retcodeIsSuccess && lastSolEqualsReference
 end
 
 function testResultRetCodeSuccess(sol;
                                   symbol::Symbol,
                                   expectedValue,
-                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success)
+                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
+                                  rtol = 1.0e-6,
+                                  atol = 1.0e-6)
   local retcodeIsSuccess = expectedRetCode == sol.retcode
   #= Quite high tolerance for now =#
-  local lastSolEqualsReference = isapprox(expectedValue, last(sol[symbol]); rtol = 0.001)
+  local valueWas = last(sol[symbol])
+  local lastSolEqualsReference = isapprox(expectedValue, valueWas; rtol = rtol, atol = atol)
+  valueErrorMsg(lastSolEqualsReference, valueWas, expectedValue)
   return retcodeIsSuccess && lastSolEqualsReference
 end
 
@@ -192,7 +207,9 @@ function testResultRetCodeSuccess(sols::Vector;
                                   solutionIndex,
                                   symbol,
                                   expectedValue,
-                                  expectedRetCode)
+                                  expectedRetCode,
+                                  rtol = 1.0e-6,
+                                  atol = 1.0e-6)
   local retCodeWas = sols[solutionIndex].retcode
   local retcodeIsSuccess = expectedRetCode == retCodeWas
   if !(retcodeIsSuccess)
@@ -203,211 +220,37 @@ function testResultRetCodeSuccess(sols::Vector;
   Quite high tolerance for now
   TODO, values to abstol and reltol should probably be added as return code arguments...
   =#
-  local lastSolEqualsReference = isapprox(expectedValue, valueWas; rtol = 0.001)
-  if !(lastSolEqualsReference)
-    println("Expected value was:" * string(valueWas) * " but value was:" * string(expectedValue))
-  end
+  local lastSolEqualsReference = isapprox(expectedValue, valueWas; rtol = rtol, atol = atol)
+  valueErrorMsg(lastSolEqualsReference, valueWas, expectedValue)
   return retcodeIsSuccess && lastSolEqualsReference
 end
 
-try
-  @testset "OM tests" begin
-    @info "Starting frontend santity tests"
-    @testset "Frontend tests" begin
-      @testset "Flatten simple models" begin
-        @test true == begin
-          @info "Running flatten test:"
-          OM.flattenFM("HelloWorld", "Models/HelloWorld.mo")
-          OM.flattenFM("VanDerPol", "Models/VanDerPol.mo")
-          OM.flattenFM("LotkaVolterra", "Models/LotkaVolterra.mo")
-          OM.flattenFM("BouncingBall", "Models/BouncingBall.mo");
-          OM.flattenFM("SimpleMechanicalSystem", "Models/SimpleMechanicalSystem.mo")
-          true
-        end
 
+@testset "OM Tests:" begin
+  #= These tests are the bare minimum of the tests that needs to be run.=#
+  @testset "Sanity Tests:" begin
+    include("sanityTests.jl")
+    include("backendSanityTests.jl")
+  end
+  @testset "Libraries And Language Extensions:" begin
+    #= Translate and run some "advanced" models. Does not check the results =#
+    @testset "Libraries:" begin
+      include("libraries.jl")
+    end
+    @info "Starting Extension Sanity Tests..."
+    @testset "Extensions:" begin
+      @testset "Translation Sanity Test:" begin
+        include("extensionSanityTests.jl")
       end
-      @testset "Flatten Advanced Models:" begin
-        @test true == begin
-          local tst = ["ElectricalComponentTest.ResistorCircuit0",
-                       "ElectricalComponentTest.ResistorCircuit1",
-                       "ElectricalComponentTest.SimpleCircuit"]
-          local F = "ElectricalComponentTest"
-          oldRes = flattenModelsToFlatModelica(tst, F)
-          true
-        end
-      end
-      @info "Starting Backend Sanity Tests"
-      @testset "Simulate Simple Modelica models using the MTK backend" begin
-        @testset "Test models that do not require tearing/sorting" begin
-          @test true == begin
-            simpleModelsNoSorting = ["HelloWorld", "LotkaVolterra", "VanDerPol"]
-            runModelsMTK(simpleModelsNoSorting)
-            true
-          end
-        end
-        @testset "Test models that require sorting and or tearing" begin
-          @test true == begin
-            simpleModelsSorting = ["SimpleMechanicalSystem",
-                                   "CellierCirc",
-                                   "ModelA1",
-                                   "ModelA2"]
-            runModelsMTK(simpleModelsSorting)
-            true
-          end
-        end
-        @testset "Test models that do not have any differential equations" begin
-          @test true == begin
-            systemsWithoutDifferentials = ["HelloWorldWithoutDer"]
-            runModelsMTK(systemsWithoutDifferentials)
-            true
-          end
-        end
-        @testset "Test models that have hybrid/discrete behavior" begin
-          @test true == begin
-            simpleHybridModels = ["BouncingBallReals",
-                                  "IfEquationDer"
-                                  ]
-            runModelsMTK(simpleHybridModels)
-            true
-          end
-          @test true == begin
-            try
-              OM.translate("BrakeSystem", "./Models/BrakeSystemOM.mo")
-              true
-            catch
-              false
-            end
-          end
-        end
+      @testset "Extension Simulation Sanity Test:" begin
+        @info "Testing backend translation..."
+        include("backendExtensions.jl")
       end
     end
-
-    @info "Starting Library Use Sanity Test"
-
-    @testset "Libraries and extensions" begin
-      #= Runs some "advanced" models. Does not check the results =#
-      @testset "Run Advanced Models:" begin
-        @test true == begin
-          local tst = ["ElectricalComponentTest.SimpleCircuit"]
-          local F = "ElectricalComponentTest"
-          runModelsMTK(tst, F)
-          true
-        end
-      end
-
-      @testset "Simulating a model using MSL components" begin
-        @test true == begin
-          #= Check if it passes through the frontend =#
-          flattenAndPrintModelMSL("ElectricalComponentTestMSL.SimpleCircuit",
-                                  "./Models/MSL/ElectricalComponentTest.mo")
-          runModelMTK("ElectricalComponentTestMSL.SimpleCircuit"
-                      ,"./Models/MSL/ElectricalComponentTest.mo"
-                      ;MSL = true,
-                      timeSpan=(0.0, 1.0))
-          true
-        end
-      end #= MSL Components=#
-
-      @info "Starting Extension Sanity Tests"
-      @testset "Test extension in the frontend" begin
-        @test true == try
-          flatten("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
-          flatten("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo")
-          true
-        catch e
-          @error "Failed to flatten SimpleSingleMode. We encountered the following error:" e
-          false
-        end
-        @test true == try
-          flatten("Pendulums.BreakingPendulums.BreakingPendulumStatic", "./Models/VSS/BreakingPendulums.mo")
-          true
-        catch e
-          @error "Failed to flatten BreakingPendulum. We encountered the following error:" e
-          false
-        end
-      end
-      @info "Frontend passed for OMFrontend extensions"
-      @info "Testing backend translation..."
-      @testset "Modelica extensions for VSS" begin
-        @testset "Structural transitions" begin
-          @test true == begin
-            runModelMTK("SimpleSingleMode", "./Models/VSS/SimpleSingleMode.mo")
-            true
-          end
-          @test true == begin
-            runModelMTK("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo"; solver = FBDF())
-            true
-          end
-          @test true == begin
-            runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumStatic", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())
-            true
-          end
-        end
-        @testset "Testing recompilation construct" begin
-          @testset "Conditional recompilation" begin
-            @test true == begin
-              runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumDynamic", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())
-              true
-            end
-          end
-
-          @testset "Clocked recompilation" begin
-            @test true == begin
-              runModelMTK("SimpleClock", "./Models/VSS/SimpleClock.mo"; timeSpan=(0.0, 1.0))
-              true
-            end
-            @test true == begin
-              runModelMTK("SimpleClockParameter", "./Models/VSS/SimpleClockParameter.mo"; timeSpan=(0.0, 1.0))
-              true
-            end
-            @test true == begin
-              runModelMTK("SimpleClockArrayGrow", "./Models/VSS/SimpleClockArrayGrow.mo"; timeSpan=(0.0, 1.0))
-              true
-            end
-            @test true == begin
-              runModelMTK("ArrayGrow", "./Models/VSS/ArrayGrow.mo")
-              true
-            end
-          end
-        end #= End Clock tests =#
-      end #= End recompilation=#
-    end #= Libraries and extensions=#
-
-    @info "Testing simulation results..."
-
-    @testset "Regression test for simulation results:" begin
-      @testset "Continuous Systems" begin
-        @test true == begin
-          OM.translate("HelloWorld", "./Models/HelloWorld.mo");
-          sol = OM.simulate("HelloWorld");
-          testResultRetCodeSuccess(sol, symbol = :x, expectedValue = 0.006738051637)
-        end
-
-      end
-      @test true == begin
-        OM.translate("IfEquationDer", "./Models/IfEquationDer.mo");
-        sol = OM.simulate("IfEquationDer", startTime = 0.0, stopTime = 20.0);
-        testResultRetCodeSuccess(sol, symbol = :y, expectedValue = 124)
-      end
-      @test true == begin
-        flatModelica = OM.generateFlatModelica("InfluenzaTest.Influenza", "./Models/Influenza.mo")
-        #= Should be 75 equations / assignments in the model. =#
-        count("=", flatModelica) == 75
-      end
-    end
-    @testset "Hybrid Systems" begin
-      @test true == begin
-        sol = OM.simulate("BrakeSystem", "./Models/BrakeSystemOM.mo"; startTime = 0.0, stopTime = 20.0)
-        testResultRetCodeSuccess(sol, symbol = :vehicleSpeed , expectedValue = 1.1977088848134451e-15)
-      end
-    end
-    @testset "Library use" begin
-      include("mslTests.jl")
-    end
+  end #= Libraries and extensions=#
+  @info "Testing simulation results..."
+  @testset "Simulation Results:" begin
+    include("simulationResultTests.jl")
     include("vssTests.jl")
-  end #= End OM tests =#
-  #= End logging =#
-  #close(logger)
-catch
-  #close(logger)
-end
+  end
+end #= End OM tests =#

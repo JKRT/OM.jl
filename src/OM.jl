@@ -203,7 +203,8 @@ end
 ```
   Simulates a model.
 Calls `translate` internally.
-By Default no library is used.
+
+If the numerical value `saveat` is provided, the simulation is saved at every instance of t between `startTime` and `stopTime`.
 """
 function simulate(modelName::String,
                   modelFile::String;
@@ -211,10 +212,13 @@ function simulate(modelName::String,
                   stopTime= 1.0,
                   MSL = false,
                   MSL_VERSION = "MSL:3.2.3",
-                  solver = Rodas5(),
-                  mode = OMBackend.MTK_MODE)
+                  solver = Rodas5(autodiff=false),
+                  mode = OMBackend.MTK_MODE,
+                  saveat = 0.0)
   translate(modelName, modelFile; MSL = MSL, mode = mode, MSL_VERSION = MSL_VERSION,)
-  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime), solver = solver)
+  OMBackend.simulateModel(modelName
+                          ;MODE = mode, tspan = (startTime, stopTime),
+                          solver = solver, saveat = saveat)
 end
 
 """
@@ -232,8 +236,21 @@ end
 """
   Translates a model and load it in memory.
   The model can be simulated at a later stage by calling simulate with the name of the model.
-Note if MSL = true is specified the compiler will use MSL_3_2_3 by default.
+Note if MSL = true is specified the compiler will use the Modelica Standard Library (MSL) version 3,2.3 by default.
 To translate a model using another version of the MSL please specify that by providing a keyword argument.
+
+Valid libraries are MSL:3.2.3 and MSL: 4.0.0
+
+Example:
+
+```
+OM.translate("CircuitExamples.Circuit", "circuit.mo")
+```
+
+```
+OM.translate("CircuitExamples.Circuit", "circuit.mo")
+```
+
 """
 function translate(modelName::String,
                    modelFile::String;
@@ -260,7 +277,7 @@ end
   Resimulates an already compiled model.
   If no compiled model with the specific name it throws an error.
 """
-function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(), mode = OMBackend.MTK_MODE)
+function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(autodiff=false), mode = OMBackend.MTK_MODE)
   try
     OMBackend.resimulateModel(modelName, tspan = (startTime, stopTime), solver = solver)
   catch
@@ -324,9 +341,9 @@ function translateToSCode(modelFile::String)
   scodeProgram = OMFrontend.translateToSCode(p)
 end
 
-function toString(flatModel)
-  return OMFrontend.toString(flatModel)
-end
+toString(flatModel) = OMFrontend.toString(flatModel)
+#= S.t it can be used by base =#
+#Base.string(flatModel) = toString
 
 """
 ```
@@ -361,9 +378,7 @@ function generateFlatModelica(modelName::String,
     else
       local fmAndFuncs = OMFrontend.flattenModel(modelName, file,
                                                  scalarize = scalarize)
-      OMFrontend.toFlatModelica(fmAndFuncs,
-                                printBindingTypes = printBindingTypes)
-      return fmStr
+      OMFrontend.toFlatModelica(fmAndFuncs, printBindingTypes = printBindingTypes)
     end
   catch e
     #= Reset the scalarization flag =#

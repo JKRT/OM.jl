@@ -4,7 +4,7 @@
   The model SimpleSingleMode simple wraps its inner model for the entire
   duration of the simulation.
 
-The value of the x ≈ 0.719 at time t = 1.0.
+The x should be ≈ 0.719 at time t = 1.0.
 */
 model SimpleTwoModes
   model Single

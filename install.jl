@@ -18,6 +18,7 @@ subPkgs = joinpath.(
 
 
 for pkg in subPkgs
+  @info "Developing" pkg
   Pkg.develop(path=pkg)
 end
 
