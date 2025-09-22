@@ -57,7 +57,8 @@ function exportCSV(modelName, sol; filePath = nothing)
   vals = Any[]
   #= Get algebraic variables that have been removed by optimization. =#
   try
-    for v in sol.prob.f.observed.obs.contents
+    local observed = OMBackend.MTK_getObserved(sol)
+    for v in obsreved
       name = String(v.lhs)
       valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
       push!(vals, (name => valVec))
@@ -89,7 +90,8 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
     DataFrames.rename!(df, Dict(:timestamp=> "time"))
     local vals = Any[]
     #= Get algebraic variables that have been removed by optimization. =#
-    for v in sol.prob.f.observed.obs.contents
+    local observed = OMBackend.MTK_getObserved(sol)
+    for v in observed
       name = String(v.lhs)
       valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
       push!(vals, (name => valVec))
@@ -203,8 +205,6 @@ end
 ```
   Simulates a model.
 Calls `translate` internally.
-
-If the numerical value `saveat` is provided, the simulation is saved at every instance of t between `startTime` and `stopTime`.
 """
 function simulate(modelName::String,
                   modelFile::String;
@@ -214,11 +214,11 @@ function simulate(modelName::String,
                   MSL_VERSION = "MSL:3.2.3",
                   solver = Rodas5(autodiff=false),
                   mode = OMBackend.MTK_MODE,
-                  saveat = 0.0)
+                  kwargs...)
   translate(modelName, modelFile; MSL = MSL, mode = mode, MSL_VERSION = MSL_VERSION,)
   OMBackend.simulateModel(modelName
                           ;MODE = mode, tspan = (startTime, stopTime),
-                          solver = solver, saveat = saveat)
+                          solver = solver,  kwargs...)
 end
 
 """
