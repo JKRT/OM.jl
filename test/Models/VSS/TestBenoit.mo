@@ -116,9 +116,9 @@ equation
   connect(L.p, R1.n);
 end HWRLI;
 
-model TestSeparation
+model Test
 
-end TestSeparation;
+end Test;
 
 
 end ElectricalComponents;

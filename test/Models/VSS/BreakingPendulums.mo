@@ -67,10 +67,10 @@ package BreakingPendulums
 model BouncingBall
   parameter Real e=0.7;
   parameter Real g=9.81;
-  Real x;
+  Real x(start = 0.0);
   Real y(start = 1.0);
-  Real vx;
-  Real vy;
+  Real vx(start = 0.0);
+  Real vy(start = 0.0);
   Real phi;
   Real phid;
 equation
@@ -88,10 +88,10 @@ end BouncingBall;
 model FreeFall
   parameter Real e=0.7;
   parameter Real g=9.81;
-  Real x;
-  Real y;
-  Real vx;
-  Real vy;
+  Real x (start = 0.0);
+  Real y (start = 0.0);
+  Real vx (start = 0.0);
+  Real vy (start = 0.0);
 equation
   der(x) = vx;
   der(y) = vy;
@@ -110,7 +110,7 @@ model Pendulum
   Real vx;
   Real vy;
  /* Model specific variables */
-  Real phi(start = 1., fixed = true);
+  Real phi;
   Real phid;
 equation
   x = L * sin(phi);

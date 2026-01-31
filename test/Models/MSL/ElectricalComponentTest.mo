@@ -24,4 +24,21 @@ import Modelica.Electrical.Analog.Sources.SineVoltage;
     connect(AC.n, G.p); // 7, Ground
   end SimpleCircuit;
 
+ model JustAnExample
+    structuralmode Resistor R1(R=10);
+    structuralmode Capacitor C(C=0.01);
+    structuralmode Resistor R2(R=100);
+    structuralmode Inductor L(L=0.1);
+    structuralmode SineVoltage AC(freqHz = 1., phase = 1.);
+    structuralmode Ground G;
+  equation
+    connect(AC.p, R1.p); // 1, Capacitor circuit
+    connect(R1.n, C.p); // Wire 2
+    connect(C.n, AC.n); // Wire 3
+    connect(R1.p, R2.p); // 2, Inductor circuit
+    connect(R2.n, L.p); // Wire 5
+    connect(L.n, C.n); // Wire 6
+    connect(AC.n, G.p); // 7, Ground
+ end JustAnExample;
+
 end ElectricalComponentTestMSL;

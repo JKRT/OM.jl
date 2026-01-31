@@ -78,10 +78,16 @@ function exportCSV(modelName, sol; filePath = nothing)
 end
 
 """
+```
+exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false)
+```
   Exports the csv of the simulation s.t it can be used by OMEdit.
   In some cases several solutions will be generated.
   In this case we currently generate one csv file for each subsolution.
   To use the exported solution in OMEdit click File in the top left corner then select Open Result(s) file(s).
+
+Use the coalesce keyword to specify if the solution should be coalesced or not
+
 """
 function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false)
   local dfs = Any[]
@@ -110,6 +116,7 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
     println("Wrote $(modelName)_part$(i).csv")
   end
   if coalesce
+    global DFS = dfs
     for (i, df) in enumerate(dfs[1:end])
       open("$(modelName)_part$(i).csv") do input
         readuntil(input, '\n')
@@ -199,7 +206,7 @@ end
                   startTime= 0.0,
                   stopTime= 1.0,
                   MSL = false,
-                  MSL_VERSION = "MSL:3.2.3",
+                  MSL_Version = "MSL:3.2.3",
                   solver = Rodas5(),
                   mode = OMBackend.MTK_MODE)
 ```
@@ -211,11 +218,11 @@ function simulate(modelName::String,
                   startTime= 0.0,
                   stopTime= 1.0,
                   MSL = false,
-                  MSL_VERSION = "MSL:3.2.3",
+                  MSL_Version = "MSL:3.2.3",
                   solver = Rodas5(autodiff=false),
                   mode = OMBackend.MTK_MODE,
                   kwargs...)
-  translate(modelName, modelFile; MSL = MSL, mode = mode, MSL_VERSION = MSL_VERSION,)
+  translate(modelName, modelFile; MSL = MSL, mode = mode, MSL_Version = MSL_Version)
   OMBackend.simulateModel(modelName
                           ;MODE = mode, tspan = (startTime, stopTime),
                           solver = solver,  kwargs...)
@@ -226,8 +233,8 @@ end
   This function assumes that translate has been called sometime prior s.t the model is compiled.
 """
 function simulate(modelName::String;
-                  startTime=0.0,
-                  stopTime=1.0,
+                  startTime = 0.0,
+                  stopTime = 1.0,
                   solver = Rodas5(),
                   mode = OMBackend.MTK_MODE)
   OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime), solver = solver)
@@ -255,22 +262,42 @@ OM.translate("CircuitExamples.Circuit", "circuit.mo")
 function translate(modelName::String,
                    modelFile::String;
                    MSL = false,
-                   MSL_VERSION = "MSL:3.2.3",
+                   MSL_Version = "MSL:3.2.3",
                    mode = OMBackend.MTK_MODE)
   (dae, cache) = if mode == OMBackend.MTK_MODE
     if MSL
-      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String; MSL_Version = MSL_VERSION)
+      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String; MSL_Version = MSL_Version)
     else
       flattenFM(modelName, modelFile)
     end
   else # This branch is for the old DAE mode.
     if MSL
-      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String, MSL_Version = MSL_VERSION)
+      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String, MSL_Version = MSL_Version)
     else
       flattenDAE(modelName, modelFile)
     end
   end
-  OMBackend.translate(dae; BackendMode = mode)
+  functionList = OMFrontend.cacheToFunctionList(cache)
+  OMBackend.translate(dae; functionList = functionList, BackendMode = mode)
+end
+
+"""
+  Translates a model and writes the generated code to a file for debugging.
+
+  Example:
+  ```julia
+  OM.writeModelToFile("MyModel", "MyModel.mo", "/tmp/MyModel_debug.jl")
+  ```
+"""
+function writeModelToFile(modelName::String, modelFile::String, filePath::String;
+                          MSL = false,
+                          MSL_Version = "MSL:3.2.3",
+                          mode = OMBackend.MTK_MODE,
+                          keepComments = true,
+                          keepBeginBlocks = true)
+  translate(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, mode = mode)
+  internalName = replace(modelName, "." => "__")
+  OMBackend.writeModelToFile(internalName, filePath; keepComments = keepComments, keepBeginBlocks = keepBeginBlocks)
 end
 
 """
@@ -355,7 +382,7 @@ generateFlatModelica(modelName::String,
 ```
   Returns the flat Modelica representation as a String.
 - The print binding types option should only be used for debugging.
-- scalarize enables or disables scalarization. Note that the omc of which this is based does not scalarize flat Modelica. Hence, running it with scalarization disabled might result in incorrect code.
+- scalarize enables or disables scalarization. Note that the omc of which this is based does not scalarize flat Modelica. Hence, running it with scalarization might result in incorrect code.
 """
 function generateFlatModelica(modelName::String,
                               file::String;
@@ -363,9 +390,8 @@ function generateFlatModelica(modelName::String,
                               MSL = false,
                               MSL_Version = "MSL:4.0.0",
                               scalarize = false)
-
+  local fmStr::String
   try
-    OMFrontend.Frontend.Flags.NF_SCALARIZE
     OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, scalarize)
     fmStr = if MSL
       local fmAndFuncs = OMFrontend.flattenModelWithMSL(modelName,
@@ -386,6 +412,8 @@ function generateFlatModelica(modelName::String,
     OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
     throw(e)
   end
+  OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
+  return fmStr
 end
 
 """
@@ -455,5 +483,7 @@ end
 
 #= Precompilation script=#
 include("precompilation.jl")
+include("mosfileAdapter.jl")
+
 
 end # module

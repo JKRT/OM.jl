@@ -65,4 +65,27 @@ equation
    end when;
 end Circuit;
 
+model Circuit1Test
+   Real R;
+   Real C;
+   Real i(start = -0.00067, fixed = true);
+   Real u_C(start = -9.933, fixed = true);
+   Real u_R(start = -0.06737411136251836);
+   Real u_Sw;
+
+
+   Real freq;
+equation
+
+  C = 0.01;
+  R = 100;
+  u_C + u_R + u_Sw = 0;
+  u_R = R*i;
+  i = C*der(u_C);
+
+   freq = 5;
+   u_Sw = 10*cos(x=freq*(time-5));
+end Circuit1Test;
+
+
 end CircuitExamples;

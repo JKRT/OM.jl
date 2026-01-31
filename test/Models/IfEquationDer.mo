@@ -2,12 +2,12 @@ model IfEquationDer
   parameter Real u = 4;
   parameter Real uMax = 10;
   parameter Real uMin = 2;
-  Real y;
+  Real y(start = 0.0);
 equation
   if uMax < time then
     der(y) = uMax;
   elseif uMin < time then
-    der(y) = uMin;  
+    der(y) = uMin;
   else
     der(y) = u;
   end if;

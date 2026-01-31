@@ -1,6 +1,6 @@
 /*Same as Simple clock but the paramter is a complex expression*/
 model SimpleClockParameter
-  Real x;
+  Real x (start = 0.0);
   parameter Integer N = 2;
 equation
   when sample(0.0, 0.2) then

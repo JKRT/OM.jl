@@ -39,7 +39,7 @@
                                         atol = 1.0e-2,
                                         rtol = 1.0e-2,)
 
-          x1 && x1 && x3
+          x1 && x2 && x3
         end
 
         #= Testing Pendulums both static and dynamic variants =#
@@ -59,7 +59,7 @@
           testResultRetCodeSuccess(sols,
                                    solutionIndex = 2,
                                    symbol = :bouncingBall_y,
-                                   expectedValue = 3.469,
+                                   expectedValue = 4.004,
                                    expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
                                    atol = 1.0e-2,
                                    rtol = 1.0e-2,);
@@ -67,33 +67,81 @@
 
       end
       @testset "Dynamic Transitions" begin
+
+        @test true == begin
+          sols = runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumDynamic", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())::Vector;
+          testResultRetCodeSuccess(sols,
+                                   solutionIndex = 2,
+                                   symbol = :freeFall_vy,
+                                   expectedValue = -19.62 ,
+                                   expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
+                                   atol = 1.0e-2,
+                                   rtol = 1.0e-2,);
+        end
+
         @test true == begin
         sols::Vector = runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumDynamicBouncingBall", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())
         testResultRetCodeSuccess(sols,
                                  solutionIndex = 2,
                                  symbol = :bouncingBall_y,
-                                 expectedValue = 3.466,
+                                 expectedValue = 4.004,
                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
                                  atol = 1.0e-2,
                                  rtol = 1.0e-2,)
         end
         @test true == begin
-          sols::Vector = runModelMTK("CircuitExamples.Circuit", "./Models/VSS/dynamicCircuit.mo"; timeSpan=(0.0, 20.0), solver = FBDF());
-          circuit3_iOK = testResultRetCodeSuccess(sols,
-                                                  solutionIndex = 4,
-                                                  symbol = :circuit3_i,
-                                                  expectedValue = 0.05769,
+          sols::Vector = runModelMTK("CircuitExamples.Circuit", "./Models/VSS/dynamicCircuit.mo"; timeSpan=(0.0, 20.0), solver = Rodas5())
+
+          circuit1_freqOK = testResultRetCodeSuccess(sols,
+                                                     solutionIndex = 2,
+                                                     symbol = :circuit1_freq,
+                                                     expectedValue = 5,
+                                                     expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
+                                                     atol = 1.0e-2,
+                                                     rtol = 1.0e-2,)
+
+          circuit1_u_SwOK = testResultRetCodeSuccess(sols,
+                                                     solutionIndex = 2,
+                                                     symbol = :circuit1_u_Sw,
+                                                     expectedValue = 10,
+                                                     expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
+                                                     atol = 1.0e-2,
+                                                     rtol = 1.0e-2,)
+
+
+          circuit2_iOK = testResultRetCodeSuccess(sols,
+                                                  solutionIndex = 3,
+                                                  symbol = :circuit2_i,
+                                                  expectedValue = -0.2,
                                                   expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
                                                   atol = 1.0e-2,
                                                   rtol = 1.0e-2,)
 
+          circuit2_u_C_OK = testResultRetCodeSuccess(sols,
+                                                  solutionIndex = 3,
+                                                  symbol = :circuit2_u_C,
+                                                  expectedValue = -100.191,
+                                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
+                                                  atol = 1.0e-2,
+                                                  rtol = 1.0e-2,)
+
+
           circuit3_iOK = testResultRetCodeSuccess(sols,
+                                                  solutionIndex = 4,
+                                                  symbol = :circuit3_i,
+                                                  expectedValue =  0.0578,
+                                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
+                                                  atol = 1.0e-2,
+                                                  rtol = 1.0e-2,)
+
+          circuit3_u_C_OK = testResultRetCodeSuccess(sols,
                                                   solutionIndex = 4,
                                                   symbol = :circuit3_u_C,
                                                   expectedValue =  -63.46978,
                                                   expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
                                                   atol = 1.0e-2,
-                                                  rtol = 1.0e-2,)
+                                                     rtol = 1.0e-2,)
+          circuit1_freqOK && circuit1_u_SwOK && circuit2_iOK && circuit2_u_C_OK && circuit3_iOK && circuit3_u_C_OK
         end
       end
     end
