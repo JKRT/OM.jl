@@ -483,7 +483,5 @@ end
 
 #= Precompilation script=#
 include("precompilation.jl")
-include("mosfileAdapter.jl")
-
 
 end # module
