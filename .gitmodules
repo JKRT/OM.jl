@@ -28,3 +28,6 @@
 [submodule "OMParser.jl"]
 	path = OMParser.jl
 	url = https://github.com/OpenModelica/OMParser.jl.git
+[submodule "OMRuntimeExternalC.jl"]
+	path = OMRuntimeExternalC.jl
+	url = git@github.com:JKRT/OMRuntimeExternalC.jl.git
