@@ -28,7 +28,9 @@ function printWelcomeMessage()
   println("For help run OM.help()")
 end
 
-printWelcomeMessage()
+if isinteractive()
+  printWelcomeMessage()
+end
 
 """
   List models that are currently available for direct simulation.
@@ -39,11 +41,38 @@ function listAvailableModels()
 end
 
 """
-TODO:
-Provide a helpful info message
+    help()
+
+Print a summary of the main OM.jl workflow functions.
 """
 function help()
-  println("Some useful information for users...")
+  printstyled("OM.jl Workflow\n", bold=true)
+  println()
+  printstyled("  Translate and simulate:\n", color=:cyan)
+  println("    OM.translate(modelName, file)        Compile a Modelica model")
+  println("    OM.simulate(modelName)               Simulate a compiled model")
+  println("    OM.simulate(modelName, file)         Translate + simulate in one step")
+  println("    OM.resimulate(modelName)             Re-simulate with different parameters")
+  println()
+  printstyled("  Inspect and export:\n", color=:cyan)
+  println("    OM.exportCSV(modelName, sol)         Export results to CSV (OMEdit compatible)")
+  println("    OM.writeModelToFile(name, file, out) Write generated Julia code to file")
+  println("    OM.generateFlatModelica(name, file)  Get flat Modelica as a string")
+  println("    OM.listAvailableModels()             List compiled models")
+  println()
+  printstyled("  Intermediate representations:\n", color=:cyan)
+  println("    OM.flattenFM(modelName, file)        Flatten to FlatModel representation")
+  println("    OM.flattenDAE(modelName, file)       Flatten to DAE representation")
+  println("    OM.parseFile(file)                   Parse a Modelica file to AST")
+  println("    OM.translateToSCode(file)            Parse and convert to SCode")
+  println()
+  printstyled("  Debugging:\n", color=:cyan)
+  println("    OM.LogBackend()                      Enable backend debug logging")
+  println("    OM.LogFrontend()                     Enable frontend debug logging")
+  println()
+  printstyled("  MSL support:\n", color=:cyan)
+  println("    OM.loadMSL(MSL_Version=\"MSL:3.2.3\") Load Modelica Standard Library")
+  println("    OM.translate(name, file; MSL=true)   Translate with MSL")
 end
 
 """
@@ -58,14 +87,15 @@ function exportCSV(modelName, sol; filePath = nothing)
   #= Get algebraic variables that have been removed by optimization. =#
   try
     local observed = OMBackend.MTK_getObserved(sol)
-    for v in obsreved
+    for v in observed
       name = String(v.lhs)
       valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
       push!(vals, (name => valVec))
     end
     DataFrames.rename!(df1, Dict(:timestamp => "time"))
     finalDf = hcat(df1, DataFrames.DataFrame(vals))
-  catch
+  catch e
+    @warn "Could not export observed variables, exporting state variables only" exception=(e, catch_backtrace())
     finalDf = df1
   end
   modelName = replace(modelName, "."=>"_")
@@ -116,7 +146,6 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
     println("Wrote $(modelName)_part$(i).csv")
   end
   if coalesce
-    global DFS = dfs
     for (i, df) in enumerate(dfs[1:end])
       open("$(modelName)_part$(i).csv") do input
         readuntil(input, '\n')
@@ -164,7 +193,7 @@ end
 function flattenFM(modelName::String, modelFile::String, library::String; scalarize = true)::Tuple
   local p = OMFrontend.parseFile(modelFile)
   if !haskey(OMFrontend.LIBRARY_CACHE, library)
-    throw("Library $(library) not loaded")
+    error("Library $(library) not loaded")
   end
   local libAsSCode = OMFrontend.LIBRARY_CACHE[library]
   local scodeProgram = OMFrontend.translateToSCode(p)
@@ -189,14 +218,6 @@ function runModelFM(modelName::String, modelFile::String; startTime=0.0, stopTim
   (fm, cache) = flattenFM(modelName, modelFile)
   OMBackend.translate(fm; BackendMode = mode)
   OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
-end
-
-"""
- Runs a model given a DAE representation of said model.
-"""
-function runModel(dae::DAE_T; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE) where {DAE_T}
-  OMBackend.translate(dae)
-  OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
 end
 
 """
@@ -235,7 +256,7 @@ end
 function simulate(modelName::String;
                   startTime = 0.0,
                   stopTime = 1.0,
-                  solver = Rodas5(),
+                  solver = Rodas5(autodiff=false),
                   mode = OMBackend.MTK_MODE)
   OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime), solver = solver)
 end
@@ -307,36 +328,13 @@ end
 function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(autodiff=false), mode = OMBackend.MTK_MODE)
   try
     OMBackend.resimulateModel(modelName, tspan = (startTime, stopTime), solver = solver)
-  catch
-    @error("Failed to resimulate: {" * modelName * "} make sure that the model is compiled by calling 'translate'")
+  catch e
+    @error "Failed to resimulate '$(modelName)'. Make sure the model is compiled by calling 'translate'." exception=(e, catch_backtrace())
     println("Available models are:\n")
-    println(availableModels())
+    println(OMBackend.availableModels())
   end
 end
 
-"""
-  Resimulates and plots an already compiled model.
-  If no compiled model with the specific name it throws an error.
-"""
-function resimulateModelAndPlot(modelName; startTime = 0.0, stopTime = 1.0, mode = OMBackend.MTK_MODE)
-  OMBackend.simulateModel(modelName, tspan = (startTime, stopTime))
-  Plots.plot(runModel(modelName, modelFile; tspan = (startTime = startTime, stopTime = stopTime)))
-end
-
-"""
-  Run and plots a model, otherwise similar to runModel.
-"""
-function runModelAndPlot(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0)
-  Plots.plot(runModel(modelName, modelFile; tspan = (startTime = 0.0, stopTime = 1.0)))
-end
-
-"""
-  Same as flatten but also return a backend representation of the given model.
-"""
-function translateModel(modelName::String, modelFile::String; mode = OMBackend.DAE_MODE, MSL = false)
-  (dae, cache) = translate(modelName, modelFile; mode = mode, MSL = MSL)
-  OMBackend.translate(dae; BackendMode = mode)
-end
 
 """
   Produces the DAE representation given a modelName and a scodeProgram.
@@ -397,8 +395,7 @@ function generateFlatModelica(modelName::String,
       local fmAndFuncs = OMFrontend.flattenModelWithMSL(modelName,
                                                         file;
                                                         MSL_Version = MSL_Version,
-                                                        scalarize = scalarize,
-                                                        )
+                                                        scalarize = scalarize)
       OMFrontend.toFlatModelica(fmAndFuncs,
                                 printBindingTypes = printBindingTypes)
     else
@@ -406,29 +403,47 @@ function generateFlatModelica(modelName::String,
                                                  scalarize = scalarize)
       OMFrontend.toFlatModelica(fmAndFuncs, printBindingTypes = printBindingTypes)
     end
-  catch e
-    #= Reset the scalarization flag =#
-    @info "Generating Flat Modelica Failed"
+  finally
     OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
-    throw(e)
   end
-  OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
   return fmStr
 end
 
 """
+    setDebug(; frontend=false, backend=false)
+
+Enable debug logging for the frontend, backend, or both.
+Call with no arguments to disable all debug logging.
+
+Examples:
+  OM.setDebug(backend=true)
+  OM.setDebug(frontend=true, backend=true)
+  OM.setDebug()  # disable
+"""
+function setDebug(; frontend=false, backend=false)
+  modules = String[]
+  frontend && push!(modules, "OMFrontend")
+  backend && push!(modules, "OMBackend")
+  ENV["JULIA_DEBUG"] = join(modules, ",")
+  if isempty(modules)
+    @info "Debug logging disabled"
+  else
+    @info "Debug logging enabled for: $(join(modules, ", "))"
+  end
+  nothing
+end
+
+#= Backwards-compatible convenience wrappers =#
+
+"""
   Turns on debugging for the backend.
 """
-function LogBackend()
-  ENV["JULIA_DEBUG"] = "OMBackend"
-end
+LogBackend() = setDebug(backend=true)
 
 """
   Turns on debugging for the frontend.
 """
-function LogFrontend()
-  ENV["JULIA_DEBUG"] = "OMFrontend"
-end
+LogFrontend() = setDebug(frontend=true)
 
 """
 Loads the specified MSL version.
