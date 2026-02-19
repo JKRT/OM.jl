@@ -42,10 +42,20 @@ include("testUtils.jl")
   @info "Testing simulation results..."
   @testset "Simulation Results:" begin
     include("simulationResultTests.jl")
+    include("recordTests.jl")
+    include("matrixTests.jl")
     include("vssTests.jl")
   end
   @info "Testing procedural/algorithmic Modelica..."
   @testset "Procedural Modelica:" begin
     include("proceduralTests.jl")
+  end
+  @info "Testing external builtin functions..."
+  @testset "External Builtin Functions:" begin
+    include("externalBuiltinTests.jl")
+  end
+  @info "Testing MSL models..."
+  @testset "MSL Tests:" begin
+    include("mslTests.jl")
   end
 end #= End OM tests =#

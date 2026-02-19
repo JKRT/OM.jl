@@ -73,6 +73,8 @@ function help()
   printstyled("  MSL support:\n", color=:cyan)
   println("    OM.loadMSL(MSL_Version=\"MSL:3.2.3\") Load Modelica Standard Library")
   println("    OM.translate(name, file; MSL=true)   Translate with MSL")
+  println("    OM.translate(name; MSL_Version=...)   Translate an MSL model")
+  println("    OM.simulate(name; MSL=true, ...)      Simulate an MSL model")
 end
 
 """
@@ -250,15 +252,32 @@ function simulate(modelName::String,
 end
 
 """
-  Simulates a model that has already been translated.
-  This function assumes that translate has been called sometime prior s.t the model is compiled.
+    simulate(modelName; MSL, MSL_Version, startTime, stopTime, solver, mode)
+
+Simulate a model without specifying a file.
+If `MSL=true`, the model is translated from the loaded library first.
+Otherwise, the model must have been translated previously via `translate`.
+
+Example:
+```
+sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+                  MSL=true, MSL_Version="MSL:3.2.3", stopTime=1.0)
+```
 """
 function simulate(modelName::String;
                   startTime = 0.0,
                   stopTime = 1.0,
+                  MSL = false,
+                  MSL_Version = "MSL:3.2.3",
                   solver = Rodas5(autodiff=false),
-                  mode = OMBackend.MTK_MODE)
-  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime), solver = solver)
+                  mode = OMBackend.MTK_MODE,
+                  kwargs...)
+  if MSL
+    translate(modelName; MSL_Version = MSL_Version, mode = mode)
+  end
+  OMBackend.simulateModel(modelName;
+                          MODE = mode, tspan = (startTime, stopTime),
+                          solver = solver, kwargs...)
 end
 
 """
@@ -298,6 +317,24 @@ function translate(modelName::String,
       flattenDAE(modelName, modelFile)
     end
   end
+  functionList = OMFrontend.cacheToFunctionList(cache)
+  OMBackend.translate(dae; functionList = functionList, BackendMode = mode)
+end
+
+"""
+    translate(modelName; MSL_Version, mode)
+
+Translate an MSL model by name.
+
+Example:
+```
+OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum"; MSL_Version="MSL:3.2.3")
+```
+"""
+function translate(modelName::String;
+                   MSL_Version = "MSL:3.2.3",
+                   mode = OMBackend.MTK_MODE)
+  (dae, cache) = OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version)
   functionList = OMFrontend.cacheToFunctionList(cache)
   OMBackend.translate(dae; functionList = functionList, BackendMode = mode)
 end
@@ -403,6 +440,35 @@ function generateFlatModelica(modelName::String,
                                                  scalarize = scalarize)
       OMFrontend.toFlatModelica(fmAndFuncs, printBindingTypes = printBindingTypes)
     end
+  finally
+    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
+  end
+  return fmStr
+end
+
+"""
+    generateFlatModelica(modelName; MSL_Version, printBindingTypes, scalarize)
+
+Generate flat Modelica for an MSL model by name.
+
+Example:
+```
+fm = OM.generateFlatModelica("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+                             MSL_Version="MSL:3.2.3")
+```
+"""
+function generateFlatModelica(modelName::String;
+                              printBindingTypes = false,
+                              MSL_Version = "MSL:3.2.3",
+                              scalarize = false)
+  local fmStr::String
+  try
+    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, scalarize)
+    local fmAndFuncs = OMFrontend.flattenModelWithMSL(modelName;
+                                                      MSL_Version = MSL_Version,
+                                                      scalarize = scalarize)
+    fmStr = OMFrontend.toFlatModelica(fmAndFuncs,
+                                      printBindingTypes = printBindingTypes)
   finally
     OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
   end
