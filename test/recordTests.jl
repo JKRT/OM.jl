@@ -1,13 +1,43 @@
 #=
+* This file is part of OpenModelica.
+*
+* Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
+* c/o Linköpings universitet, Department of Computer and Information Science,
+* SE-58183 Linköping, Sweden.
+*
+* All rights reserved.
+*
+* THIS PROGRAM IS PROVIDED UNDER THE TERMS OF GPL VERSION 3 LICENSE OR
+* THIS OSMC PUBLIC LICENSE (OSMC-PL) VERSION 1.2.
+* ANY USE, REPRODUCTION OR DISTRIBUTION OF THIS PROGRAM CONSTITUTES
+* RECIPIENT'S ACCEPTANCE OF THE OSMC PUBLIC LICENSE OR THE GPL VERSION 3,
+* ACCORDING TO RECIPIENTS CHOICE.
+*
+* The OpenModelica software and the Open Source Modelica
+* Consortium (OSMC) Public License (OSMC-PL) are obtained
+* from OSMC, either from the above address,
+* from the URLs: http:www.ida.liu.se/projects/OpenModelica or
+* http:www.openmodelica.org, and in the OpenModelica distribution.
+* GNU version 3 is obtained from: http:www.gnu.org/copyleft/gpl.html.
+*
+* This program is distributed WITHOUT ANY WARRANTY; without
+* even the implied warranty of  MERCHANTABILITY or FITNESS
+* FOR A PARTICULAR PURPOSE, EXCEPT AS EXPRESSLY SET FORTH
+* IN THE BY RECIPIENT SELECTED SUBSIDIARY LICENSE CONDITIONS OF OSMC-PL.
+*
+* See the full OSMC Public License conditions for more details.
+*
+=#
+
+#=
   Tests for models with complex record types.
   These test record field access, nested records, and record parameters.
 =#
 
 @testset "Complex Records" begin
-  #= ComplexRecord1: R2 contains R1[2] (array of records inside a record).
-     Frontend reconstructRecordInstances does not handle this pattern yet. =#
+  #= ComplexRecord1: R2 contains R1[2] (array of records inside a record). =#
   @testset "Basic Record Access" begin
-    @test_broken begin
+    @test begin
       OM.translate("ComplexRecords.ComplexRecord1", "./Models/ComplexRecords.mo")
       sol = OM.simulate("ComplexRecords.ComplexRecord1"; startTime = 0.0, stopTime = 10.0)
       testResultRetCodeSuccess(sol; symbol = :(var"'(myRecord_z')"), expectedValue = 100.0)
@@ -116,6 +146,35 @@
     @test true == begin
       sol = OM.simulate("RecordFunctionTest.ControlFlowFuncSymbolicArgs", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
       testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 1.0)
+    end
+  end
+
+  @testset "Record Pass-Through in Component Equations" begin
+    #= Test 1D array field pass-through: R_out.w = R_in.w inside a component.
+       R_in.w = {1,2,3}, R_out = R_in, so R_out.w[2] = 2.0.
+       der(x) = 2.0, x(1) = 2.0. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.RecordPassthrough1D", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 2.0)
+    end
+
+    #= Test 2D matrix field pass-through: R_out.T = R_in.T inside a component.
+       R_in.T = {{1,2,3},{4,5,6},{7,8,9}}, R_out = R_in, so R_out.T[2,3] = 6.0.
+       der(x) = 6.0, x(1) = 6.0.
+       This reproduces the DoublePendulum BoundsError where the backend
+       generates bare symbol indexing R_T[1,1] instead of scalarized
+       variable names var"R_T[1][1]". =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.RecordPassthroughMatrix", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 6.0)
+    end
+
+    #= Simplest case: record with only a 1D vector field.
+       R_in.w = {1,2,3}, R_out = R_in, so R_out.w[2] = 2.0.
+       der(x) = 2.0, x(1) = 2.0. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.RecordPassthroughSimple", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 2.0)
     end
   end
 end

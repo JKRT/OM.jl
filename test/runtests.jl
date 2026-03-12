@@ -16,6 +16,7 @@ if pwd() != @__DIR__
 end
 
 include("testUtils.jl")
+OMBackend.warnMissingStartValues(false)
 
 @testset "OM Tests:" begin
   #= These tests are the bare minimum of the tests that needs to be run.=#

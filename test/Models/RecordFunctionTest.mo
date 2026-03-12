@@ -1,4 +1,34 @@
 /*
+* This file is part of OpenModelica.
+*
+* Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
+* c/o Linköpings universitet, Department of Computer and Information Science,
+* SE-58183 Linköping, Sweden.
+*
+* All rights reserved.
+*
+* THIS PROGRAM IS PROVIDED UNDER THE TERMS OF GPL VERSION 3 LICENSE OR
+* THIS OSMC PUBLIC LICENSE (OSMC-PL) VERSION 1.2.
+* ANY USE, REPRODUCTION OR DISTRIBUTION OF THIS PROGRAM CONSTITUTES
+* RECIPIENT'S ACCEPTANCE OF THE OSMC PUBLIC LICENSE OR THE GPL VERSION 3,
+* ACCORDING TO RECIPIENTS CHOICE.
+*
+* The OpenModelica software and the Open Source Modelica
+* Consortium (OSMC) Public License (OSMC-PL) are obtained
+* from OSMC, either from the above address,
+* from the URLs: http:www.ida.liu.se/projects/OpenModelica or
+* http:www.openmodelica.org, and in the OpenModelica distribution.
+* GNU version 3 is obtained from: http:www.gnu.org/copyleft/gpl.html.
+*
+* This program is distributed WITHOUT ANY WARRANTY; without
+* even the implied warranty of  MERCHANTABILITY or FITNESS
+* FOR A PARTICULAR PURPOSE, EXCEPT AS EXPRESSLY SET FORTH
+* IN THE BY RECIPIENT SELECTED SUBSIDIARY LICENSE CONDITIONS OF OSMC-PL.
+*
+* See the full OSMC Public License conditions for more details.
+*/
+
+/*
   Minimal test case for record-as-function-argument pattern.
   This mimics the MSL PendulumTest pattern where:
   1. A record type has array fields
@@ -279,5 +309,73 @@ package RecordFunctionTest
     // absFirstElement({1,2,3}) = 1, so der(x) = 1, x(1) = 1.0
     der(x) = absFirstElement(v);
   end ControlFlowFuncSymbolicArgs;
+
+  // ========================================================================
+  // Tests for record-to-record pass-through equations inside components.
+  // This pattern appears in MSL FixedTranslation: frame_b.R = frame_a.R
+  // where R is a record with array fields (T[3,3], w[3]).
+  // The backend must scalarize these into individual equations referencing
+  // scalarized variable names like var"comp_R_out_T[1][1]" instead of
+  // bare symbol indexing like comp_R_out_T[1, 1].
+  // ========================================================================
+
+  // Component that passes a record through: R_out = R_in
+  // Mimics MSL FixedTranslation's frame_b.R = frame_a.R
+  model Passthrough
+    Transform R_in;
+    Transform R_out;
+  equation
+    R_out = R_in;
+  end Passthrough;
+
+  // Simplest test: 1D array field pass-through in a component equation
+  // R_in.w = {1,2,3}, R_out.w = R_in.w via the Passthrough component.
+  // der(x) = pt.R_out.w[2] = 2.0, so x(1) = 2.0.
+  model RecordPassthrough1D
+    Passthrough pt;
+    Real x(start = 0);
+  equation
+    pt.R_in.T = {{1,0,0},{0,1,0},{0,0,1}};
+    pt.R_in.w = {1, 2, 3};
+    der(x) = pt.R_out.w[2];
+  end RecordPassthrough1D;
+
+  // Full test: 2D matrix field pass-through in a component equation
+  // R_in.T = {{1,2,3},{4,5,6},{7,8,9}}, R_out.T = R_in.T via Passthrough.
+  // der(x) = pt.R_out.T[2,3] = 6.0, so x(1) = 6.0.
+  // This is the exact pattern that fails in the DoublePendulum (BoundsError
+  // on R_T[1,1] because it generates bare symbol indexing instead of
+  // scalarized variable names).
+  model RecordPassthroughMatrix
+    Passthrough pt;
+    Real x(start = 0);
+  equation
+    pt.R_in.T = {{1,2,3},{4,5,6},{7,8,9}};
+    pt.R_in.w = {0, 0, 0};
+    der(x) = pt.R_out.T[2,3];
+  end RecordPassthroughMatrix;
+
+  // ---- Even simpler: record with only a 1D vector field ----
+  record Vec3Record
+    Real[3] w;
+  end Vec3Record;
+
+  model Vec3Passthrough
+    Vec3Record R_in;
+    Vec3Record R_out;
+  equation
+    R_out = R_in;
+  end Vec3Passthrough;
+
+  // Minimal test: 1D-only record pass-through in a component equation.
+  // R_in.w = {1,2,3}, R_out = R_in, so R_out.w[2] = 2.0.
+  // der(x) = 2.0, x(1) = 2.0.
+  model RecordPassthroughSimple
+    Vec3Passthrough pt;
+    Real x(start = 0);
+  equation
+    pt.R_in.w = {1, 2, 3};
+    der(x) = pt.R_out.w[2];
+  end RecordPassthroughSimple;
 
 end RecordFunctionTest;
