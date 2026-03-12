@@ -1,3 +1,34 @@
+#=
+* This file is part of OpenModelica.
+*
+* Copyright (c) 1998-CurrentYear, Open Source Modelica Consortium (OSMC),
+* c/o Linköpings universitet, Department of Computer and Information Science,
+* SE-58183 Linköping, Sweden.
+*
+* All rights reserved.
+*
+* THIS PROGRAM IS PROVIDED UNDER THE TERMS OF GPL VERSION 3 LICENSE OR
+* THIS OSMC PUBLIC LICENSE (OSMC-PL) VERSION 1.2.
+* ANY USE, REPRODUCTION OR DISTRIBUTION OF THIS PROGRAM CONSTITUTES
+* RECIPIENT'S ACCEPTANCE OF THE OSMC PUBLIC LICENSE OR THE GPL VERSION 3,
+* ACCORDING TO RECIPIENTS CHOICE.
+*
+* The OpenModelica software and the Open Source Modelica
+* Consortium (OSMC) Public License (OSMC-PL) are obtained
+* from OSMC, either from the above address,
+* from the URLs: http:www.ida.liu.se/projects/OpenModelica or
+* http:www.openmodelica.org, and in the OpenModelica distribution.
+* GNU version 3 is obtained from: http:www.gnu.org/copyleft/gpl.html.
+*
+* This program is distributed WITHOUT ANY WARRANTY; without
+* even the implied warranty of  MERCHANTABILITY or FITNESS
+* FOR A PARTICULAR PURPOSE, EXCEPT AS EXPRESSLY SET FORTH
+* IN THE BY RECIPIENT SELECTED SUBSIDIARY LICENSE CONDITIONS OF OSMC-PL.
+*
+* See the full OSMC Public License conditions for more details.
+*
+=#
+
 module OM
 
 import Absyn
@@ -17,6 +48,9 @@ using MetaModelica
 import CSV
 import DataFrames
 import Pkg
+
+"""Re-export EliminationOptions for convenient access as OM.EliminationOptions."""
+const EliminationOptions = OMBackend.SimulationCode.EliminationOptions
 
 function printWelcomeMessage()
   printstyled("Open", bold=true, color=:light_blue)
@@ -69,12 +103,14 @@ function help()
   printstyled("  Debugging:\n", color=:cyan)
   println("    OM.LogBackend()                      Enable backend debug logging")
   println("    OM.LogFrontend()                     Enable frontend debug logging")
+  println("    ...; warnMissingStartValues=true     Show warnings for implicit 0.0 start values")
   println()
   printstyled("  MSL support:\n", color=:cyan)
   println("    OM.loadMSL(MSL_Version=\"MSL:3.2.3\") Load Modelica Standard Library")
   println("    OM.translate(name, file; MSL=true)   Translate with MSL")
-  println("    OM.translate(name; MSL_Version=...)   Translate an MSL model")
-  println("    OM.simulate(name; MSL=true, ...)      Simulate an MSL model")
+  println("    OM.translate(name; MSL_Version=...)   Translate an MSL model by name")
+  println("    OM.simulate(name; MSL_Version=...)    Simulate an MSL model by name")
+  println("    OM.writeModelToFile(name, path)       Write generated code to file")
 end
 
 """
@@ -223,18 +259,26 @@ function runModelFM(modelName::String, modelFile::String; startTime=0.0, stopTim
 end
 
 """
-```
-  simulate(modelName::String,
-                  modelFile::String;
-                  startTime= 0.0,
-                  stopTime= 1.0,
-                  MSL = false,
-                  MSL_Version = "MSL:3.2.3",
-                  solver = Rodas5(),
-                  mode = OMBackend.MTK_MODE)
-```
-  Simulates a model.
-Calls `translate` internally.
+    simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false, ...)
+
+Translate and simulate a file-based Modelica model.
+
+# Keyword arguments
+- `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0)
+- `MSL`: set `true` to also load the Modelica Standard Library
+- `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
+- `solver`: ODE solver (default `Rodas5(autodiff=false)`)
+- `mode`: backend mode (default `OMBackend.MTK_MODE`)
+- `warnMissingStartValues`: override missing-start-value warnings
+- `eliminateNonDynamic`: elimination of non-dynamic variables before
+  MTK code generation, reducing ODEProblem compilation time. Accepts:
+  - `true` (default): eliminate variables not reachable from state derivatives
+  - `nothing` or `false`: disable elimination
+  - `EliminationOptions(...)`: fine-grained control (see `EliminationOptions`)
+
+  Eliminated variables are bookkept for potential later reconstruction
+  (e.g., 3D visualization). The optimization is automatically skipped for
+  VSS models and models with structural transitions.
 """
 function simulate(modelName::String,
                   modelFile::String;
@@ -244,36 +288,79 @@ function simulate(modelName::String,
                   MSL_Version = "MSL:3.2.3",
                   solver = Rodas5(autodiff=false),
                   mode = OMBackend.MTK_MODE,
+                  warnMissingStartValues = nothing,
+                  eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
+                  observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                   kwargs...)
-  translate(modelName, modelFile; MSL = MSL, mode = mode, MSL_Version = MSL_Version)
+  translate(modelName, modelFile;
+            MSL = MSL,
+            mode = mode,
+            MSL_Version = MSL_Version,
+            warnMissingStartValues = warnMissingStartValues,
+            eliminateNonDynamic = eliminateNonDynamic,
+            observedFilter = observedFilter)
   OMBackend.simulateModel(modelName
                           ;MODE = mode, tspan = (startTime, stopTime),
                           solver = solver,  kwargs...)
 end
 
 """
-    simulate(modelName; MSL, MSL_Version, startTime, stopTime, solver, mode)
+    simulate(modelName; MSL_Version="MSL:3.2.3", startTime=0.0, stopTime=1.0, ...)
 
-Simulate a model without specifying a file.
-If `MSL=true`, the model is translated from the loaded library first.
-Otherwise, the model must have been translated previously via `translate`.
+Translate and simulate an MSL model by name. Defaults to `MSL=true`.
 
-Example:
-```
+# Keyword arguments
+- `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0)
+- `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
+- `solver`: ODE solver (default `Rodas5(autodiff=false)`)
+- `mode`: backend mode (default `OMBackend.MTK_MODE`)
+- `warnMissingStartValues`: override missing-start-value warnings
+- `eliminateNonDynamic`: elimination of non-dynamic variables before
+  MTK code generation, reducing ODEProblem compilation time. Accepts:
+  - `true` (default): eliminate variables not reachable from state derivatives
+  - `nothing` or `false`: disable elimination
+  - `EliminationOptions(...)`: fine-grained control (see `EliminationOptions`)
+
+  Eliminated variables are bookkept for potential later reconstruction
+  (e.g., 3D visualization). The optimization is automatically skipped for
+  VSS models and models with structural transitions.
+- `observedFilter`: filter which alias variables generate observed equations.
+  Reduces MTK compilation time by limiting the observed function size.
+  Accepts `nothing` (keep all, default), `Vector{String}` (regex patterns),
+  or `Vector{Regex}`. Only alias entries whose `eliminatedName` matches at
+  least one pattern are kept. Use component-level patterns like
+  `["^rev_", "^body_"]` to observe specific components.
+
+# Example
+```julia
 sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                  MSL=true, MSL_Version="MSL:3.2.3", stopTime=1.0)
+                  MSL_Version="MSL:3.2.3", stopTime=1.0)
+# With observed filter for faster compilation:
+sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+                  MSL_Version="MSL:3.2.3", stopTime=1.0,
+                  observedFilter=["^rev_", "^body_"])
 ```
 """
 function simulate(modelName::String;
                   startTime = 0.0,
                   stopTime = 1.0,
-                  MSL = false,
+                  MSL = true,
                   MSL_Version = "MSL:3.2.3",
                   solver = Rodas5(autodiff=false),
                   mode = OMBackend.MTK_MODE,
+                  warnMissingStartValues = nothing,
+                  eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
+                  observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                   kwargs...)
-  if MSL
-    translate(modelName; MSL_Version = MSL_Version, mode = mode)
+  internalName = replace(modelName, "." => "__")
+  alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
+  if !alreadyCompiled && MSL
+    translate(modelName;
+              MSL_Version = MSL_Version,
+              mode = mode,
+              warnMissingStartValues = warnMissingStartValues,
+              eliminateNonDynamic = eliminateNonDynamic,
+              observedFilter = observedFilter)
   end
   OMBackend.simulateModel(modelName;
                           MODE = mode, tspan = (startTime, stopTime),
@@ -281,29 +368,45 @@ function simulate(modelName::String;
 end
 
 """
-  Translates a model and load it in memory.
-  The model can be simulated at a later stage by calling simulate with the name of the model.
-Note if MSL = true is specified the compiler will use the Modelica Standard Library (MSL) version 3,2.3 by default.
-To translate a model using another version of the MSL please specify that by providing a keyword argument.
+    translate(modelName, modelFile; MSL=false, MSL_Version="MSL:3.2.3", mode, eliminateNonDynamic=nothing)
 
-Valid libraries are MSL:3.2.3 and MSL: 4.0.0
+Translate a Modelica model from a file and load it in memory.
+The model can be simulated at a later stage by calling `simulate` with the name of the model.
 
-Example:
+If `MSL = true` the compiler will use the Modelica Standard Library (MSL) version 3.2.3 by default.
+Valid libraries are `MSL:3.2.3` and `MSL:4.0.0`.
 
-```
+# Keyword arguments
+
+- `MSL::Bool = false`: whether to load the MSL alongside the model file.
+- `MSL_Version::String = "MSL:3.2.3"`: which MSL version to use.
+- `mode`: backend mode (default `OMBackend.MTK_MODE`).
+- `warnMissingStartValues`: control warnings for missing start values.
+- `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
+  opt-in elimination of variables that do not influence the dynamic states.
+  Accepts `nothing` (no elimination, default), `true` (eliminate using backward
+  reachability from state derivatives), or an `EliminationOptions` instance for
+  fine-grained control. Eliminated equations are bookkept in the `SIM_CODE` for
+  later reconstruction (e.g. 3D visualization). This optimization is
+  automatically skipped for models with structural transitions (VSS models).
+
+# Examples
+
+```julia
 OM.translate("CircuitExamples.Circuit", "circuit.mo")
-```
 
+# With non-dynamic variable elimination for faster ODEProblem compilation:
+OM.translate("MyModel", "model.mo"; eliminateNonDynamic=true)
 ```
-OM.translate("CircuitExamples.Circuit", "circuit.mo")
-```
-
 """
 function translate(modelName::String,
                    modelFile::String;
                    MSL = false,
                    MSL_Version = "MSL:3.2.3",
-                   mode = OMBackend.MTK_MODE)
+                   mode = OMBackend.MTK_MODE,
+                   warnMissingStartValues = nothing,
+                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
+                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing)
   (dae, cache) = if mode == OMBackend.MTK_MODE
     if MSL
       OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String; MSL_Version = MSL_Version)
@@ -318,25 +421,57 @@ function translate(modelName::String,
     end
   end
   functionList = OMFrontend.cacheToFunctionList(cache)
-  OMBackend.translate(dae; functionList = functionList, BackendMode = mode)
+  OMBackend.translate(dae;
+                      functionList = functionList,
+                      BackendMode = mode,
+                      warnMissingStartValues = warnMissingStartValues,
+                      eliminateNonDynamic = eliminateNonDynamic,
+                      observedFilter = observedFilter)
 end
 
 """
-    translate(modelName; MSL_Version, mode)
+    translate(modelName; MSL_Version="MSL:3.2.3", mode, eliminateNonDynamic=nothing)
 
-Translate an MSL model by name.
+Translate an MSL model by name and load it in memory.
 
-Example:
-```
-OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum"; MSL_Version="MSL:3.2.3")
+# Keyword arguments
+
+- `MSL_Version::String = "MSL:3.2.3"`: which MSL version to use.
+- `mode`: backend mode (default `OMBackend.MTK_MODE`).
+- `warnMissingStartValues`: control warnings for missing start values.
+- `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
+  opt-in elimination of variables that do not influence the dynamic states.
+  Accepts `nothing` (no elimination, default), `true` (eliminate using backward
+  reachability from state derivatives), or an `EliminationOptions` instance for
+  fine-grained control. Eliminated equations are bookkept in the `SIM_CODE` for
+  later reconstruction (e.g. 3D visualization). This optimization is
+  automatically skipped for models with structural transitions (VSS models).
+
+# Examples
+
+```julia
+OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+             MSL_Version="MSL:3.2.3")
+
+# With non-dynamic variable elimination for faster ODEProblem compilation:
+OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+             MSL_Version="MSL:3.2.3", eliminateNonDynamic=true)
 ```
 """
 function translate(modelName::String;
                    MSL_Version = "MSL:3.2.3",
-                   mode = OMBackend.MTK_MODE)
+                   mode = OMBackend.MTK_MODE,
+                   warnMissingStartValues = nothing,
+                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
+                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing)
   (dae, cache) = OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version)
   functionList = OMFrontend.cacheToFunctionList(cache)
-  OMBackend.translate(dae; functionList = functionList, BackendMode = mode)
+  OMBackend.translate(dae;
+                      functionList = functionList,
+                      BackendMode = mode,
+                      warnMissingStartValues = warnMissingStartValues,
+                      eliminateNonDynamic = eliminateNonDynamic,
+                      observedFilter = observedFilter)
 end
 
 """
@@ -354,6 +489,27 @@ function writeModelToFile(modelName::String, modelFile::String, filePath::String
                           keepComments = true,
                           keepBeginBlocks = true)
   translate(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, mode = mode)
+  internalName = replace(modelName, "." => "__")
+  OMBackend.writeModelToFile(internalName, filePath; keepComments = keepComments, keepBeginBlocks = keepBeginBlocks)
+end
+
+"""
+    writeModelToFile(modelName, filePath; MSL_Version, mode)
+
+Translate an MSL model and write the generated Julia code to a file.
+
+Example:
+```julia
+OM.writeModelToFile("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum",
+                    "/tmp/pendulum_debug.jl"; MSL_Version="MSL:3.2.3")
+```
+"""
+function writeModelToFile(modelName::String, filePath::String;
+                          MSL_Version = "MSL:3.2.3",
+                          mode = OMBackend.MTK_MODE,
+                          keepComments = true,
+                          keepBeginBlocks = true)
+  translate(modelName; MSL_Version = MSL_Version, mode = mode)
   internalName = replace(modelName, "." => "__")
   OMBackend.writeModelToFile(internalName, filePath; keepComments = keepComments, keepBeginBlocks = keepBeginBlocks)
 end
