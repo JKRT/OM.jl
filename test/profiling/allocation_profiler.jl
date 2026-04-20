@@ -37,7 +37,7 @@ function profile_allocations(model::String, file::String; verbose::Bool=true)
     results = Dict{String, NamedTuple{(:time, :bytes, :gctime), Tuple{Float64, Int64, Float64}}}()
 
     #= Phase 1: Flatten =#
-    stats = @timed OM.flattenFM(model, file)
+    stats = @timed OM.flatten(model, file)
     results["1_flatten"] = (time=stats.time, bytes=stats.bytes, gctime=stats.gctime)
 
     #= Phase 2: Full translate (flatten + backend + codegen) =#

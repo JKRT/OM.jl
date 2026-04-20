@@ -90,7 +90,7 @@ Benchmark the frontend flattening phase only.
 Returns (time_seconds, bytes_allocated).
 """
 function benchmark_flatten(model::String, file::String)
-    stats = @timed OM.flattenFM(model, file)
+    stats = @timed OM.flatten(model, file)
     return (stats.time, stats.bytes)
 end
 
@@ -117,7 +117,7 @@ Benchmark backend phases individually:
 Returns a NamedTuple of per-phase times and allocations.
 """
 function benchmark_backend_phases(model::String, file::String)
-    flatten_stats = @timed OM.flattenFM(model, file)
+    flatten_stats = @timed OM.flatten(model, file)
     fm = first(flatten_stats.value)
 
     lower_stats = @timed OMBackend.lower(fm)

@@ -56,7 +56,7 @@ Returns (simCode, equationExprs, stateVarSyms, parVarSyms, algebraicVarSyms).
 """
 function getEquationsFromPipeline(model::String, file::String)
     #= Frontend: flatten =#
-    flatModelica = OM.flattenFM(model, file)
+    flatModelica = OM.flatten(model, file)
     #= Backend: lower =#
     bdae = OMBackend.lower(flatModelica)
     #= Backend: generate simulation code =#

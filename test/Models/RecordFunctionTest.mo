@@ -378,4 +378,53 @@ package RecordFunctionTest
     der(x) = pt.R_out.w[2];
   end RecordPassthroughSimple;
 
+  // ========================================================================
+  // Tests for record-returning functions where the record has array fields.
+  // This mimics MSL MultiBody Frames.absoluteRotation which returns an
+  // Orientation record (T[3,3] + w[3]).
+  // DAE pattern: ASUB(ASUB(CALL, [tupleIx]), [i, j, ...])
+  // where inner ASUB extracts the field (treated as tuple element) and
+  // outer ASUB indexes into the array field.
+  // ========================================================================
+
+  record MatrixRecord
+    Real[3, 3] M;
+    Real[3] v;
+  end MatrixRecord;
+
+  function makeMatrixRecord
+    input Real a;
+    input Real b;
+    output MatrixRecord r;
+  algorithm
+    r.M := [a, 0, 0; 0, b, 0; 0, 0, 1];
+    r.v := {a, b, a + b};
+  end makeMatrixRecord;
+
+  // Test D: 2D matrix field access from record-returning function with state args.
+  // Exercises ASUB(ASUB(CALL, [1]), [1, 1]) - matrix element of first tuple element.
+  // r.M = [2, 0, 0; 0, 3, 0; 0, 0, 1], so r.M[1,1] = 2, der(x) = 2, x(1) = 2.0.
+  model MatrixRecordFuncAccess2D
+    Real state(start = 2.0);
+    MatrixRecord r;
+    Real x(start = 0);
+  equation
+    der(state) = 0;
+    r = makeMatrixRecord(state, 3.0);
+    der(x) = r.M[1, 1];
+  end MatrixRecordFuncAccess2D;
+
+  // Test E: 1D vector field access from record-returning function with state args.
+  // Exercises ASUB(ASUB(CALL, [2]), [1]) - vector element of second tuple element.
+  // r.v = {2, 3, 5}, so r.v[1] = 2, der(y) = 2, y(1) = 2.0.
+  model MatrixRecordFuncAccess1D
+    Real state(start = 2.0);
+    MatrixRecord r;
+    Real y(start = 0);
+  equation
+    der(state) = 0;
+    r = makeMatrixRecord(state, 3.0);
+    der(y) = r.v[1];
+  end MatrixRecordFuncAccess1D;
+
 end RecordFunctionTest;

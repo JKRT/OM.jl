@@ -48,25 +48,31 @@
       end
     end
 
-    #= End-to-end Modelica simulation tests using external "C" functions.
-       These are @test_broken because the full pipeline for external "C" functions
-       with String/Integer parameter types has not been validated yet. =#
+    #= End-to-end Modelica simulation tests using external "C" functions. =#
     @testset "External Function Simulation" begin
       @testset "String length in ODE coefficient" begin
         #= StringLengthModel: len = stringLength("hello") = 5, der(x) = -5*x, x(1) = exp(-5) =#
-        @test_broken begin
-          sol = OM.simulate("ExternalBuiltinTest.StringLengthModel",
-                            "./Models/ExternalBuiltinTest.mo"; stopTime = 1.0)
-          testResultRetCodeSuccess(sol; variableIndex = 1, expectedValue = exp(-5.0), atol = 1e-4)
+        @test begin
+          try
+            sol = OM.simulate("ExternalBuiltinTest.StringLengthModel",
+                              "./Models/ExternalBuiltinTest.mo"; stopTime = 1.0)
+            testResultRetCodeSuccess(sol; variableIndex = 1, expectedValue = exp(-5.0), atol = 1e-4)
+          catch
+            false
+          end
         end
       end
 
       @testset "SkipWhiteSpace in ODE coefficient" begin
         #= SkipWhiteSpaceModel: idx = skipWhiteSpace("   ab", 1) = 4, der(x) = -4*x, x(1) = exp(-4) =#
-        @test_broken begin
-          sol = OM.simulate("ExternalBuiltinTest.SkipWhiteSpaceModel",
-                            "./Models/ExternalBuiltinTest.mo"; stopTime = 1.0)
-          testResultRetCodeSuccess(sol; variableIndex = 1, expectedValue = exp(-4.0), atol = 1e-4)
+        @test begin
+          try
+            sol = OM.simulate("ExternalBuiltinTest.SkipWhiteSpaceModel",
+                              "./Models/ExternalBuiltinTest.mo"; stopTime = 1.0)
+            testResultRetCodeSuccess(sol; variableIndex = 1, expectedValue = exp(-4.0), atol = 1e-4)
+          catch
+            false
+          end
         end
       end
     end

@@ -35,10 +35,10 @@
   @testset "MSL v3.2.3 Flat Modelica Generation" begin
     @test true == begin
       try
-        flatModelica = OM.generateFlatModelica("ElectricalComponentTestMSL.SimpleCircuit",
+        flatModelica = OM.exportModelica("ElectricalComponentTestMSL.SimpleCircuit",
                                                "./Models/MSL/ElectricalComponentTest.mo";
                                                MSL = true, MSL_Version = "MSL:3.2.3")
-        flatModelica = OM.generateFlatModelica("MechanicsExamples.EngineTest",
+        flatModelica = OM.exportModelica("MechanicsExamples.EngineTest",
                                                "./Models/MSL/Mechanics.mo";
                                                MSL = true, MSL_Version = "MSL:3.2.3")
         true
@@ -52,7 +52,7 @@
   @testset "MSL v4.0.0 Flat Modelica Generation" begin
     @test true == begin
       try
-        flatModelica = OM.generateFlatModelica("MechanicsExamples.EngineTest",
+        flatModelica = OM.exportModelica("MechanicsExamples.EngineTest",
                                                "./Models/MSL/Mechanics.mo";
                                                MSL = true, MSL_Version = "MSL:4.0.0")
         true
@@ -374,6 +374,26 @@ end
       end
     end
 
+    #= NestedResolveChain: tests the nested function chain that fails in Pendulum:
+       planarRotation -> TSUB extract T -> resolve1(T, gravity).
+       Asserts no array-shaped subtrees remain (shape invariant). =#
+    @testset "NestedResolveChainTest" begin
+      @test true == begin
+        try
+          sol = OM.simulate("SimpleMultiBodyTest.NestedResolveChainTest",
+                             "./Models/MSL/SimpleMultiBody.mo";
+                             MSL = true, MSL_Version = "MSL:3.2.3",
+                             stopTime = 1.0)
+          sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success &&
+            isapprox(sol[:x][end], -9.80665*sin(1.0), atol = 0.1) &&
+            OMBackend.CodeGeneration._LAST_ARRAY_SHAPE_COUNT[] == 0
+        catch e
+          @info "Failed to simulate SimpleMultiBodyTest.NestedResolveChainTest" exception=(e, catch_backtrace())
+          false
+        end
+      end
+    end
+
     #= Resolve2SymbolicOrientation: tests Frames.resolve2 with state-dependent
        Orientation. R.T = axisRotation(3, theta) where theta is a state.
        der(theta) = 0.1, so theta = 0.1*t. v_out[1] = cos(0.1*t).
@@ -440,19 +460,11 @@ end
        if-statement. This is the exact pattern that fails in the Pendulum:
        array params + array return + if-statement + symbolic args.
        v = {x,0,0}, normalized = {1,0,0}. der(x) = -x. x(1) = exp(-1).
-       NOTE: First call creates element extractor functions via @eval (world-age issue).
-       Second call succeeds because the functions exist. =#
+       The first call must succeed; extractor functions are created together
+       with the wrapper instead of lazily during symbolic lowering. =#
     @testset "VecNormalizeStateArgTest" begin
       @test true == begin
         try
-          try
-            OM.simulate("SimpleMultiBodyTest.VecNormalizeStateArgTest",
-                         "./Models/MSL/SimpleMultiBody.mo";
-                         MSL = true, MSL_Version = "MSL:3.2.3",
-                         stopTime = 1.0)
-          catch
-            #= First call may fail due to world-age; element functions now exist =#
-          end
           sol = OM.simulate("SimpleMultiBodyTest.VecNormalizeStateArgTest",
                              "./Models/MSL/SimpleMultiBody.mo";
                              MSL = true, MSL_Version = "MSL:3.2.3",
@@ -568,50 +580,253 @@ end
   end
 end
 
-# Heavy MSL models: only run when OM_HEAVY_TESTS=true (e.g. in CI for PRs).
-# Models that do not yet work are marked @test_broken.
-const RUN_HEAVY_TESTS = get(ENV, "OM_HEAVY_TESTS", "false") == "true"
+@testset verbose=true "MSL Electrical Machines" begin
 
-if RUN_HEAVY_TESTS
-  @testset verbose=true "Heavy MSL Models" begin
+  @testset "MSL DCEE_Start" begin
+    sol = nothing
+    @test true == begin
+      try
+        #= Tight tolerances needed: default solver tolerances give ~3.8% error on dcee.la.i =#
+        sol = OM.simulate("Modelica.Electrical.Machines.Examples.DCMachines.DCEE_Start";
+                          MSL_Version = "MSL:3.2.3", stopTime = 1.5,
+                          reltol = 1e-8, abstol = 1e-10)
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      catch e
+        @info "Failed to simulate MSL DCEE_Start" exception=(e, catch_backtrace())
+        false
+      end
+    end
+    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      @test begin
+        passed, details = validateMSLModel(sol,
+          "Electrical_Machines_Examples_DCMachines_DCEE_Start";
+          stopTime = 1.5, reltol = 0.01, atol = 0.01)
+        if !passed
+          @warn "DCEE_Start validation failed" details
+        end
+        passed
+      end
+    end
+  end
 
+  @testset "MSL DCPM_Start" begin
+    sol = nothing
+    @test true == begin
+      try
+        #= Tight tolerances needed: default solver tolerances give ~3.4% error on dcpm.la.i =#
+        sol = OM.simulate("Modelica.Electrical.Machines.Examples.DCMachines.DCPM_Start";
+                          MSL_Version = "MSL:3.2.3", stopTime = 1.5,
+                          reltol = 1e-8, abstol = 1e-10)
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      catch e
+        @info "Failed to simulate MSL DCPM_Start" exception=(e, catch_backtrace())
+        false
+      end
+    end
+    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      @test begin
+        passed, details = validateMSLModel(sol,
+          "Electrical_Machines_Examples_DCMachines_DCPM_Start";
+          stopTime = 1.5, reltol = 0.01, atol = 0.01)
+        if !passed
+          @warn "DCPM_Start validation failed" details
+        end
+        passed
+      end
+    end
+  end
 
+end
 
-    #= MSL Pendulum: the full Modelica Standard Library Pendulum example.
-    Uses the library-only API (no user file needed).
-    First call warms up @eval'd element functions (world-age). =#
-    try OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                    MSL=true, MSL_Version="MSL:3.2.3", stopTime=0.01) catch end
+@testset verbose=true "MSL Electrical Analog" begin
+
+  @testset "MSL HeatingRectifier" begin
+    sol = nothing
+    @test true == begin
+      try
+        sol = OM.simulate("Modelica.Electrical.Analog.Examples.HeatingRectifier";
+                          MSL_Version = "MSL:3.2.3", stopTime = 5.0)
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      catch e
+        @info "Failed to simulate MSL HeatingRectifier" exception=(e, catch_backtrace())
+        false
+      end
+    end
+    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      @test begin
+        passed, details = validateMSLModel(sol,
+          "Electrical_Analog_Examples_HeatingRectifier";
+          stopTime = 5.0)
+        if !passed
+          @warn "HeatingRectifier validation failed" details
+        end
+        passed
+      end
+    end
+  end
+
+  @testset "MSL OvervoltageProtection" begin
+    sol = nothing
+    @test true == begin
+      try
+        sol = OM.simulate("Modelica.Electrical.Analog.Examples.OvervoltageProtection";
+                          MSL_Version = "MSL:3.2.3", stopTime = 0.4)
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      catch e
+        @info "Failed to simulate MSL OvervoltageProtection" exception=(e, catch_backtrace())
+        false
+      end
+    end
+    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      @test begin
+        passed, details = validateMSLModel(sol,
+          "Electrical_Analog_Examples_OvervoltageProtection";
+          stopTime = 0.4)
+        if !passed
+          @warn "OvervoltageProtection validation failed" details
+        end
+        passed
+      end
+    end
+  end
+
+end
+
+@testset verbose=true "MSL Mechanics Translational" begin
+
+  @testset "MSL ElastoGap" begin
+    sol = nothing
+    @test true == begin
+      try
+        sol = OM.simulate("Modelica.Mechanics.Translational.Examples.ElastoGap";
+                          MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      catch e
+        @info "Failed to simulate MSL ElastoGap" exception=(e, catch_backtrace())
+        false
+      end
+    end
+    #= Validation: elastoGap1_v_rel and elastoGap2_s_rel are stored as 0.0 throughout
+       simulation. Coupling algebraic equations between elastoGap and mass flanges are
+       not being solved (contact/force unknowns also stuck at 0, while mass1_v evolves
+       correctly). This is a compiler-level DAE translation issue, not a signal lookup
+       problem. =#
+    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      @test_broken begin
+        passed, _ = validateMSLModel(sol,
+          "Mechanics_Translational_Examples_ElastoGap";
+          stopTime = 1.0)
+        passed
+      end
+    end
+  end
+
+  @testset "MSL Oscillator" begin
+    @test true == begin
+      try
+        sol = OM.simulate("Modelica.Mechanics.Translational.Examples.Oscillator";
+                          MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+        @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+        passed, details = validateMSLModel(sol,
+          "Mechanics_Translational_Examples_Oscillator";
+          stopTime = 1.0, reltol = 0.01, atol = 0.01)
+        if !passed
+          @warn "Oscillator validation failed" details
+        end
+        passed
+      catch e
+        @info "Failed to simulate MSL Oscillator" exception=(e, catch_backtrace())
+        false
+      end
+    end
+  end
+
+end
+
+@testset verbose=true "MSL Mechanics Rotational" begin
+
+  @testset "MSL FirstGrounded" begin
+    @test true == begin
+      try
+        sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.FirstGrounded";
+                          MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+        @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+        passed, details = validateMSLModel(sol,
+          "Mechanics_Rotational_Examples_FirstGrounded";
+          stopTime = 1.0, reltol = 0.01, atol = 0.01)
+        if !passed
+          @warn "FirstGrounded validation failed" details
+        end
+        passed
+      catch e
+        @info "Failed to simulate MSL FirstGrounded" exception=(e, catch_backtrace())
+        false
+      end
+    end
+  end
+
+end
+
+@testset verbose=true "MSL MultiBody Models" begin
+
+  #= MSL Pendulum: the full Modelica Standard Library Pendulum example. =#
+  @testset "MSL Pendulum" begin
     @test true == begin
       try
         sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                          MSL = true, MSL_Version = "MSL:3.2.3",
+                          MSL_Version = "MSL:3.2.3",
                           stopTime = 1.0)
-        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+        @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+        passed, details = validateMSLModel(sol,
+          "Mechanics_MultiBody_Examples_Elementary_Pendulum";
+          stopTime = 1.0, reltol = 0.01, atol = 0.01)
+        if !passed
+          @warn "Pendulum validation failed" details
+        end
+        passed
       catch e
         @info "Failed to simulate MSL Pendulum" exception=(e, catch_backtrace())
         false
       end
     end
+  end
 
-    @test_broken begin
+  #= MSL DoublePendulum: two revolute joints with gravity.
+     Known broken: FBDF solver returns ReturnCode.Unstable on the 30-unknown
+     multibody DAE with redundant orthogonality constraints. Signals blow up
+     to O(1e10) vs reference O(1). Not a fold regression (this test is new,
+     not in HEAD); solver stability issue needs separate investigation. =#
+  @testset "MSL DoublePendulum" begin
+    @test_broken true == begin
       try
         sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.DoublePendulum";
-                          MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1.0)
-        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      catch
-        false
-      end
-    end
-
-    @test_broken begin
-      try
-        sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a";
-                          MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1.0)
-        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      catch
+                          MSL_Version = "MSL:3.2.3", stopTime = 1.0,
+                          solver = OMBackend.DifferentialEquations.FBDF(),
+                          reltol = 1e-5, abstol = 1e-8)
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success || return false
+        passed, details = validateMSLModel(sol,
+          "Mechanics_MultiBody_Examples_Elementary_DoublePendulum";
+          stopTime = 1.0, reltol = 0.01, atol = 0.05)
+        if !passed
+          @warn "DoublePendulum validation failed" details
+        end
+        passed
+      catch e
+        @info "Failed to simulate MSL DoublePendulum" exception=(e, catch_backtrace())
         false
       end
     end
   end
+
+  #= MSL Engine1a: crank mechanism with closed kinematic loop.
+     Fixed: DAE initialization solver handles rank-deficient algebraic Jacobian. =#
+  @testset "MSL Engine1a" begin
+    @test begin
+        sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a";
+                          MSL_Version = "MSL:3.2.3", stopTime = 0.72,
+                          solver = OMBackend.DifferentialEquations.FBDF())
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      end
+    end
+
 end

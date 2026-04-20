@@ -40,7 +40,7 @@
     @test begin
       OM.translate("ComplexRecords.ComplexRecord1", "./Models/ComplexRecords.mo")
       sol = OM.simulate("ComplexRecords.ComplexRecord1"; startTime = 0.0, stopTime = 10.0)
-      testResultRetCodeSuccess(sol; symbol = :(var"'(myRecord_z')"), expectedValue = 100.0)
+      testResultRetCodeSuccess(sol; symbol = :myRecord_z, expectedValue = 100.0)
     end
   end
 

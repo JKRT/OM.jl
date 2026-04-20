@@ -13,6 +13,9 @@
 [submodule "OMBackend.jl"]
 	path = OMBackend.jl
 	url = git@github.com:JKRT/OMBackend.jl.git
+[submodule "DoubleEnded.jl"]
+	path = DoubleEnded.jl
+	url = git@github.com:OpenModelica/DoubleEnded.jl.git
 [submodule "ListUtil.jl"]
 	path = ListUtil.jl
 	url = git@github.com:JKRT/ListUtil.jl.git
@@ -28,3 +31,6 @@
 [submodule "OMParser.jl"]
 	path = OMParser.jl
 	url = https://github.com/OpenModelica/OMParser.jl.git
+[submodule "OMLibraryTesting.jl"]
+	path = OMLibraryTesting.jl
+	url = git@github.com:OpenModelica/OMLibraryTesting.jl.git

@@ -65,8 +65,12 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
     end
 
     #= Rotational.Friction: friction elements with stuck/sliding modes.
-       Currently fails: STMT_WHILE code generation (String*Nothing).
-       Kept as broken to track progress. =#
+       Frontend and backend translation succeed, but MTK structural_simplify
+       leaves the reduced system structurally imbalanced: 35 full_equations
+       vs 36 unknowns. DirectRHSGeneration now rejects this with a clear error
+       message. The underlying issue is in how the friction mode/sliding
+       equations interact with structural_simplify; needs a separate fix at
+       the MTK/tearing level. Kept as broken to track progress. =#
     @testset "Rotational.Friction" begin
       @test_broken begin
         sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.Friction";
@@ -197,10 +201,91 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
      ---------------------------------------------------------------- =#
   @testset verbose=true "Blocks" begin
 
+    #= ----------------------------------------------------------------
+       PID_Controller decomposition tests.
+       Each sub-model isolates one piece of the full PID_Controller. Pass/fail
+       combinations pin the init-NaN to a specific component, so the fix path
+       (seeding algebraic guesses from params-only equations) has a verifiable
+       minimum reproducer. See Models/PIDDecomposition.mo for the wrappers.
+       ---------------------------------------------------------------- =#
+    @testset verbose=true "PID decomposition" begin
+
+      #= KinematicPTPOnly: KinematicPTP -> Integrator, no feedback plant.
+         Passes once `foldParameterClosure` promotes the purely-algebraic
+         unknowns (aux1[1], aux2[1], sd_max, sdd_max, Ta1, Ta2) to
+         PARAMETERs with bindExp, so MTK sees numeric values instead of
+         the zero guess that drove sqrt(1/0) = Inf at Newton iter 0. =#
+      @testset "KinematicPTPOnly" begin
+        @test begin
+          sol = OM.simulate("PIDDecomposition.KinematicPTPOnly",
+                            "./Models/PIDDecomposition.mo";
+                            MSL = true, MSL_Version = "MSL:3.2.3",
+                            stopTime = 2.0)
+          sol.retcode == _SUCCESS
+        end
+      end
+
+      #= KinematicPTPHandwritten: inline copy of KinematicPTP with start
+         attributes on the 7 algebraic unknowns. If this passes while
+         KinematicPTPOnly fails, seeding guesses from parameters fixes init. =#
+      @testset "KinematicPTPHandwritten" begin
+        @test begin
+          sol = OM.simulate("PIDDecomposition.KinematicPTPHandwritten",
+                            "./Models/PIDDecomposition.mo";
+                            MSL = true, MSL_Version = "MSL:3.2.3",
+                            stopTime = 2.0)
+          sol.retcode == _SUCCESS
+        end
+      end
+
+      #= PIWithConstantInputs: LimPID with constant setpoint + measurement.
+         Isolates SteadyState init of the continuous PI controller. =#
+      @testset "PIWithConstantInputs" begin
+        @test begin
+          sol = OM.simulate("PIDDecomposition.PIWithConstantInputs",
+                            "./Models/PIDDecomposition.mo";
+                            MSL = true, MSL_Version = "MSL:3.2.3",
+                            stopTime = 1.0)
+          sol.retcode == _SUCCESS
+        end
+      end
+
+      #= PIDrivingInertia: LimPID + single inertia + constant setpoint.
+         Simplest closed-loop PI control plant. =#
+      @testset "PIDrivingInertia" begin
+        @test begin
+          sol = OM.simulate("PIDDecomposition.PIDrivingInertia",
+                            "./Models/PIDDecomposition.mo";
+                            MSL = true, MSL_Version = "MSL:3.2.3",
+                            stopTime = 1.0)
+          sol.retcode == _SUCCESS
+        end
+      end
+
+      #= PIDrivingSpringMassWithConstant: full PID_Controller plant (two
+         inertias + spring/damper + constant load torque) driven by LimPID,
+         with KinematicPTP+Integrator replaced by a constant setpoint. If this
+         passes while PID_Controller fails, KinematicPTP alone is the blocker. =#
+      @testset "PIDrivingSpringMassWithConstant" begin
+        @test begin
+          sol = OM.simulate("PIDDecomposition.PIDrivingSpringMassWithConstant",
+                            "./Models/PIDDecomposition.mo";
+                            MSL = true, MSL_Version = "MSL:3.2.3",
+                            stopTime = 2.0)
+          sol.retcode == _SUCCESS
+        end
+      end
+    end
+
     #= PID_Controller: PID control of a spring-mass-damper system.
-       Currently fails: frontend lookupName argument order mismatch. =#
+       Passes once `foldParameterClosure` (simCodeUtil.jl) promotes the
+       purely-algebraic kinematicPTP unknowns (aux1[1], aux2[1], sd_max,
+       sdd_max, Ta1, Ta2) to PARAMETERs with bindExp. That supplies MTK
+       with numeric values for the parameter closure before Newton sees
+       `sqrt(1/sdd_max)` and `-sd_max/sdd_max` at the zero guess, which
+       was the source of the NaN/Inf init-failure. =#
     @testset "PID_Controller" begin
-      @test_broken begin
+      @test begin
         sol = OM.simulate("Modelica.Blocks.Examples.PID_Controller";
                           MSL_Version = "MSL:3.2.3", stopTime = 4.0)
         sol.retcode == _SUCCESS

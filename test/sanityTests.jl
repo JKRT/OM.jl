@@ -3,11 +3,11 @@
   @testset "Flatten simple models" begin
     @test true == begin
       @info "Running flatten test:"
-      OM.flattenFM("HelloWorld", "Models/HelloWorld.mo")
-      OM.flattenFM("VanDerPol", "Models/VanDerPol.mo")
-      OM.flattenFM("LotkaVolterra", "Models/LotkaVolterra.mo")
-      OM.flattenFM("BouncingBall", "Models/BouncingBall.mo");
-      OM.flattenFM("SimpleMechanicalSystem", "Models/SimpleMechanicalSystem.mo")
+      OM.flatten("HelloWorld", "Models/HelloWorld.mo")
+      OM.flatten("VanDerPol", "Models/VanDerPol.mo")
+      OM.flatten("LotkaVolterra", "Models/LotkaVolterra.mo")
+      OM.flatten("BouncingBall", "Models/BouncingBall.mo");
+      OM.flatten("SimpleMechanicalSystem", "Models/SimpleMechanicalSystem.mo")
       true
     end
   end

@@ -13,7 +13,7 @@
     testResultRetCodeSuccess(sol, symbol = :y, expectedValue = 124)
   end
   @test true == begin
-    flatModelica = OM.generateFlatModelica("InfluenzaTest.Influenza", "./Models/Influenza.mo")
+    flatModelica = OM.exportModelica("InfluenzaTest.Influenza", "./Models/Influenza.mo")
     #= Should be 75 equations / assignments in the model. =#
     count("=", flatModelica) == 75
   end
@@ -27,8 +27,4 @@ end
     sol = OM.simulate("PersonalityAspects.Example1", "./Models/PAspects.mo"; startTime = 0.0, stopTime = 60., solver = FBDF(autodiff=AutoFiniteDiff()), abstol =1e-2, reltol=1e-2)
     testResultRetCodeSuccess(sol; symbol = :john0_personBehavior_DNTime , expectedValue = 12.0, rtol = 0.5)
   end
-end
-
-@testset "Library use" begin
-  include("mslTests.jl")
 end

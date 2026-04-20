@@ -16,6 +16,7 @@ if pwd() != @__DIR__
 end
 
 include("testUtils.jl")
+OM.clearCaches!()
 OMBackend.warnMissingStartValues(false)
 
 @testset "OM Tests:" begin
@@ -45,6 +46,7 @@ OMBackend.warnMissingStartValues(false)
     include("simulationResultTests.jl")
     include("recordTests.jl")
     include("matrixTests.jl")
+    include("eventTests.jl")
     include("vssTests.jl")
   end
   @info "Testing procedural/algorithmic Modelica..."
@@ -59,4 +61,27 @@ OMBackend.warnMissingStartValues(false)
   @testset "MSL Tests:" begin
     include("mslTests.jl")
   end
+  @info "Testing MSL expansion models (Rotational, Electrical, Translational, Thermal, Blocks)..."
+  @testset "MSL Expansion Tests:" begin
+    include("mslExpansionTests.jl")
+  end
+  @info "Testing initial equation handling..."
+  @testset "Initial Equation Tests:" begin
+    include("initialEquationTests.jl")
+  end
+  @info "Testing foldParameterClosure regression MWEs..."
+  @testset "Fold Regression MWEs:" begin
+    include("foldRegressionTests.jl")
+  end
+  #= DOCC tests deactivated — run manually from test/ with include("DOCC/doccTests.jl")
+  @info "Testing DOCC (Dynamically Overconstrained Connectors)..."
+  @testset "DOCC Tests:" begin
+    include("DOCC/doccTests.jl")
+  end
+  =#
 end #= End OM tests =#
+
+if get(ENV, "AGENTIC_MODELICA", "") != ""
+  @info "AGENTIC_MODELICA set — running agentic tests..."
+  include("Agentic/agenticTests.jl")
+end

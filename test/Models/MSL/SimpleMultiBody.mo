@@ -352,4 +352,25 @@ equation
   der(x) = -normalized[1] * x;
 end VecNormalizeStateArgTest;
 
+model NestedResolveChainTest
+  "Tests nested function chain mimicking the Pendulum gravity computation:
+   1. planarRotation({0,0,1}, phi, 1.0) returns (T, w) orientation tuple
+   2. T is extracted via TSUB and fed into resolve1(T, gravity)
+   3. The resolved gravity drives der(x) = gravity_body[2]
+   Includes constant vectors {0.5,0,0} and {0,-9.80665,0} matching Pendulum.
+   phi(t) = t. gravity_body[2] = -9.80665*cos(t).
+   x(t) = -9.80665*sin(t). x(1) = -9.80665*sin(1)."
+  Real phi(start = 0.0);
+  Frames.Orientation R;
+  parameter Real[3] gravity = {0.0, -9.80665, 0.0};
+  parameter Real[3] r_CM = {0.5, 0.0, 0.0};
+  Real[3] gravity_body;
+  Real x(start = 0.0);
+equation
+  der(phi) = 1.0;
+  R = Frames.planarRotation({0.0, 0.0, 1.0}, phi, 1.0);
+  gravity_body = TransformationMatrices.resolve1(R.T, gravity);
+  der(x) = gravity_body[2];
+end NestedResolveChainTest;
+
 end SimpleMultiBodyTest;
