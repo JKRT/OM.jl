@@ -34,3 +34,6 @@
 [submodule "OMLibraryTesting.jl"]
 	path = OMLibraryTesting.jl
 	url = git@github.com:OpenModelica/OMLibraryTesting.jl.git
+[submodule "OMRuntimeExternalC.jl"]
+	path = OMRuntimeExternalC.jl
+	url = git@github.com:OpenModelica/OMRuntimeExternalC.jl.git

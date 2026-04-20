@@ -10,10 +10,12 @@ subPkgs = joinpath.(
     "SCode.jl",
     "DAE.jl",
     "ArrayUtil.jl",
+    "DoubleEnded.jl",
     "ListUtil.jl",
     "OMParser.jl",
     "OMFrontend.jl",
     "OMBackend.jl",
+    "OMRuntimeExternalC.jl",
   ])
 
 

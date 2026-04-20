@@ -28,7 +28,7 @@ function flatten(models, file)
   return res
 end
 
-function flattenFM(models, file)
+function flattenToFM(models, file)
   local scode = OM.translateToSCode("test/$(file).mo")
   local res
   for model in models
@@ -188,7 +188,7 @@ function flattenConnectTest()
   # F = "HelloWorld"  
   #  @info oldRes
   @info "Flatten"  
-  local oldRes = flattenFM(tst, F)[1]
+  local oldRes = flattenToFM(tst, F)[1]
   @info "Dumping the models"
   res =OMFrontend.toString(oldRes)
   @info "Dumping the model:"

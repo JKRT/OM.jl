@@ -91,19 +91,28 @@ function help()
   printstyled("  Inspect and export:\n", color=:cyan)
   println("    OM.exportCSV(modelName, sol)         Export results to CSV (OMEdit compatible)")
   println("    OM.writeModelToFile(name, file, out) Write generated Julia code to file")
-  println("    OM.generateFlatModelica(name, file)  Get flat Modelica as a string")
+  println("    OM.exportModelica(name, file)        Get flat Modelica as a string")
   println("    OM.listAvailableModels()             List compiled models")
   println()
   printstyled("  Intermediate representations:\n", color=:cyan)
-  println("    OM.flattenFM(modelName, file)        Flatten to FlatModel representation")
-  println("    OM.flattenDAE(modelName, file)       Flatten to DAE representation")
-  println("    OM.parseFile(file)                   Parse a Modelica file to AST")
-  println("    OM.translateToSCode(file)            Parse and convert to SCode")
+  println("    OM.flatten(name, file)                Flatten to FlatModel (default)")
+  println("    OM.flatten(name, file; repr=:DAE)     Flatten to DAE representation")
+  println("    OM.flatten(name, file; MSL=true)      Flatten with MSL")
+  println("    OM.flatten(name, file; libraries=[])  Flatten with user libraries")
+  println("    OM.flatten(name; MSL_Version=...)     Flatten an MSL model by name")
+  println("    OM.parseFile(file)                    Parse a Modelica file to AST")
+  println("    OM.translateToSCode(file)             Parse and convert to SCode")
   println()
   printstyled("  Debugging:\n", color=:cyan)
   println("    OM.LogBackend()                      Enable backend debug logging")
   println("    OM.LogFrontend()                     Enable frontend debug logging")
   println("    ...; warnMissingStartValues=true     Show warnings for implicit 0.0 start values")
+  println()
+  printstyled("  Libraries:\n", color=:cyan)
+  println("    OM.loadLibrary(path)                  Load a Modelica library (.mo file)")
+  println("    OM.loadPackage(dir)                   Load a directory-based package")
+  println("    OM.translate(n, f; libraries=[...])   Translate with user libraries")
+  println("    OM.simulate(n, f; libraries=[...])    Simulate with user libraries")
   println()
   printstyled("  MSL support:\n", color=:cyan)
   println("    OM.loadMSL(MSL_Version=\"MSL:3.2.3\") Load Modelica Standard Library")
@@ -111,6 +120,61 @@ function help()
   println("    OM.translate(name; MSL_Version=...)   Translate an MSL model by name")
   println("    OM.simulate(name; MSL_Version=...)    Simulate an MSL model by name")
   println("    OM.writeModelToFile(name, path)       Write generated code to file")
+end
+
+"""
+    clearCaches!(; models=true, implementations=true, wrappers=true, extractors=true)
+
+Clear persistent backend caches. By default all caches are cleared.
+Use keyword arguments to selectively clear individual caches.
+
+- `models`: compiled MTK model ASTs
+- `implementations`: Modelica function implementations
+- `wrappers`: RTG wrapper functions for symbolic dispatch
+- `extractors`: per-element array extractor functions
+"""
+function clearCaches!(; kwargs...)
+  cleared = OMBackend.clearCaches!(; kwargs...)
+  @info "OM: cleared caches: $(join(cleared, ", "))"
+  nothing
+end
+
+"""
+    loadLibrary(libraryPath::String; name=nothing)
+
+Load a Modelica library from a single `.mo` file. Returns the cache key
+(a string) for use in the `libraries` keyword argument of `translate`/`simulate`.
+
+If `name` is not provided, the key is derived from the top-level class name.
+
+# Example
+```julia
+OM.loadLibrary("path/to/MyLib.mo")
+OM.translate("MyModel", "model.mo"; libraries=["MyLib"])
+```
+"""
+function loadLibrary(libraryPath::String; name = nothing)
+  OMFrontend.loadLibrary(libraryPath; name = name)
+end
+
+"""
+    loadPackage(dirPath::String; name=nothing)
+
+Load a Modelica library organized as a directory tree with `package.mo` files.
+Returns the cache key (a string) for use in the `libraries` keyword argument
+of `translate`/`simulate`.
+
+Each `.mo` file is parsed individually and its `within` clause determines where
+the class is placed in the package hierarchy.
+
+# Example
+```julia
+OM.loadPackage("path/to/MyLibrary/")
+OM.simulate("UserModel", "model.mo"; libraries=["MyLibrary"])
+```
+"""
+function loadPackage(dirPath::String; name = nothing)
+  OMFrontend.loadPackageDirectory(dirPath; name = name)
 end
 
 """
@@ -124,11 +188,31 @@ function exportCSV(modelName, sol; filePath = nothing)
   vals = Any[]
   #= Get algebraic variables that have been removed by optimization. =#
   try
-    local observed = OMBackend.MTK_getObserved(sol)
+    local observed = OMBackend.MTK_getObserved(sol, modelName)
+    #= Try direct sol indexing first (works for models with states).
+       If any variable is missing, fall back to symbolic evaluation for
+       purely algebraic (0-unknown) models. =#
+    local directFailed = false
     for v in observed
-      name = String(v.lhs)
-      valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
+      local name = String(v.lhs)
+      local valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
+      if valVec === nothing
+        directFailed = true
+        break
+      end
       push!(vals, (name => valVec))
+    end
+    if directFailed
+      empty!(vals)
+      local obsMap = OMBackend.MTK_evaluateAllObserved(sol, observed, modelName)
+      if obsMap !== nothing
+        for v in observed
+          local name = String(v.lhs)
+          if haskey(obsMap, name)
+            push!(vals, (name => obsMap[name]))
+          end
+        end
+      end
     end
     DataFrames.rename!(df1, Dict(:timestamp => "time"))
     finalDf = hcat(df1, DataFrames.DataFrame(vals))
@@ -164,7 +248,7 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
     DataFrames.rename!(df, Dict(:timestamp=> "time"))
     local vals = Any[]
     #= Get algebraic variables that have been removed by optimization. =#
-    local observed = OMBackend.MTK_getObserved(sol)
+    local observed = OMBackend.MTK_getObserved(sol, modelName)
     for v in observed
       name = String(v.lhs)
       valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
@@ -173,90 +257,124 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
     push!(dfs, hcat(df, DataFrames.DataFrame(vals)))
   end
   modelName = replace(modelName, "."=>"_")
-  local finalFileName = if( filePath === nothing)
-    string(modelName,"_res.csv")
+  local outDir = filePath !== nothing ? dirname(abspath(filePath)) : pwd()
+  local prefix = joinpath(outDir, modelName)
+  local finalFileName = if filePath === nothing
+    "$(prefix)_res.csv"
   else
     filePath
   end
-  CSV.write(finalFileName, first(dfs))
   for (i, df) in enumerate(dfs)
-    CSV.write("$(modelName)_part$(i).csv", df)
-    println("Wrote $(modelName)_part$(i).csv")
+    local partFile = "$(prefix)_part$(i).csv"
+    CSV.write(partFile, df)
+    println("Wrote $partFile")
   end
   if coalesce
-    for (i, df) in enumerate(dfs[1:end])
-      open("$(modelName)_part$(i).csv") do input
-        readuntil(input, '\n')
-        write("part$(i).csv", read(input))
+    open(finalFileName, "w") do out
+      for (i, df) in enumerate(dfs)
+        local partFile = "$(prefix)_part$(i).csv"
+        open(partFile) do inp
+          i > 1 && readuntil(inp, '\n')  # skip header for parts after the first
+          write(out, read(inp))
+        end
       end
     end
-    for (i, df) in enumerate(dfs[1:end])
-      open(finalFileName, "a") do f
-        write(f, read("part$(i).csv"))
-      end
-    end
-    for i in 1:length(dfs)
-      rm("part$(i).csv")
-    end
-    println(string("Wrote coalesced CSV to:", finalFileName))
+    println("Wrote coalesced CSV to: $finalFileName")
   end
-  println(string("Wrote CSV to $(length(dfs)) file(s):"))
+  println("Wrote CSV to $(length(dfs)) file(s):")
 end
 
 """
- Given the name of a model and a specified file.
- Flattens the model and return a Tuple of the DAE and the function cache.
+    _resolveLibraries(libraries::Vector{String}) -> Vector{String}
+
+Resolve a vector of library identifiers. Each entry can be:
+- A cache key for an already-loaded library
+- A file path to a `.mo` file (auto-loaded via `loadLibrary`)
+- A directory path with a `package.mo` (auto-loaded via `loadPackage`)
+
+Returns a vector of resolved cache keys.
 """
-function flattenDAE(modelName::String, modelFile::String)::Tuple
+function _resolveLibraries(libraries::Vector{String})::Vector{String}
+  resolved = String[]
+  for lib in libraries
+    if haskey(OMFrontend.LIBRARY_CACHE, lib)
+      push!(resolved, lib)
+    elseif isfile(lib) && endswith(lib, ".mo")
+      key = loadLibrary(lib)
+      push!(resolved, key)
+    elseif isdir(lib) && isfile(joinpath(lib, "package.mo"))
+      key = loadPackage(lib)
+      push!(resolved, key)
+    else
+      error("Library not found: '$lib'. Pass a cache key from loadLibrary, a .mo file path, or a package directory.")
+    end
+  end
+  return resolved
+end
+
+"""
+    flatten(modelName, modelFile; repr=:FM, scalarize=true, MSL=false,
+            MSL_Version="MSL:3.2.3", libraries=String[])
+
+Flatten a Modelica model from a file. Returns a Tuple of the flattened
+representation and the function cache.
+
+# Keyword arguments
+- `repr`: output representation, `:FM` (FlatModel, default) or `:DAE`
+- `scalarize`: enable scalarization (default `true`, only applies to `:FM`)
+- `MSL`: load the Modelica Standard Library alongside the model file
+- `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
+- `libraries`: cache keys or file/directory paths for user libraries
+
+# Examples
+```julia
+OM.flatten("HelloWorld", "HelloWorld.mo")
+OM.flatten("HelloWorld", "HelloWorld.mo"; repr=:DAE)
+OM.flatten("MyModel", "model.mo"; MSL=true)
+OM.flatten("MyModel", "model.mo"; libraries=["MyLib"])
+```
+"""
+function flatten(modelName::String, modelFile::String;
+                 repr::Symbol = :FM,
+                 scalarize = true,
+                 MSL = false,
+                 MSL_Version = "MSL:3.2.3",
+                 libraries::Vector{String} = String[])::Tuple
+  resolvedLibs = _resolveLibraries(libraries)
+  if !isempty(resolvedLibs) || MSL
+    return OMFrontend.flattenModelWithLibraries(modelName, modelFile;
+                                                libraries = resolvedLibs,
+                                                MSL = MSL, MSL_Version = MSL_Version,
+                                                scalarize = scalarize)
+  end
   p = OMFrontend.parseFile(modelFile)
   scodeProgram = OMFrontend.translateToSCode(p)
-  (dae, cache) = OMFrontend.instantiateSCodeToDAE(modelName, scodeProgram)
-end
-
-"""
- Given the name of a model and a specified file.
- Flattens the model and return a Tuple of Flat Modelica and the function cache.
-"""
-function flattenFM(modelName::String, modelFile::String; scalarize = true)::Tuple
-  p = OMFrontend.parseFile(modelFile)
-  scodeProgram = OMFrontend.translateToSCode(p)
-  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, scodeProgram, scalarize = scalarize)
-  return FM, cache
-end
-
-"""
- Given the name of a model,  a specified file and a library
- Flattens the model and return a Tuple of Flat Modelica and the function cache.
-"""
-function flattenFM(modelName::String, modelFile::String, library::String; scalarize = true)::Tuple
-  local p = OMFrontend.parseFile(modelFile)
-  if !haskey(OMFrontend.LIBRARY_CACHE, library)
-    error("Library $(library) not loaded")
+  if repr == :DAE
+    return OMFrontend.instantiateSCodeToDAE(modelName, scodeProgram)
+  elseif repr == :FM
+    return OMFrontend.instantiateSCodeToFM(modelName, scodeProgram, scalarize = scalarize)
+  else
+    error("Unknown representation: $repr. Use :FM or :DAE.")
   end
-  local libAsSCode = OMFrontend.LIBRARY_CACHE[library]
-  local scodeProgram = OMFrontend.translateToSCode(p)
-  scodeProgram = listAppend(libAsSCode, scodeProgram)
-  (FM, cache) = OMFrontend.instantiateSCodeToFM(modelName, scodeProgram; scalarize = scalarize)
-  return FM, cache
 end
 
 """
- Runs a model given a model name and a model file. Using DAE
+    flatten(modelName; MSL_Version="MSL:3.2.3")
+
+Flatten an MSL model by name. Returns a Tuple of the flattened representation
+and the function cache.
+
+# Examples
+```julia
+OM.flatten("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
+OM.flatten("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+           MSL_Version="MSL:3.2.3")
+```
 """
-function runModelDAE(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE)
-  (dae, cache) = flattenDAE(modelName, modelFile)
-  OMBackend.translate(dae; BackendMode = mode)
-  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
+function flatten(modelName::String; MSL_Version = "MSL:3.2.3")::Tuple
+  return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version)
 end
 
-"""
- Runs a model given a model name and a model file. Using Flat Modelica
-"""
-function runModelFM(modelName::String, modelFile::String; startTime=0.0, stopTime=1.0, mode = OMBackend.DAE_MODE)
-  (fm, cache) = flattenFM(modelName, modelFile)
-  OMBackend.translate(fm; BackendMode = mode)
-  OMBackend.simulateModel(modelName; MODE = mode, tspan = (startTime, stopTime))
-end
 
 """
     simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false, ...)
@@ -279,6 +397,8 @@ Translate and simulate a file-based Modelica model.
   Eliminated variables are bookkept for potential later reconstruction
   (e.g., 3D visualization). The optimization is automatically skipped for
   VSS models and models with structural transitions.
+- `overwriteCache`: force re-evaluation of generated code even if the model
+  is already compiled (default `false`).
 """
 function simulate(modelName::String,
                   modelFile::String;
@@ -286,22 +406,28 @@ function simulate(modelName::String,
                   stopTime= 1.0,
                   MSL = false,
                   MSL_Version = "MSL:3.2.3",
+                  libraries::Vector{String} = String[],
                   solver = Rodas5(autodiff=false),
                   mode = OMBackend.MTK_MODE,
                   warnMissingStartValues = nothing,
                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                  directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
+                  overwriteCache::Bool = false,
                   kwargs...)
+  OMBackend.DIRECT_RHS_GENERATION[] = directRHS
   translate(modelName, modelFile;
             MSL = MSL,
+            libraries = libraries,
             mode = mode,
             MSL_Version = MSL_Version,
             warnMissingStartValues = warnMissingStartValues,
             eliminateNonDynamic = eliminateNonDynamic,
             observedFilter = observedFilter)
-  OMBackend.simulateModel(modelName
-                          ;MODE = mode, tspan = (startTime, stopTime),
-                          solver = solver,  kwargs...)
+  OMBackend.simulateModel(modelName;
+                          MODE = mode, tspan = (startTime, stopTime),
+                          solver = solver, overwriteCache = overwriteCache,
+                          kwargs...)
 end
 
 """
@@ -330,6 +456,9 @@ Translate and simulate an MSL model by name. Defaults to `MSL=true`.
   or `Vector{Regex}`. Only alias entries whose `eliminatedName` matches at
   least one pattern are kept. Use component-level patterns like
   `["^rev_", "^body_"]` to observe specific components.
+- `overwriteCache`: force re-translation and re-evaluation even if the model
+  is already compiled (default `false`). Useful when code generation logic has
+  changed and the cached compiled model is stale.
 
 # Example
 ```julia
@@ -339,6 +468,9 @@ sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
 sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
                   MSL_Version="MSL:3.2.3", stopTime=1.0,
                   observedFilter=["^rev_", "^body_"])
+# Force re-translation (e.g. after code generation changes):
+sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+                  MSL_Version="MSL:3.2.3", overwriteCache=true)
 ```
 """
 function simulate(modelName::String;
@@ -351,10 +483,13 @@ function simulate(modelName::String;
                   warnMissingStartValues = nothing,
                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                  directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
+                  overwriteCache::Bool = false,
                   kwargs...)
+  OMBackend.DIRECT_RHS_GENERATION[] = directRHS
   internalName = replace(modelName, "." => "__")
   alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
-  if !alreadyCompiled && MSL
+  if (!alreadyCompiled || overwriteCache) && MSL
     translate(modelName;
               MSL_Version = MSL_Version,
               mode = mode,
@@ -364,11 +499,22 @@ function simulate(modelName::String;
   end
   OMBackend.simulateModel(modelName;
                           MODE = mode, tspan = (startTime, stopTime),
-                          solver = solver, kwargs...)
+                          solver = solver, overwriteCache = overwriteCache,
+                          kwargs...)
 end
 
 """
-    translate(modelName, modelFile; MSL=false, MSL_Version="MSL:3.2.3", mode, eliminateNonDynamic=nothing)
+    getMTKProblem(modelName; tspan=(0.0, 1.0), overwriteCache=false)
+
+Return the MTK problem for an already-translated model without solving it.
+Call `OM.translate` first.
+"""
+function getMTKProblem(modelName::String; tspan = (0.0, 1.0), overwriteCache::Bool = false)
+  OMBackend.getMTKProblem(modelName; tspan = tspan, overwriteCache = overwriteCache)
+end
+
+"""
+    translate(modelName, modelFile; MSL=false, libraries=String[], ...)
 
 Translate a Modelica model from a file and load it in memory.
 The model can be simulated at a later stage by calling `simulate` with the name of the model.
@@ -380,6 +526,9 @@ Valid libraries are `MSL:3.2.3` and `MSL:4.0.0`.
 
 - `MSL::Bool = false`: whether to load the MSL alongside the model file.
 - `MSL_Version::String = "MSL:3.2.3"`: which MSL version to use.
+- `libraries::Vector{String} = String[]`: cache keys or file paths for user
+  libraries to load alongside the model. Load libraries first with
+  `OM.loadLibrary` or pass `.mo` file paths directly.
 - `mode`: backend mode (default `OMBackend.MTK_MODE`).
 - `warnMissingStartValues`: control warnings for missing start values.
 - `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
@@ -403,23 +552,18 @@ function translate(modelName::String,
                    modelFile::String;
                    MSL = false,
                    MSL_Version = "MSL:3.2.3",
+                   libraries::Vector{String} = String[],
                    mode = OMBackend.MTK_MODE,
                    warnMissingStartValues = nothing,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing)
-  (dae, cache) = if mode == OMBackend.MTK_MODE
-    if MSL
-      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String; MSL_Version = MSL_Version)
-    else
-      flattenFM(modelName, modelFile)
-    end
-  else # This branch is for the old DAE mode.
-    if MSL
-      OMFrontend.flattenModelWithMSL(modelName::String, modelFile::String, MSL_Version = MSL_Version)
-    else
-      flattenDAE(modelName, modelFile)
-    end
-  end
+                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[])
+  OMBackend.DIRECT_RHS_GENERATION[] = directRHS
+  repr = mode == OMBackend.MTK_MODE ? :FM : :DAE
+  (dae, cache) = flatten(modelName, modelFile;
+                         repr = repr,
+                         MSL = MSL, MSL_Version = MSL_Version,
+                         libraries = libraries)
   functionList = OMFrontend.cacheToFunctionList(cache)
   OMBackend.translate(dae;
                       functionList = functionList,
@@ -463,8 +607,10 @@ function translate(modelName::String;
                    mode = OMBackend.MTK_MODE,
                    warnMissingStartValues = nothing,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing)
-  (dae, cache) = OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version)
+                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[])
+  OMBackend.DIRECT_RHS_GENERATION[] = directRHS
+  (dae, cache) = flatten(modelName; MSL_Version = MSL_Version)
   functionList = OMFrontend.cacheToFunctionList(cache)
   OMBackend.translate(dae;
                       functionList = functionList,
@@ -564,38 +710,42 @@ toString(flatModel) = OMFrontend.toString(flatModel)
 #Base.string(flatModel) = toString
 
 """
+    exportModelica(modelName, file; MSL=false, MSL_Version="MSL:4.0.0",
+                   libraries=String[], printBindingTypes=false, scalarize=false)
+
+Returns the flat Modelica representation as a String.
+
+# Keyword arguments
+- `MSL`: load the Modelica Standard Library alongside the model file
+- `MSL_Version`: MSL version string (default `"MSL:4.0.0"`)
+- `libraries`: cache keys or file/directory paths for user libraries
+- `printBindingTypes`: include type annotations in bindings (debugging only)
+- `scalarize`: enable scalarization (default `false`). Note that the omc of
+  which this is based does not scalarize flat Modelica. Running with
+  scalarization might produce incorrect code.
+
+# Examples
+```julia
+OM.exportModelica("MyModel", "model.mo")
+OM.exportModelica("MyModel", "model.mo"; MSL=true, MSL_Version="MSL:3.2.3")
+OM.exportModelica("MyModel", "model.mo"; libraries=["MyLib"])
 ```
-generateFlatModelica(modelName::String,
-                              file::String;
-                              printBindingTypes = false,
-                              MSL = false,
-                              MSL_Version = "MSL:4.0.0")
-```
-  Returns the flat Modelica representation as a String.
-- The print binding types option should only be used for debugging.
-- scalarize enables or disables scalarization. Note that the omc of which this is based does not scalarize flat Modelica. Hence, running it with scalarization might result in incorrect code.
 """
-function generateFlatModelica(modelName::String,
-                              file::String;
-                              printBindingTypes = false,
-                              MSL = false,
-                              MSL_Version = "MSL:4.0.0",
-                              scalarize = false)
+function exportModelica(modelName::String,
+                        file::String;
+                        printBindingTypes = false,
+                        MSL = false,
+                        MSL_Version = "MSL:4.0.0",
+                        libraries::Vector{String} = String[],
+                        scalarize = false)
   local fmStr::String
   try
     OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, scalarize)
-    fmStr = if MSL
-      local fmAndFuncs = OMFrontend.flattenModelWithMSL(modelName,
-                                                        file;
-                                                        MSL_Version = MSL_Version,
-                                                        scalarize = scalarize)
-      OMFrontend.toFlatModelica(fmAndFuncs,
-                                printBindingTypes = printBindingTypes)
-    else
-      local fmAndFuncs = OMFrontend.flattenModel(modelName, file,
-                                                 scalarize = scalarize)
-      OMFrontend.toFlatModelica(fmAndFuncs, printBindingTypes = printBindingTypes)
-    end
+    fmAndFuncs = flatten(modelName, file;
+                         MSL = MSL, MSL_Version = MSL_Version,
+                         libraries = libraries, scalarize = scalarize)
+    fmStr = OMFrontend.toFlatModelica(fmAndFuncs,
+                                      printBindingTypes = printBindingTypes)
   finally
     OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
   end
@@ -603,26 +753,24 @@ function generateFlatModelica(modelName::String,
 end
 
 """
-    generateFlatModelica(modelName; MSL_Version, printBindingTypes, scalarize)
+    exportModelica(modelName; MSL_Version="MSL:3.2.3", printBindingTypes=false, scalarize=false)
 
-Generate flat Modelica for an MSL model by name.
+Export flat Modelica for an MSL model by name.
 
-Example:
-```
-fm = OM.generateFlatModelica("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                             MSL_Version="MSL:3.2.3")
+# Examples
+```julia
+OM.exportModelica("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+                  MSL_Version="MSL:3.2.3")
 ```
 """
-function generateFlatModelica(modelName::String;
-                              printBindingTypes = false,
-                              MSL_Version = "MSL:3.2.3",
-                              scalarize = false)
+function exportModelica(modelName::String;
+                        printBindingTypes = false,
+                        MSL_Version = "MSL:3.2.3",
+                        scalarize = false)
   local fmStr::String
   try
     OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, scalarize)
-    local fmAndFuncs = OMFrontend.flattenModelWithMSL(modelName;
-                                                      MSL_Version = MSL_Version,
-                                                      scalarize = scalarize)
+    fmAndFuncs = flatten(modelName; MSL_Version = MSL_Version)
     fmStr = OMFrontend.toFlatModelica(fmAndFuncs,
                                       printBindingTypes = printBindingTypes)
   finally

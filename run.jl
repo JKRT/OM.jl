@@ -28,7 +28,7 @@ function flatten(models, file)
   return res
 end
 
-function flattenFM(models, file)
+function flattenToFM(models, file)
   local scode = OM.translateToSCode("test/$(file).mo")
   local res
   for model in models
@@ -40,21 +40,21 @@ end
 function runModels(models)
   for model in models
     @info "Running : $model"
-    @time OM.runModelDAE(model, "test/$(model).mo")
+    @time OM.simulate(model, "test/$(model).mo")
   end
 end
 
 function runModelsMTK(models)
   for model in models
     @info "Running : $model"
-    @time OM.runModelDAE(model, "test/$(model).mo", mode = OMBackend.MTK_MODE)
+    @time OM.simulate(model, "test/$(model).mo")
   end
 end
 
 function runModelsMTK(models, file)
   for model in models
     @info "Running : $model"
-    @time OM.runModelDAE(model, "test/$(file).mo", mode = OMBackend.MTK_MODE)
+    @time OM.simulate(model, "test/$(file).mo")
   end
 end
 
@@ -91,7 +91,7 @@ function flattenSimpleModels()
 end
 
 function flattenHybridSystems()
-  flatten(simpleHybridModels)  
+  flatten(simpleHybridModels)
 end
 
 function flattenCompoundModels()
@@ -131,7 +131,7 @@ function flattenAdvancedModelsC()
   tst = ["ElectricalComponentTest.Resistor0", "ElectricalComponentTest.Resistor1", "ElectricalComponentTest.SimpleCircuit"]
   F = "ElectricalComponentTest"
   #tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
-  # F = "HelloWorld"  
+  # F = "HelloWorld"
   for _ in 1:100
     newRes = flatten(tst, F);
     res = newRes
@@ -152,9 +152,9 @@ function flattenFlatSimpleCircuit()
   local tst = ["SimpleCircuit"]
   local F = "FlattenSimpleCircuit"
   #tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
-  # F = "HelloWorld"  
+  # F = "HelloWorld"
   #  @info oldRes
-  @info "Flatten"  
+  @info "Flatten"
   oldRes = flatten(tst, F)
   @info "Dumping the models"
   dumpModelsMTK(tst, F)
@@ -169,9 +169,9 @@ function flattenAdvancedModels()
                "ElectricalComponentTest.SimpleCircuit"]
   local F = "ElectricalComponentTest"
   #tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
-  # F = "HelloWorld"  
+  # F = "HelloWorld"
   #  @info oldRes
-  @info "Flatten"  
+  @info "Flatten"
   oldRes = flatten(tst, F)
   dumpModelsMTK(tst, F)
   #=lets try to run=#
@@ -184,10 +184,10 @@ function flattenConnectTest()
   local tst = ["Connect5"]
   local F = "Connect5"
   #tst = ["HelloWorld"#=, "ElectricalComponentTest.SimpleCircuit"=#]
-  # F = "HelloWorld"  
+  # F = "HelloWorld"
   #  @info oldRes
-  @info "Flatten"  
-  local oldRes = flattenFM(tst, F)[1]
+  @info "Flatten"
+  local oldRes = flattenToFM(tst, F)[1]
   @info "Dumping the models"
   res =OMFrontend.toString(oldRes)
   @info "Dumping the model:"
