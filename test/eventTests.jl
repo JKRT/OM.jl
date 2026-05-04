@@ -230,6 +230,46 @@
       end
     end
 
+    @testset "IntegerStepHold (resolveIntegers + when regression)" begin
+      # Regression for 2026-04-23: Causalize.jl `_resolveIntVarsInSystem!`
+      # used to unconditionally reclassify every Integer VARIABLE as a
+      # PARAM. It ignored BDAE.WHEN_EQUATION, so a when-driven discrete
+      # Integer like `mode` below was silently dropped and `sol(t, idxs=:mode)`
+      # returned `KeyError: key :mode not found`. The fix teaches the pass
+      # to detect Integer LHSs inside when-clauses and keep them as VARIABLEs.
+      @test begin
+        sol = OM.simulate("IntegerStepHold", "./Models/IntegerStepHold.mo";
+                          startTime = 0.0, stopTime = 1.0)
+        sol.retcode == ReturnCode.Success &&
+          sol(0.25, idxs = :mode) == 3.0 &&
+          sol(0.499, idxs = :mode) == 3.0 &&
+          sol(0.501, idxs = :mode) == 1.0 &&
+          sol(0.9, idxs = :mode) == 1.0
+      end
+    end
+
+    @testset "EnumLiteralAlias (Causalize enum reclassification regression)" begin
+      # Regression for 2026-05-04: Causalize.jl `_resolveIntVarsInSystem!`
+      # only matched T_INTEGER, not T_ENUMERATION. As a result the
+      # auxiliary-array pattern in Modelica.Electrical.Digital gates
+      # (Logic 9-value enumeration with constant 'U' bindings forwarded
+      # through alias chains) left the enum variables as BDAE.VARIABLE,
+      # each getting both a `der(d)~0` dummy AND a defining equation -
+      # MTK then threw ExtraEquationsSystemException. Fix A in
+      # `_resolveIntVarsInSystem!` adds `_isIntOrEnumVarType`, captures
+      # ENUM_LITERAL values into valueMap, and runs an alias-chain fixpoint
+      # so chains like `auxAlias = auxLit; auxLit = Logic.'U'` fully
+      # collapse to PARAM bindings. Without the fix the model below
+      # would be over-determined (5 equations / 3 variables).
+      @test begin
+        sol = OM.simulate("EnumLiteralAlias", "./Models/EnumLiteralAlias.mo";
+                          startTime = 0.0, stopTime = 1.0)
+        sol.retcode == ReturnCode.Success &&
+          isapprox(sol(0.5, idxs = :x), 0.5; atol = 1e-6) &&
+          isapprox(sol(1.0, idxs = :x), 1.0; atol = 1e-6)
+      end
+    end
+
   end
 
 end

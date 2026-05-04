@@ -54,4 +54,12 @@ package InitialEquationTests
     der(x) = B_act;
   end IEQ5_DiscreteFromParamInitEq;
 
+  model IEQ7_FixedFalseParamNoBind
+    "fixed=false parameter with start attribute and no inline binding. Pre-fix this tripped createParameterArray with `parameter coef has no bound expression`. Post-fix the start attribute is used as the codegen-time value (0.5), giving x(1) = exp(-0.5)."
+    parameter Real coef(fixed = false, start = 0.5);
+    Real x(start = 1.0);
+  equation
+    der(x) = -coef * x;
+  end IEQ7_FixedFalseParamNoBind;
+
 end InitialEquationTests;

@@ -557,9 +557,12 @@ function translate(modelName::String,
                    warnMissingStartValues = nothing,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
-                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[])
+                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
+                   checkSimCode::Bool = true)
   OMBackend.DIRECT_RHS_GENERATION[] = directRHS
-  repr = mode == OMBackend.MTK_MODE ? :FM : :DAE
+  #= MTK_MODE and DEMode both consume the FlatModel-derived SIM_CODE. Only the
+     deprecated DAE_MODE wants the legacy :DAE representation. =#
+  repr = (mode == OMBackend.MTK_MODE || mode == OMBackend.DEMode) ? :FM : :DAE
   (dae, cache) = flatten(modelName, modelFile;
                          repr = repr,
                          MSL = MSL, MSL_Version = MSL_Version,
@@ -570,7 +573,8 @@ function translate(modelName::String,
                       BackendMode = mode,
                       warnMissingStartValues = warnMissingStartValues,
                       eliminateNonDynamic = eliminateNonDynamic,
-                      observedFilter = observedFilter)
+                      observedFilter = observedFilter,
+                      checkSimCode = checkSimCode)
 end
 
 """
@@ -608,7 +612,8 @@ function translate(modelName::String;
                    warnMissingStartValues = nothing,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
-                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[])
+                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
+                   checkSimCode::Bool = true)
   OMBackend.DIRECT_RHS_GENERATION[] = directRHS
   (dae, cache) = flatten(modelName; MSL_Version = MSL_Version)
   functionList = OMFrontend.cacheToFunctionList(cache)
@@ -617,7 +622,8 @@ function translate(modelName::String;
                       BackendMode = mode,
                       warnMissingStartValues = warnMissingStartValues,
                       eliminateNonDynamic = eliminateNonDynamic,
-                      observedFilter = observedFilter)
+                      observedFilter = observedFilter,
+                      checkSimCode = checkSimCode)
 end
 
 """
@@ -865,6 +871,19 @@ function removeQuotesFromFlatModelica(fmStr::String)
   end
   return String(take!(buffer))
 end
+
+function _registerGUIAPIDelegates!()
+  if isdefined(OMFrontend, :GUI_API)
+    OMFrontend.GUI_API.setExecutionDelegates!(
+      compileModel = (classPath, modelFile; kwargs...) -> translate(classPath, modelFile; kwargs...),
+      simulateModel = (classPath, modelFile; kwargs...) -> simulate(classPath, modelFile; kwargs...),
+      exportFlatModelica = (classPath, modelFile; kwargs...) -> exportModelica(classPath, modelFile; kwargs...),
+    )
+  end
+  return nothing
+end
+
+_registerGUIAPIDelegates!()
 
 #= Precompilation script=#
 include("precompilation.jl")

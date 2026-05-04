@@ -46,4 +46,102 @@
     end
   end
 
+  @testset "BDAE.TERMINATE when-stmt handling (B7 regression)" begin
+    #= Regression for 2026-04-23. MSL MultiBody path-planners use
+       `when done then terminate("...") end when;` to stop the
+       simulation at end of motion. BDAECreate.jl correctly builds
+       `BDAE.TERMINATE(message, source)`, but `traverseWhenEquation!`
+       in BDAEUtil.jl had no arm for it and threw
+         "TERMINATE is not implemented yet!"
+       blocking RobotR3.oneAxis and RobotR3.fullRobot (audit #11, 2 models).
+       Fix added TERMINATE, ASSERT arms to the @match and a matching
+       MTK-codegen arm that emits `DifferentialEquations.terminate!(integrator)`. =#
+    local msg = DAE.SCONST("motion done")
+    local term = OMBackend.Backend.BDAE.TERMINATE(msg, DAE.emptyElementSource)
+    local whenEq = OMBackend.Backend.BDAE.WHEN_EQUATION(
+      1,
+      OMBackend.Backend.BDAE.WHEN_STMTS(DAE.BCONST(true), Cons(term, MetaModelica.nil), nothing),
+      DAE.emptyElementSource,
+      OMBackend.Backend.BDAE.EQ_ATTR_DEFAULT_UNKNOWN)
+    #= Traverse without rewriting: the identity traversal should return the same tree.
+       traverseExpTopDown callback signature: (exp, arg) -> (exp, cont::Bool, arg). =#
+    local identityOp = (exp, arg) -> (exp, true, arg)
+    local (newWhenEq, err) = try
+      local result = OMBackend.Backend.BDAEUtil.traverseWhenEquation!(whenEq.whenEquation,
+                                                                       identityOp, nothing)
+      (result, nothing)
+    catch e
+      (nothing, e)
+    end
+    @test err === nothing  #= pre-fix this threw "TERMINATE is not implemented yet!" =#
+    @test newWhenEq !== nothing
+  end
+
+  @testset "DAE.WILD in tuple-assign (B6 regression)" begin
+    #= Regression for 2026-04-23. Modelica function bodies that use
+       `(a, _, b) := f(...)` produce a DAE.STMT_TUPLE_ASSIGN with a
+       DAE.WILD placeholder in the LHS list. Before the fix,
+       `_writeCref` in backendDump.jl had no arm for DAE.WILD and
+       `string(DAE.WILD())` threw
+         MatchFailure("unfinished match for type", DAE.WILD)
+       blocking Modelica.Blocks.Examples.FilterWithRiseTime and
+       Modelica.Electrical.Machines.Examples.SynchronousInductionMachines.SMEE_Rectifier.
+
+       Additionally, `generateStatement(STMT_TUPLE_ASSIGN)` did
+       `Symbol(string(expExpLst))` producing a single identifier
+       `var"(a, _, b)"` that is silently wrong — replaced with a real
+       `Expr(:tuple, …)` destructuring assignment. =#
+    @test string(DAE.WILD()) == "_"
+    #= Ensure the tuple-assign generator emits proper Julia syntax. =#
+    local wildExp = DAE.CREF(DAE.WILD(), DAE.T_REAL_DEFAULT)
+    local aExp = DAE.CREF(DAE.CREF_IDENT("a", DAE.T_REAL_DEFAULT, MetaModelica.nil), DAE.T_REAL_DEFAULT)
+    local bExp = DAE.CREF(DAE.CREF_IDENT("b", DAE.T_REAL_DEFAULT, MetaModelica.nil), DAE.T_REAL_DEFAULT)
+    local rhs = DAE.ICONST(1)
+    local lhsList = Cons(aExp, Cons(wildExp, Cons(bExp, MetaModelica.nil)))
+    local stmt = DAE.STMT_TUPLE_ASSIGN(DAE.T_REAL_DEFAULT, lhsList, rhs,
+                                        DAE.emptyElementSource)
+    local expr = OMBackend.CodeGeneration.AlgorithmicCodeGeneration.generateStatement(stmt)
+    #= Should be `(a, _, b) = 1` → Expr(:(=), Expr(:tuple, :a, :_, :b), ...). =#
+    @test expr isa Expr
+    @test expr.head === :(=)
+    @test expr.args[1] isa Expr
+    @test expr.args[1].head === :tuple
+    @test expr.args[1].args == [:a, :_, :b]
+  end
+
+  @testset "expToJuliaExpAlg subscripts (B2/B3 regression)" begin
+    #= Regression for 2026-04-23. In algorithmic code generation for Modelica
+       function bodies, `expToJuliaExpAlg` wrapped DAE.ICONST subscripts in
+       `quote $int end` (flattened to `Expr(:block, int)` → rendered as
+       `a[(1;)]`), and DAE.WHOLEDIM as `Expr(:(:))` (rendered as
+       `$(Expr(:(:)))`). Both failed `eval` with "syntax: invalid syntax (:)".
+       DAE.SLICE had no subscript arm at all and threw "Unsupported subscript".
+       Surfaced by Modelica.Mechanics.MultiBody.Frames.axesRotationsAngles. =#
+    local algCodegen = OMBackend.CodeGeneration.AlgorithmicCodeGeneration
+    local realTy = DAE.T_REAL_DEFAULT
+
+    #= a[1] — integer literal subscript on CREF_IDENT. =#
+    local crefA1 = DAE.CREF(DAE.CREF_IDENT("a", realTy, list(DAE.INDEX(DAE.ICONST(1)))), realTy)
+    local exprA1 = algCodegen.expToJuliaExpAlg(crefA1)
+    @test Meta.parse(string(exprA1)) == :(a[1])
+
+    #= a[:] — WHOLEDIM subscript. =#
+    local crefACol = DAE.CREF(DAE.CREF_IDENT("a", realTy, list(DAE.WHOLEDIM())), realTy)
+    local exprACol = algCodegen.expToJuliaExpAlg(crefACol)
+    @test Meta.parse(string(exprACol)) == :(a[:])
+
+    #= M[2, :] — mixed integer + WHOLEDIM subscripts. =#
+    local crefMRow = DAE.CREF(DAE.CREF_IDENT("M", realTy,
+                                              list(DAE.INDEX(DAE.ICONST(2)), DAE.WHOLEDIM())),
+                              realTy)
+    local exprMRow = algCodegen.expToJuliaExpAlg(crefMRow)
+    @test Meta.parse(string(exprMRow)) == :(M[2, :])
+
+    #= v[1:3] — DAE.SLICE(DAE.RANGE) subscript (B3). =#
+    local rangeExp = DAE.RANGE(realTy, DAE.ICONST(1), nothing, DAE.ICONST(3))
+    local crefVSlice = DAE.CREF(DAE.CREF_IDENT("v", realTy, list(DAE.SLICE(rangeExp))), realTy)
+    local exprVSlice = algCodegen.expToJuliaExpAlg(crefVSlice)
+    @test Meta.parse(string(exprVSlice)) == :(v[1:3])
+  end
+
 end

@@ -51,12 +51,18 @@ PrecompileTools.@compile_workload begin
   local frontendModels = [
     "Modelica.Electrical.Analog.Examples.IdealTriacCircuit",
     "Modelica.Mechanics.Rotational.Examples.RollingWheel",
-    "Modelica.Mechanics.MultiBody.Examples.Elementary.DoublePendulum",
-    "Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a"
+    "Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum",
+    #= TODO: find faster models that exercise similar code paths =#
+    #"Modelica.Mechanics.MultiBody.Examples.Elementary.DoublePendulum",
+    #"Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a"
   ]
   for model in frontendModels
     @info "Frontend: $(model)"
-    @time flattenModelInMSL_TST(model; MSL_V = mslVersion)
+    try
+      @time flattenModelInMSL_TST(model; MSL_V = mslVersion)
+    catch e
+      @warn "Frontend precompilation failed for $(model) (non-fatal)" exception=(e, catch_backtrace())
+    end
   end
   @info "Frontend precompilation done."
 

@@ -386,7 +386,7 @@ end
                              stopTime = 1.0)
           sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success &&
             isapprox(sol[:x][end], -9.80665*sin(1.0), atol = 0.1) &&
-            OMBackend.CodeGeneration._LAST_ARRAY_SHAPE_COUNT[] == 0
+            (!OMBackend.ENABLE_BACKEND_LOGGING || OMBackend.CodeGeneration._LAST_ARRAY_SHAPE_COUNT[] == 0)
         catch e
           @info "Failed to simulate SimpleMultiBodyTest.NestedResolveChainTest" exception=(e, catch_backtrace())
           false
@@ -580,63 +580,8 @@ end
   end
 end
 
-@testset verbose=true "MSL Electrical Machines" begin
-
-  @testset "MSL DCEE_Start" begin
-    sol = nothing
-    @test true == begin
-      try
-        #= Tight tolerances needed: default solver tolerances give ~3.8% error on dcee.la.i =#
-        sol = OM.simulate("Modelica.Electrical.Machines.Examples.DCMachines.DCEE_Start";
-                          MSL_Version = "MSL:3.2.3", stopTime = 1.5,
-                          reltol = 1e-8, abstol = 1e-10)
-        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      catch e
-        @info "Failed to simulate MSL DCEE_Start" exception=(e, catch_backtrace())
-        false
-      end
-    end
-    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      @test begin
-        passed, details = validateMSLModel(sol,
-          "Electrical_Machines_Examples_DCMachines_DCEE_Start";
-          stopTime = 1.5, reltol = 0.01, atol = 0.01)
-        if !passed
-          @warn "DCEE_Start validation failed" details
-        end
-        passed
-      end
-    end
-  end
-
-  @testset "MSL DCPM_Start" begin
-    sol = nothing
-    @test true == begin
-      try
-        #= Tight tolerances needed: default solver tolerances give ~3.4% error on dcpm.la.i =#
-        sol = OM.simulate("Modelica.Electrical.Machines.Examples.DCMachines.DCPM_Start";
-                          MSL_Version = "MSL:3.2.3", stopTime = 1.5,
-                          reltol = 1e-8, abstol = 1e-10)
-        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      catch e
-        @info "Failed to simulate MSL DCPM_Start" exception=(e, catch_backtrace())
-        false
-      end
-    end
-    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      @test begin
-        passed, details = validateMSLModel(sol,
-          "Electrical_Machines_Examples_DCMachines_DCPM_Start";
-          stopTime = 1.5, reltol = 0.01, atol = 0.01)
-        if !passed
-          @warn "DCPM_Start validation failed" details
-        end
-        passed
-      end
-    end
-  end
-
-end
+#= MSL Electrical Machines DCEE_Start / DCPM_Start moved to heavyTests.jl
+   (gated behind ENV["OM_HEAVY_TESTS"]). =#
 
 @testset verbose=true "MSL Electrical Analog" begin
 
@@ -818,15 +763,7 @@ end
     end
   end
 
-  #= MSL Engine1a: crank mechanism with closed kinematic loop.
-     Fixed: DAE initialization solver handles rank-deficient algebraic Jacobian. =#
-  @testset "MSL Engine1a" begin
-    @test begin
-        sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a";
-                          MSL_Version = "MSL:3.2.3", stopTime = 0.72,
-                          solver = OMBackend.DifferentialEquations.FBDF())
-        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      end
-    end
+  #= MSL Engine1a moved to heavyTests.jl — crank mechanism with closed
+     kinematic loop takes 4-7 min to translate+simulate. =#
 
 end

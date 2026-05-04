@@ -35,6 +35,90 @@
 =#
 
 @testset "Complex Records" begin
+  @testset "Operator-record call on LHS (getComplexType regression)" begin
+    @test true == begin
+      try
+        OM.translate("OperatorRecordLhsCall.Case", "./Models/OperatorRecordLhsCall.mo")
+        true
+      catch e
+        @error "OperatorRecordLhsCall translate failed" exception=(e, catch_backtrace())
+        false
+      end
+    end
+  end
+
+  @testset "equationSides dispatch (B1 .lhs→.left regression)" begin
+    # Regression for 2026-04-23: `isParametricOnlyEquation` and
+    # `solveParametricInitialEquations!` in CodeGenerationUtil.jl
+    # unconditionally accessed `eq.lhs` / `eq.rhs`. Those fields only
+    # exist on BDAE.EQUATION. BDAE.COMPLEX_EQUATION has `.left` /
+    # `.right`, BDAE.ARRAY_EQUATION too. Any model where the initial
+    # equations included a record-to-record equality (e.g. MSL
+    # MultiBody.Examples.Rotational3DEffects.GyroscopicEffects) threw
+    # `FieldError: type BDAE.COMPLEX_EQUATION has no field 'lhs'`. The
+    # fix introduced `equationSides(eq)` which dispatches on the
+    # equation shape and returns (lhs, rhs) via the correct field names.
+    local emptySrc = DAE.emptyElementSource
+    local lhsE = DAE.RCONST(1.0)
+    local rhsE = DAE.RCONST(2.0)
+    local ePlain = OMBackend.Backend.BDAE.EQUATION(lhsE, rhsE, emptySrc,
+                                                    OMBackend.Backend.BDAE.EQ_ATTR_DEFAULT_UNKNOWN)
+    local eComplex = OMBackend.Backend.BDAE.COMPLEX_EQUATION(1, DAE.RCONST(3.0), DAE.RCONST(4.0),
+                                                              emptySrc,
+                                                              OMBackend.Backend.BDAE.EQ_ATTR_DEFAULT_UNKNOWN)
+    local eResidual = OMBackend.Backend.BDAE.RESIDUAL_EQUATION(DAE.RCONST(5.0), emptySrc,
+                                                                OMBackend.Backend.BDAE.EQ_ATTR_DEFAULT_UNKNOWN)
+    local (lp, rp) = OMBackend.CodeGeneration.equationSides(ePlain)
+    @test lp isa DAE.RCONST && lp.real == 1.0
+    @test rp isa DAE.RCONST && rp.real == 2.0
+    local (lc, rc) = OMBackend.CodeGeneration.equationSides(eComplex)
+    @test lc isa DAE.RCONST && lc.real == 3.0
+    @test rc isa DAE.RCONST && rc.real == 4.0
+    local (lr, rr) = OMBackend.CodeGeneration.equationSides(eResidual)
+    @test lr isa DAE.RCONST && lr.real == 5.0
+    @test rr isa DAE.RCONST && rr.real == 0.0
+  end
+
+  @testset "appendFieldToCref IFEXP and conj (B5 regression)" begin
+    #= Regression for 2026-04-23. decomposeComplexEquation splits a record
+       equality like `x = if cond then conj(u) else u` by calling
+       appendFieldToCref on both sides for each field (re, im). Before the
+       fix, appendFieldToCref only handled DAE.CREF and DAE.RECORD; the
+       DAE.IFEXP on the RHS threw "appendFieldToCref: unexpected expression
+       type DAE.IFEXP when appending field 're'".
+       Surfaced by Modelica.Electrical.QuasiStationary.SinglePhase.Examples.SeriesBode.
+       The fix recurses into both IFEXP branches and inlines conj via
+       conj(c).re == c.re, conj(c).im == -c.im. =#
+    local complexTy = DAE.T_REAL_DEFAULT
+    local condE = DAE.BCONST(true)
+    local innerCref = DAE.CREF(DAE.CREF_IDENT("u", DAE.T_REAL_DEFAULT, MetaModelica.nil), DAE.T_REAL_DEFAULT)
+    local conjPath = Absyn.QUALIFIED("Modelica", Absyn.QUALIFIED("ComplexMath", Absyn.IDENT("conj")))
+    local conjCall = DAE.CALL(conjPath, Cons(innerCref, MetaModelica.nil),
+                              DAE.CALL_ATTR(DAE.T_REAL_DEFAULT, false, true, false, false,
+                                            DAE.NO_INLINE(), DAE.NO_TAIL()))
+    local ifE = DAE.IFEXP(condE, conjCall, innerCref)
+
+    #= IFEXP on a plain CREF in both branches. =#
+    local plainIf = DAE.IFEXP(condE, innerCref, innerCref)
+    local plainIfRe = OMBackend.Backend.BDAEUtil.appendFieldToCref(plainIf, "re", complexTy)
+    @test plainIfRe isa DAE.IFEXP
+    @test plainIfRe.expThen isa DAE.CREF
+    @test plainIfRe.expElse isa DAE.CREF
+
+    #= IFEXP where the THEN branch is conj(u): re should pass through,
+       im should wrap in UMINUS. =#
+    local ifRe = OMBackend.Backend.BDAEUtil.appendFieldToCref(ifE, "re", complexTy)
+    @test ifRe isa DAE.IFEXP
+    @test ifRe.expThen isa DAE.CREF  #= conj(u).re == u.re =#
+    @test ifRe.expElse isa DAE.CREF  #= u.re =#
+
+    local ifIm = OMBackend.Backend.BDAEUtil.appendFieldToCref(ifE, "im", complexTy)
+    @test ifIm isa DAE.IFEXP
+    @test ifIm.expThen isa DAE.UNARY  #= conj(u).im == -u.im =#
+    @test ifIm.expThen.operator isa DAE.UMINUS
+    @test ifIm.expElse isa DAE.CREF   #= u.im =#
+  end
+
   #= ComplexRecord1: R2 contains R1[2] (array of records inside a record). =#
   @testset "Basic Record Access" begin
     @test begin

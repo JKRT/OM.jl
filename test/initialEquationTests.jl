@@ -24,6 +24,7 @@ const IEQ_MODELS = [
   "InitialEquationTests.IEQ3_InitFromParameter",
   "InitialEquationTests.IEQ4_TwoStatesFromInitEq",
   "InitialEquationTests.IEQ5_DiscreteFromParamInitEq",
+  "InitialEquationTests.IEQ7_FixedFalseParamNoBind",
 ]
 
 @testset "Initial Equations" begin
@@ -162,6 +163,49 @@ const IEQ_MODELS = [
            If initial equation lost:  x(1) = 0.0,  B_act = 0.0 =#
         local hasCorrectX = any(i -> isapprox(uFinal[i], -5.0; rtol = 1e-4), 1:length(uFinal))
         @test hasCorrectX
+      end
+    end
+
+    @testset "IEQ7: fixed=false parameter falls back to start attribute" begin
+      #= parameter Real coef(fixed=false, start=0.5), no inline binding.
+         der(x) = -coef * x, x(start=1.0). With the createParameterArray
+         fallback, coef is folded to 0.5 and x(1) = exp(-0.5). =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationTests.IEQ7_FixedFalseParamNoBind",
+                          IEQ_MODEL_FILE; stopTime = 1.0)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IEQ7 simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+        @test isapprox(last(sol.u)[1], exp(-0.5); rtol = 1e-4)
+      end
+    end
+
+    @testset "IEQ6: initial equation that reads `time` directly" begin
+      #= Regression: prior to the `time`-in-initial-equation fix,
+         generateInitialEquations in MTK_CodeGeneration.jl
+         unconditionally HT-looked-up the RHS CREF. `time` is the
+         independent variable and never in stringToSimVarHT, so any
+         `x = time` initial equation produced `KeyError: "time"`.
+         Surfaced by Modelica.Fluid.Examples.ControlledTankSystem.ControlledTanks.
+         With the fix, this minimal model simulates: der(x)=1 with
+         x(0)=time=0 gives x(1)=1.0. =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationWithTime", "./Models/InitialEquationWithTime.mo";
+                          startTime = 0.0, stopTime = 1.0)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IEQ6 simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+        @test isapprox(sol[:x][end], 1.0; atol = 1e-6)
       end
     end
 

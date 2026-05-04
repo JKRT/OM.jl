@@ -33,6 +33,30 @@
    Tests for MSL coverage beyond MultiBody.
    Reference values obtained from OpenModelica (omc) with MSL 3.2.3.
    These tests are optional and can be run separately from the main test suite.
+
+   TODO: several MSL testsets below only assert `retcode == _SUCCESS` and
+   perform NO signal-level validation against omc reference trajectories.
+   That means a "passing" run can still be silently integrating to the
+   wrong solution. The following testsets need proper signal comparisons
+   (against reference/csv/*.csv via validateMSLModel or inline isapprox
+   with explicit targets):
+     - Rotational.Friction (currently @test_broken — but when it unbreaks)
+     - Electrical.Analog.Examples.ShowVariableResistor
+     - Mechanics.Translational.Examples.Oscillator (the MSL one, not the
+       OMJL-custom Oscillator that is validated elsewhere)
+     - Thermal.HeatTransfer.Examples.TwoMasses (currently validated in
+       OMLibraryTesting.jl coverage but NOT here — add inline check)
+     - PIDDecomposition.KinematicPTPOnly
+     - PIDDecomposition.KinematicPTPHandwritten
+     - PIDDecomposition.PIWithConstantInputs
+     - PIDDecomposition.PIDrivingInertia
+     - PIDDecomposition.PIDrivingSpringMassWithConstant
+   The same gap applies to the heavy models moved to heavyTests.jl:
+     - Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a
+     - Modelica.Blocks.Examples.PID_Controller
+   OMLibraryTesting.jl's coverage harness does validate many of these
+   when `reference/csv/*.csv` files exist, but that is a separate
+   harness, not the in-suite regression guardrail.
 =#
 
 @info "MSL Expansion Tests: testing models from Rotational, Electrical, and Translational domains."
@@ -65,12 +89,26 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
     end
 
     #= Rotational.Friction: friction elements with stuck/sliding modes.
-       Frontend and backend translation succeed, but MTK structural_simplify
-       leaves the reduced system structurally imbalanced: 35 full_equations
-       vs 36 unknowns. DirectRHSGeneration now rejects this with a clear error
-       message. The underlying issue is in how the friction mode/sliding
-       equations interact with structural_simplify; needs a separate fix at
-       the MTK/tearing level. Kept as broken to track progress. =#
+       Frontend/backend translation succeed and MTK structural_simplify
+       reduces the system to a balanced 31 equations / 31 unknowns.
+       The real failure is a rank-deficient Jacobian during integration,
+       reported by LinearSolve as `BLAS/LAPACK dgetrf ... U(17,17) is exactly
+       zero` on the 31x31 Jacobian. Root cause: the friction FSM equations
+       `startForward`, `startBackward`, `locked` are Boolean discrete
+       variables in Modelica PartialFriction driven by `pre(mode)` and
+       `(sa > tau0_max)` crossings, but OMBackend lowers them to a
+       polynomial Boolean encoding of shape
+         `0 = -h + x*(1 - h + h^2)`  with  `h = (sa > tau0_max)`
+       that forces `x = h` when `h` is Boolean-valued, yet exposes zero
+       symbolic gradient with respect to `sa` because the comparison
+       `<` has Heaviside derivative. The Modelica definition also includes
+       `pre(mode) == Stuck and (...)` and other disjuncts that are silently
+       dropped in the lowering. Newton's method inside the DAE solver
+       therefore sees a structurally singular column and cannot equilibrate.
+       Proper fix requires discrete-variable + event handling (`pre()` with
+       previous-event-value, zero-crossing events on the `<` predicates),
+       not a patch at the tearing or codegen layer. Kept as broken to
+       track progress. =#
     @testset "Rotational.Friction" begin
       @test_broken begin
         sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.Friction";
@@ -277,18 +315,120 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
       end
     end
 
-    #= PID_Controller: PID control of a spring-mass-damper system.
-       Passes once `foldParameterClosure` (simCodeUtil.jl) promotes the
-       purely-algebraic kinematicPTP unknowns (aux1[1], aux2[1], sd_max,
-       sdd_max, Ta1, Ta2) to PARAMETERs with bindExp. That supplies MTK
-       with numeric values for the parameter closure before Newton sees
-       `sqrt(1/sdd_max)` and `-sd_max/sdd_max` at the zero guess, which
-       was the source of the NaN/Inf init-failure. =#
-    @testset "PID_Controller" begin
-      @test begin
-        sol = OM.simulate("Modelica.Blocks.Examples.PID_Controller";
-                          MSL_Version = "MSL:3.2.3", stopTime = 4.0)
-        sol.retcode == _SUCCESS
+    #= PID_Controller moved to heavyTests.jl — full spring-mass-damper plant,
+       multi-minute simulate. =#
+  end
+
+  #= ----------------------------------------------------------------
+     Modelica.ComplexBlocks
+     ---------------------------------------------------------------- =#
+  @testset verbose=true "ComplexBlocks" begin
+
+    #= ShowTransferFunction: DAE.RECORD-in-MTK-codegen regression.
+
+       The TransferFunction block uses Modelica.ComplexMath.j (a Complex
+       constant) inside `(j*w)^(i-1)`. The frontend inlines the `j`
+       constant, leaving a DAE.RECORD(IDENT("Complex"), [0.0, 1.0], [...])
+       node for the backend to lower.
+
+       Before the DAE.RECORD case was added to
+       `OMBackend.CodeGeneration.expToJuliaExpMTK`, OM.translate() on this
+       model threw `DAE.RECORD(...) not yet supported` from the fallback
+       arm of the expression match. This test pins the translate path so
+       the regression cannot come back silently.
+
+       NOTE: We only assert that translate() succeeds here. OM.simulate()
+       on this model still fails with a separate, pre-existing bug about
+       flattened complex arrays (`transferFunction_aw_re` as a whole-array
+       reference). That is tracked independently; bundling it into this
+       regression test would couple two unrelated issues. =#
+    @testset "ShowTransferFunction translate (DAE.RECORD lowering)" begin
+      @test true == begin
+        try
+          OM.translate("Modelica.ComplexBlocks.Examples.ShowTransferFunction";
+                       MSL_Version = "MSL:3.2.3")
+          true
+        catch e
+          msg = sprint(showerror, e)
+          if occursin("DAE.RECORD", msg)
+            @error "DAE.RECORD regression (expected: handler in expToJuliaExpMTK)" msg
+          else
+            @error "ShowTransferFunction translate failed" exception=(e, catch_backtrace())
+          end
+          false
+        end
+      end
+    end
+  end
+
+  @testset verbose=true "MultiBody" begin
+
+    #= PointGravity: DAE_identifierToString unsupported DAE.ARRAY regression.
+
+       `Modelica.Mechanics.MultiBody.Parts.Body` has a Real[4] quaternion
+       state `Q`. Equations like
+         frame_a.R = Frames.from_Q(Q, Frames.Quaternions.angularVelocity2(Q, der(Q)))
+       expose `der(Q)` as a DAE.ARRAY of element CREFs to the der-handler
+       in `DAECallExpressionToMTKCallExpression`. Before the fix the
+       handler called `DAE_identifierToString(listHead(expLst))` on the
+       DAE.ARRAY and threw
+         "DAE_identifierToString: unsupported argument of type DAE.ARRAY ..."
+       Surfaced in the 2026-04-23 Mechanics coverage run on PointGravity,
+       HeatLosses, PointGravityWithPointMasses2, and PrismaticConstraint.
+
+       The fix extends the der/pre arms to scalarize DAE.ARRAY of CREFs
+       into `[der(e1), der(e2), ...]`. Here we only assert translate
+       succeeds; full simulation of PointGravity is a separate concern
+       (downstream Pantelides / init issues). =#
+    @testset "PointGravity translate (DAE_ARRAY_IN_CREF regression)" begin
+      @test true == begin
+        try
+          OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.PointGravity";
+                       MSL_Version = "MSL:3.2.3")
+          true
+        catch e
+          msg = sprint(showerror, e)
+          if occursin("unsupported argument of type DAE.ARRAY", msg)
+            @error "DAE_ARRAY_IN_CREF regression (expected: der/pre ARRAY scalarization)" msg
+          else
+            @error "PointGravity translate failed" exception=(e, catch_backtrace())
+          end
+          false
+        end
+      end
+    end
+  end
+
+  @testset verbose=true "Spice3 record lowering" begin
+    #= Spice3.Inverter: DAE.RECORD(Modelica.Electrical.Spice3.Internal.Mosfet.Mosfet)
+       is a many-field parameter record passed as a function argument. Before
+       the fix, only `DAE.RECORD(IDENT("Complex"), …)` had an arm in
+       expToJuliaExpMTK; qualified-path records fell through to the generic
+       "not yet supported" error. The fix adds a generic fallback that
+       emits a NamedTuple keyed by field names. Regression path of concern
+       (FilterWithDifferentiation hitting DAE.ARRAY via
+       DAECallExpressionToMTKCallExpression) is itself guarded by the B4 fix
+       which scalarizes DAE.ARRAY in der/pre arms. =#
+    for modelName in ["Modelica.Electrical.Spice3.Examples.Inverter",
+                      "Modelica.Electrical.Spice3.Examples.Nor",
+                      "Modelica.Electrical.Spice3.Examples.Nand",
+                      "Modelica.Electrical.Spice3.Examples.FourInverters",
+                      "Modelica.Blocks.Examples.FilterWithDifferentiation"]
+      @testset "translate $(last(split(modelName, '.')))" begin
+        @test true == begin
+          try
+            OM.translate(modelName; MSL_Version = "MSL:3.2.3")
+            true
+          catch e
+            msg = sprint(showerror, e)
+            if occursin("DAE.RECORD", msg)
+              @error "DAE.RECORD regression (expected: generic record arm + B4 DAE.ARRAY scalarization)" modelName msg
+            else
+              @error "$modelName translate failed" exception=(e, catch_backtrace())
+            end
+            false
+          end
+        end
       end
     end
   end

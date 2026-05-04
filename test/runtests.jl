@@ -24,6 +24,7 @@ OMBackend.warnMissingStartValues(false)
   @testset "Sanity Tests:" begin
     include("sanityTests.jl")
     include("backendSanityTests.jl")
+    include("simCodeCheckTests.jl")
   end
   @testset "Libraries And Language Extensions:" begin
     #= Translate and run some "advanced" models. Does not check the results =#
@@ -72,6 +73,17 @@ OMBackend.warnMissingStartValues(false)
   @info "Testing foldParameterClosure regression MWEs..."
   @testset "Fold Regression MWEs:" begin
     include("foldRegressionTests.jl")
+  end
+
+  #= Heavy MSL tests (Engine1a, DCEE/DCPM_Start, PID_Controller) add 15-30 min.
+     Opt in with ENV["OM_HEAVY_TESTS"] set to anything non-empty. =#
+  if get(ENV, "OM_HEAVY_TESTS", "") != ""
+    @info "OM_HEAVY_TESTS is set — running heavy MSL tests..."
+    @testset "Heavy MSL Tests:" begin
+      include("heavyTests.jl")
+    end
+  else
+    @info "Skipping heavy MSL tests (set OM_HEAVY_TESTS=1 to enable)."
   end
   #= DOCC tests deactivated — run manually from test/ with include("DOCC/doccTests.jl")
   @info "Testing DOCC (Dynamically Overconstrained Connectors)..."

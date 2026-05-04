@@ -41,4 +41,16 @@
       end
     end
   end
+  @testset "Complex.* multiply with .re/.im field access (DAE.RSUB)" begin
+    #= Regression for the BDAE → MTK lowering of `c.re` / `c.im` where
+       `c = a * b` on the MSL `Complex` operator record. The multiply
+       lowers to `Complex_'*'_multiply(...)` and the field access
+       produces `DAE.RSUB(call, idx, fieldName, _)`, which previously
+       crashed MTK codegen with "DAE.RSUB not yet supported". =#
+    @test true == begin
+      OM.translate("RsubTest", "./Models/RsubTest.mo"; MSL = true)
+      sol = OM.simulate("RsubTest"; tspan = (0.0, 1.0))
+      string(sol.retcode) == "Success"
+    end
+  end
 end
