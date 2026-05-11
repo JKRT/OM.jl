@@ -85,6 +85,25 @@
       end
     end
 
+    #= Regression for the qualified Modelica.Utilities.* dispatch table.
+       Without an entry in MODELICA_UTILITIES_TO_RUNTIME_C, qualified calls
+       like Modelica.Utilities.Strings.substring lower to a bare Symbol of
+       the dot-flattened path (Modelica_Utilities_Strings_substring) which
+       has no binding in the generated module, raising UndefVarError at
+       simulate time (e.g. Electrical.Machines.Examples.Transformers.Rectifier6pulse). =#
+    @testset "Modelica.Utilities runtime-C dispatch table" begin
+      local table = OMBackend.CodeGeneration.AlgorithmicCodeGeneration.MODELICA_UTILITIES_TO_RUNTIME_C
+      @test haskey(table, "Modelica_Utilities_Strings_length")
+      @test haskey(table, "Modelica_Utilities_Strings_substring")
+      @test haskey(table, "Modelica_Utilities_Strings_skipWhiteSpace")
+      @test table["Modelica_Utilities_Strings_substring"] === :ModelicaStrings_substring
+      @test table["Modelica_Utilities_Strings_length"]    === :ModelicaStrings_length
+      #= Every mapped target must actually exist in OMRuntimeExternalC. =#
+      for (_, sym) in table
+        @test isdefined(ORC, sym)
+      end
+    end
+
     #= End-to-end Modelica simulation tests using external "C" functions. =#
     @testset "External Function Simulation" begin
       @testset "String length in ODE coefficient" begin
@@ -137,6 +156,19 @@
             local msg = sprint(showerror, e)
             !occursin(r"`stateOut` not defined|`result` not defined|`finalState` not defined", msg)
           end
+        end
+      end
+      @testset "CombiTable1D Real[:,:] parameter emission" begin
+        #= Regression for the Real[:,:] parameter emission gap in DATA_STRUCTURE codegen.
+           ExternalCombiTable1D.constructor takes tableData (Real[:,:]); before the fix
+           that parameter was never emitted at module level, causing UndefVarError at
+           module load time. After the fix the module loads, the C constructor runs,
+           and der(x)=-x with x(0)=1 gives x(1)=exp(-1) (verified against OMC). =#
+        @test begin
+          sol = OM.simulate("ExternalBuiltinTest.CombiTable1DModel",
+                            "./Models/ExternalBuiltinTest.mo"; stopTime = 1.0)
+          testResultRetCodeSuccess(sol; symbol = :x,
+                                   expectedValue = exp(-1.0), atol = 1e-4)
         end
       end
     end

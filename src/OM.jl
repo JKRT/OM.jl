@@ -487,7 +487,7 @@ function simulate(modelName::String;
                   overwriteCache::Bool = false,
                   kwargs...)
   OMBackend.DIRECT_RHS_GENERATION[] = directRHS
-  internalName = replace(modelName, "." => "__")
+  internalName = OMBackend.canonicalName(modelName)
   alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
   if (!alreadyCompiled || overwriteCache) && MSL
     translate(modelName;
@@ -641,7 +641,7 @@ function writeModelToFile(modelName::String, modelFile::String, filePath::String
                           keepComments = true,
                           keepBeginBlocks = true)
   translate(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, mode = mode)
-  internalName = replace(modelName, "." => "__")
+  internalName = OMBackend.canonicalName(modelName)
   OMBackend.writeModelToFile(internalName, filePath; keepComments = keepComments, keepBeginBlocks = keepBeginBlocks)
 end
 
@@ -662,7 +662,7 @@ function writeModelToFile(modelName::String, filePath::String;
                           keepComments = true,
                           keepBeginBlocks = true)
   translate(modelName; MSL_Version = MSL_Version, mode = mode)
-  internalName = replace(modelName, "." => "__")
+  internalName = OMBackend.canonicalName(modelName)
   OMBackend.writeModelToFile(internalName, filePath; keepComments = keepComments, keepBeginBlocks = keepBeginBlocks)
 end
 

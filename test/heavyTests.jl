@@ -91,24 +91,44 @@ const _HEAVY_SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
   end
 
   @testset verbose=true "MSL MultiBody Loops (heavy)" begin
-    # TODO: Engine1a only asserts retcode == Success. Add signal-level
-    # validate against the omc reference trajectory
-    # (reference/csv/Mechanics_MultiBody_Examples_Loops_Engine1a.csv if
-    # present, or generate one). A passing retcode does not catch
-    # wrong-but-stable integration. Same gap exists for the entire
-    # Engine family (Engine1a, Engine1b, Engine1b_analytic, Engine1bV6,
-    # EngineV6, EngineV6_analytic) and for Fourbar*, PlanarLoops_analytic,
-    # and the RobotR3 examples — none are reference-validated in the
-    # Julia OM.jl test suite today. Note: OMLibraryTesting.jl DOES
-    # signal-validate these when reference CSVs exist, but that is the
-    # coverage harness, not the main runtests.jl guardrail.
+    # Engine1a: closed-loop crank/rod/piston engine with `Inertia.w(start=10,
+    # fixed=true)`. OM.jl currently returns retcode == Success but the
+    # simulation is silently stuck — every state stays at its initial value
+    # for the full window because OM.jl's MTK codegen does not lower
+    # `fixed=true` start attributes into MTK `initialization_eqs` (hard
+    # constraints). The init solver picks the trivial fixed-point
+    # `Inertia_w = 0` instead of the user-specified `start = 10`, the
+    # closed-loop kinematic chain is consistent at zero, and the integrator
+    # exits in 3 steps with no motion. See `.claude/CLAUDE.md`
+    # "Engine1a silently stuck-at-IC" for the full root-cause writeup.
+    #
+    # The trajectory comparison below uses OMC reference values captured
+    # 2026-05-06 from `omc /tmp/probe_engine1a.mos` (DASSL, tol=1e-6). The
+    # @test_broken arms flip to passing once the start-attribute /
+    # initialization_eqs codegen gap is fixed.
     @testset "MSL Engine1a" begin
-      @test begin
-        sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a";
-                          MSL_Version = "MSL:3.2.3", stopTime = 0.72,
-                          solver = OMBackend.DifferentialEquations.FBDF())
-        sol.retcode == _HEAVY_SUCCESS
+      sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a";
+                        MSL_Version = "MSL:3.2.3", stopTime = 1.0,
+                        solver = OMBackend.DifferentialEquations.FBDF())
+      @test sol.retcode == _HEAVY_SUCCESS
+      local sys = OMBackend.Modelica_Mechanics_MultiBody_Examples_Loops_Engine1a.LATEST_REDUCED_SYSTEM
+      local lookup = Dict{String, Any}()
+      for u in OMBackend.ModelingToolkit.unknowns(sys); lookup[replace(string(u), "(t)" => "")] = u; end
+      for eq in OMBackend.ModelingToolkit.observed(sys); lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs; end
+      #= OMC reference at t=1.0: crank rotating at ~10.9 rad/s, piston
+         oscillating around 0.15. =#
+      local refs = (
+        "Inertia_phi" => 10.767544,
+        "Inertia_w"   => 10.907844,
+        "Cylinder_s"  =>  0.197932,
+        "Cylinder_v"  => -0.925036,
+      )
+      for (name, omcRef) in refs
+        @test isapprox(sol(1.0; idxs = lookup[name]), omcRef; atol = 1e-1)
       end
+      #= Sanity check that the stuck-at-IC bug is gone: Inertia_w(t=1.0)
+         is far from 0 (~10.9 per OMC). =#
+      @test !isapprox(sol(1.0; idxs = lookup["Inertia_w"]), 0.0; atol = 1e-3)
     end
   end
 

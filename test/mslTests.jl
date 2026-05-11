@@ -583,6 +583,77 @@ end
 #= MSL Electrical Machines DCEE_Start / DCPM_Start moved to heavyTests.jl
    (gated behind ENV["OM_HEAVY_TESTS"]). =#
 
+#= MSL Blocks regression tests.
+
+   `Modelica.Blocks.Examples.InverseModel` is a small inverse-model topology
+   (sine → criticalDamping → inverseBlockConstraints → firstOrder1/firstOrder2)
+   with `initType = SteadyState` on the two FirstOrder blocks. The steady-state
+   init equations `der(firstOrder1.y) = 0` / `der(firstOrder2.y) = 0` together
+   with the runtime equation `der(y) = (k*u - y)/T` solve to `y(0) = k * u(0)`,
+   which the inverse-block topology pins to the source value `sine.offset = 1.0`.
+
+   This exercises the OMBackend init-equation lowering path
+   (`generateInitialEquationsAsConstraints` in MTK_CodeGeneration.jl, fed into
+   `ODESystem(...; initialization_eqs = ...)`). A regression here typically
+   shows up as `firstOrder1.y(0) = 0` instead of 1.0, because the `start = 0.0`
+   guess gets used as a hard u0 instead of the init solver finding the
+   consistent steady-state IC. =#
+@testset verbose=true "MSL Blocks" begin
+
+  @testset "MSL InverseModel" begin
+    sol = nothing
+    @test true == begin
+      try
+        sol = OM.simulate("Modelica.Blocks.Examples.InverseModel";
+                          MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      catch e
+        @info "Failed to simulate MSL InverseModel" exception=(e, catch_backtrace())
+        false
+      end
+    end
+    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      local sys = OMBackend.Modelica_Blocks_Examples_InverseModel.LATEST_REDUCED_SYSTEM
+      local lookup = Dict{String, Any}()
+      for u in OMBackend.ModelingToolkit.unknowns(sys)
+        lookup[replace(string(u), "(t)" => "")] = u
+      end
+      for eq in OMBackend.ModelingToolkit.observed(sys)
+        lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs
+      end
+      #= OMC reference trajectory captured 2026-05-10 from
+         `omc <(echo 'loadModel(Modelica, {"3.2.3+maint.om"}); simulate(...);')`
+         and stored as Blocks_Examples_InverseModel.csv. Default solver
+         tolerances. Tracks the steady-state init solve at t=0. =#
+      local refs = ("firstOrder1_y" => Dict(0.0 => 1.0,
+                                            0.25 => 1.571376556,
+                                            0.5 => 0.428623938,
+                                            0.75 => 1.571376072,
+                                            1.0 => 0.428623678),
+                    "firstOrder2_y" => Dict(0.0 => 1.0,
+                                            0.25 => 1.571376556,
+                                            0.5 => 0.428623938,
+                                            0.75 => 1.571376072,
+                                            1.0 => 0.428623678))
+      for (name, points) in refs
+        for (t, omcRef) in points
+          @test isapprox(sol(t; idxs = lookup[name]), omcRef; atol = 1e-2)
+        end
+      end
+      @test begin
+        passed, details = validateMSLModel(sol,
+          "Blocks_Examples_InverseModel";
+          stopTime = 1.0, atol = 1e-2, reltol = 1e-2)
+        if !passed
+          @warn "InverseModel validation failed" details
+        end
+        passed
+      end
+    end
+  end
+
+end
+
 @testset verbose=true "MSL Electrical Analog" begin
 
   @testset "MSL HeatingRectifier" begin
@@ -714,51 +785,110 @@ end
 
 @testset verbose=true "MSL MultiBody Models" begin
 
-  #= MSL Pendulum: the full Modelica Standard Library Pendulum example. =#
+  #= MSL Pendulum: single revolute joint with gravity + damper.
+
+     OMC reference trajectories captured 2026-05-06 from
+       omc /tmp/probe_pendulum.mos
+     (DASSL solver, tolerance 1e-6, stopTime=1.0).
+
+     Single-joint multibody: OM.jl reduces to 13 unknowns / 13 equations
+     with 2 differential states (body_w_a[2], rev_phi) and agrees with
+     OMC across the full t∈[0,1] window at the 1e-3 level. The redundant
+     rotation-matrix state bug that breaks DoublePendulum past t≈0.5 does
+     NOT trigger here because there is only one revolute joint and no
+     chain of `R_rel` propagation to confuse structural_simplify. =#
   @testset "MSL Pendulum" begin
-    @test true == begin
-      try
-        sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                          MSL_Version = "MSL:3.2.3",
-                          stopTime = 1.0)
-        @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-        passed, details = validateMSLModel(sol,
-          "Mechanics_MultiBody_Examples_Elementary_Pendulum";
-          stopTime = 1.0, reltol = 0.01, atol = 0.01)
-        if !passed
-          @warn "Pendulum validation failed" details
-        end
-        passed
-      catch e
-        @info "Failed to simulate MSL Pendulum" exception=(e, catch_backtrace())
-        false
+    @testset "trajectory matches OMC" begin
+      sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
+                        MSL_Version = "MSL:3.2.3", stopTime = 1.0,
+                        solver = OMBackend.DifferentialEquations.FBDF())
+      @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      local sys = OMBackend.Modelica_Mechanics_MultiBody_Examples_Elementary_Pendulum.LATEST_REDUCED_SYSTEM
+      local lookup = Dict{String, Any}()
+      for u in OMBackend.ModelingToolkit.unknowns(sys); lookup[replace(string(u), "(t)" => "")] = u; end
+      for eq in OMBackend.ModelingToolkit.observed(sys); lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs; end
+      #= OMC reference values at sample time points. damper.phi_rel and
+         damper.w_rel track rev.phi/rev.w because the damper connects
+         rev.support↔rev.axis (relative angle = joint angle). =#
+      local refs = (
+        (0.1, "rev_phi"        => -0.0963596,  "rev_w"        => -1.913301),
+        (0.1, "damper_phi_rel" => -0.0963596,  "damper_w_rel" => -1.913301),
+        (0.5, "rev_phi"        => -1.946926,   "rev_w"        => -5.381719),
+        (0.5, "damper_phi_rel" => -1.946926,   "damper_w_rel" => -5.381719),
+        (1.0, "rev_phi"        => -2.580713,   "rev_w"        =>  3.174131),
+        (1.0, "damper_phi_rel" => -2.580713,   "damper_w_rel" =>  3.174131),
+      )
+      for (t, ref1, ref2) in refs
+        @test isapprox(sol(t; idxs = lookup[ref1.first]), ref1.second; atol = 1e-2)
+        @test isapprox(sol(t; idxs = lookup[ref2.first]), ref2.second; atol = 1e-2)
       end
+      #= Keep the existing validateMSLModel sanity check. =#
+      passed, details = validateMSLModel(sol,
+        "Mechanics_MultiBody_Examples_Elementary_Pendulum";
+        stopTime = 1.0, reltol = 0.01, atol = 0.01)
+      if !passed
+        @warn "Pendulum validateMSLModel failed" details
+      end
+      @test passed
     end
   end
 
   #= MSL DoublePendulum: two revolute joints with gravity.
-     Known broken: FBDF solver returns ReturnCode.Unstable on the 30-unknown
-     multibody DAE with redundant orthogonality constraints. Signals blow up
-     to O(1e10) vs reference O(1). Not a fold regression (this test is new,
-     not in HEAD); solver stability issue needs separate investigation. =#
+
+     OMC reference trajectories captured 2026-05-06 from
+       omc /tmp/probe_dp.mos
+     using DASSL solver, tolerance 1e-6, stopTime=1.0.
+
+     OM.jl (FBDF defaults, MSL 3.2.3) reproduces OMC to ~1e-3 tolerance up
+     to t≈0.5, then diverges catastrophically (revolute1.w jumps from
+     -4.4 to -7.2 rad/s in a single 25ms step) due to a pre-existing
+     OMBackend defect: `Joints.Revolute` lowers to a state vector that
+     contains BOTH `revolute1_phi` and `revolute1_R_rel_T[1][2]` as
+     differential states, tied by `0 ~ R_rel_T[1][2] - sin(phi)`. The
+     redundancy survives MTK's structural_simplify and the constraint
+     stabilizer eventually re-projects to a different valid root. See
+     `.claude/CLAUDE.md` "Revolute joint redundant rotation-matrix state"
+     for the full investigation. =#
   @testset "MSL DoublePendulum" begin
-    @test_broken true == begin
-      try
-        sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.DoublePendulum";
-                          MSL_Version = "MSL:3.2.3", stopTime = 1.0,
-                          solver = OMBackend.DifferentialEquations.FBDF(),
-                          reltol = 1e-5, abstol = 1e-8)
-        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success || return false
-        passed, details = validateMSLModel(sol,
-          "Mechanics_MultiBody_Examples_Elementary_DoublePendulum";
-          stopTime = 1.0, reltol = 0.01, atol = 0.05)
-        if !passed
-          @warn "DoublePendulum validation failed" details
-        end
-        passed
-      catch e
-        @info "Failed to simulate MSL DoublePendulum" exception=(e, catch_backtrace())
-        false
+    @testset "trajectory matches OMC at t=0.4" begin
+      #= OMC reference is DASSL tol=1e-6; FBDF defaults (reltol=1e-3) leave
+         revolute2_w within ~9e-3 of OMC. Tighten to 1e-8 to match the
+         reference accuracy and keep the strict 5e-3 atol. =#
+      sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.DoublePendulum";
+                        MSL_Version = "MSL:3.2.3", stopTime = 0.5,
+                        solver = OMBackend.DifferentialEquations.FBDF(),
+                        abstol = 1e-8, reltol = 1e-8)
+      @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      local sys = OMBackend.Modelica_Mechanics_MultiBody_Examples_Elementary_DoublePendulum.LATEST_REDUCED_SYSTEM
+      local lookup = Dict{String, Any}()
+      for u in OMBackend.ModelingToolkit.unknowns(sys); lookup[replace(string(u), "(t)" => "")] = u; end
+      for eq in OMBackend.ModelingToolkit.observed(sys); lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs; end
+      local refsAt04 = ("revolute1_phi"  => -1.2464780347,
+                       "revolute1_w"     => -2.0700326513,
+                       "revolute2_phi"   =>  0.2601836221,
+                       "revolute2_w"     => -9.3163735466,
+                       "damper_phi_rel"  => -1.2464780347,
+                       "damper_w_rel"    => -2.0700326513)
+      for (name, omcRef) in refsAt04
+        local omjl = sol(0.4; idxs = lookup[name])
+        @test isapprox(omjl, omcRef; atol = 5e-3)
+      end
+    end
+
+    @testset "trajectory matches OMC at t=1.0" begin
+      sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.DoublePendulum";
+                        MSL_Version = "MSL:3.2.3", stopTime = 1.0,
+                        solver = OMBackend.DifferentialEquations.FBDF())
+      local sys = OMBackend.Modelica_Mechanics_MultiBody_Examples_Elementary_DoublePendulum.LATEST_REDUCED_SYSTEM
+      local lookup = Dict{String, Any}()
+      for u in OMBackend.ModelingToolkit.unknowns(sys); lookup[replace(string(u), "(t)" => "")] = u; end
+      for eq in OMBackend.ModelingToolkit.observed(sys); lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs; end
+      local refsAt10 = ("revolute1_phi"  => -2.9156614600,
+                       "revolute1_w"     =>  2.9445463980,
+                       "revolute2_phi"   => -0.5152193800,
+                       "revolute2_w"     => -7.2490700000)
+      for (name, omcRef) in refsAt10
+        @test isapprox(sol(1.0; idxs = lookup[name]), omcRef; atol = 5e-2)
       end
     end
   end

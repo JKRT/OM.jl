@@ -24,7 +24,7 @@ end
     testResultRetCodeSuccess(sol; symbol = :vehicleSpeed , expectedValue = 1.1977088848134451e-15, rtol = 0.5)
   end
   @test true == begin
-    sol = OM.simulate("PersonalityAspects.Example1", "./Models/PAspects.mo"; startTime = 0.0, stopTime = 60., solver = FBDF(autodiff=AutoFiniteDiff()), abstol =1e-2, reltol=1e-2)
+    sol = OM.simulate("PersonalityAspects.Example1", "./Models/PAspects.mo"; startTime = 0.0, stopTime = 60., solver = FBDF(autodiff=ADTypes.AutoFiniteDiff()), abstol =1e-2, reltol=1e-2)
     testResultRetCodeSuccess(sol; symbol = :john0_personBehavior_DNTime , expectedValue = 12.0, rtol = 0.5)
   end
 end

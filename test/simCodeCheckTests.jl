@@ -62,6 +62,6 @@ end
     local buf = IOBuffer()
     SimCodeCheck.report(buf, result)
     local text = String(take!(buf))
-    @test occursin("SimCodeCheck", text)
+    @test occursin("[SIMCODE: check]", text)
   end
 end

@@ -49,4 +49,44 @@ package ExternalBuiltinTest
     der(x) = -coef * x;
   end Xorshift128plusModel;
 
+  class ExternalCombiTable1D
+    extends ExternalObject;
+    function constructor
+      input String tableName;
+      input String fileName;
+      input Real[:,:] table;
+      input Integer[:] columns;
+      input Integer smoothness;
+      input Integer extrapolation;
+      input Boolean verboseRead;
+      output ExternalCombiTable1D tableID;
+      external "C" tableID = ModelicaStandardTables_CombiTable1D_init2(
+        fileName, tableName, table,
+        size(table, 1), size(table, 2),
+        columns, size(columns, 1),
+        smoothness, extrapolation, verboseRead)
+        annotation(Library = {"ModelicaStandardTables", "ModelicaIO", "ModelicaMatIO", "zlib"},
+                   LibraryDirectory = "modelica://Modelica/Resources/Library");
+    end constructor;
+    function destructor
+      input ExternalCombiTable1D tableID;
+      external "C" ModelicaStandardTables_CombiTable1D_close(tableID)
+        annotation(Library = {"ModelicaStandardTables", "ModelicaIO", "ModelicaMatIO", "zlib"},
+                   LibraryDirectory = "modelica://Modelica/Resources/Library");
+    end destructor;
+  end ExternalCombiTable1D;
+
+  model CombiTable1DModel
+    "Minimal reproducer: ExternalObject constructor takes a Real[:,:] parameter.
+     Before fix: UndefVarError because tableData is never emitted at module level.
+     After fix: module loads and the C constructor runs."
+    parameter Real[:,:] tableData = [0.0, 0.0; 1.0, 2.0; 2.0, 4.0];
+    parameter Integer[:] cols = {2};
+    protected parameter ExternalCombiTable1D tbl = ExternalCombiTable1D(
+      "NoName", "NoName", tableData, cols, 1, 1, false);
+    Real x(start = 1.0);
+  equation
+    der(x) = -x;
+  end CombiTable1DModel;
+
 end ExternalBuiltinTest;

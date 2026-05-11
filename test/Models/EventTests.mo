@@ -359,4 +359,54 @@ package EventTests "Comprehensive test models for Modelica event handling"
     end when;
   end ThermostatController;
 
+  // ========================================================================
+  // SECTION: Boolean alias residuals
+  //
+  // These exercise the "discrete alias fix" path in MTK_CodeGeneration.jl.
+  // Each model defines a Boolean discrete via an alias residual whose RHS
+  // returns a Boolean value (not a constant). MTK uses the alias to
+  // eliminate the discrete; the matching `der(disc) ~ 0` dummy must be
+  // suppressed up-front, otherwise structural_simplify reports an extra
+  // equation. Reproduces the over-determination that surfaced in
+  // MSL ElastoGap (`Boolean contact = s_rel < s_rel0`).
+  // ========================================================================
+
+  model BooleanComparisonAlias "Boolean discrete = (state < threshold)"
+    Real x(start = 0);
+    Boolean active;
+  equation
+    der(x) = 1.0;
+    active = x > 0.5;
+  end BooleanComparisonAlias;
+
+  model BooleanCompoundAndAlias "Boolean = (cmp1) and (cmp2) - logical AND of comparisons"
+    Real x(start = 0);
+    Real y(start = 0);
+    Boolean both;
+  equation
+    der(x) = 1.0;
+    der(y) = 0.5;
+    both = (x > 0.3) and (y > 0.2);
+  end BooleanCompoundAndAlias;
+
+  model BooleanCompoundOrAlias "Boolean = (cmp1) or (cmp2) - logical OR of comparisons"
+    Real x(start = 0);
+    Real y(start = 0);
+    Boolean either;
+  equation
+    der(x) = 1.0;
+    der(y) = 0.5;
+    either = (x > 0.7) or (y > 0.4);
+  end BooleanCompoundOrAlias;
+
+  model BooleanNotAlias "Boolean inactive = not active"
+    Real x(start = 0);
+    Boolean active;
+    Boolean inactive;
+  equation
+    der(x) = 1.0;
+    active = x > 0.5;
+    inactive = not active;
+  end BooleanNotAlias;
+
 end EventTests;

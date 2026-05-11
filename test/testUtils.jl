@@ -7,6 +7,7 @@ import Pkg
 
 using MetaModelica
 using Test
+using ADTypes
 using DifferentialEquations
 using Logging
 

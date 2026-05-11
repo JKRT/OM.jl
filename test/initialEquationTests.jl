@@ -27,6 +27,13 @@ const IEQ_MODELS = [
   "InitialEquationTests.IEQ7_FixedFalseParamNoBind",
 ]
 
+#= MSL-using models for the fixed=true / closed-loop init regression
+   (smaller variant of MSL Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a). =#
+const IEQ_MSL_MODELS = [
+  "InitialEquationTests.IEQ8a_StandaloneInertiaFixedStart",
+  "InitialEquationTests.IEQ8b_SpringLoopFixedStart",
+]
+
 @testset "Initial Equations" begin
 
   @testset "Flatten" begin
@@ -182,6 +189,80 @@ const IEQ_MODELS = [
       if sol !== nothing
         @test sol.retcode == ReturnCode.Success
         @test isapprox(last(sol.u)[1], exp(-0.5); rtol = 1e-4)
+      end
+    end
+
+    @testset "IEQ8a: standalone inertia with fixed=true start (sanity peer)" begin
+      #= Inertia with phi(start=0, fixed=true), w(start=10, fixed=true).
+         No closed loop, no algebraic aliasing of the velocity. The init
+         constraints emitted by getFixedStartConstraintsMTK pin both states
+         in a pure-ODE reduced system, so the integrator starts from
+         (phi, w) = (0, 10). With zero applied torque the inertia coasts
+         at constant 10 rad/s, so phi(1) = 10. =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationTests.IEQ8a_StandaloneInertiaFixedStart",
+                          IEQ_MODEL_FILE;
+                          MSL = true, MSL_Version = "MSL:3.2.3",
+                          stopTime = 1.0)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IEQ8a simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+        local sysmod = Base.invokelatest(getfield, OMBackend,
+                                          Symbol("InitialEquationTests_IEQ8a_StandaloneInertiaFixedStart"))
+        local sys = Base.invokelatest(getproperty, sysmod, :LATEST_REDUCED_SYSTEM)
+        local unks = OMBackend.ModelingToolkit.unknowns(sys)
+        local i1w = findfirst(u -> string(u) == "I1_w(t)", unks)
+        local i1phi = findfirst(u -> string(u) == "I1_phi(t)", unks)
+        @test i1w !== nothing && i1phi !== nothing
+        if i1w !== nothing
+          @test isapprox(sol.u[1][i1w], 10.0; atol = 1e-6)
+          @test isapprox(sol.u[end][i1w], 10.0; atol = 1e-6)
+        end
+        if i1phi !== nothing
+          @test isapprox(sol.u[1][i1phi], 0.0; atol = 1e-6)
+          @test isapprox(sol.u[end][i1phi], 10.0; atol = 1e-3)
+        end
+      end
+    end
+
+    @testset "IEQ8b: closed-loop init regression (Engine1a pattern, mini)" begin
+      #= Two inertias coupled by SpringDamper on one path, rigid link on the
+         other (closed kinematic loop). I1.w(start=10, fixed=true). The
+         spring carries no torque at t=0 (sd.phi_rel(0)=0), so the engine
+         coasts at constant 10 rad/s and I1.phi(1) ≈ 10. =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationTests.IEQ8b_SpringLoopFixedStart",
+                          IEQ_MODEL_FILE;
+                          MSL = true, MSL_Version = "MSL:3.2.3",
+                          stopTime = 1.0)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IEQ8b simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+        local sysmod = Base.invokelatest(getfield, OMBackend,
+                                          Symbol("InitialEquationTests_IEQ8b_SpringLoopFixedStart"))
+        local sys = Base.invokelatest(getproperty, sysmod, :LATEST_REDUCED_SYSTEM)
+        local unks = OMBackend.ModelingToolkit.unknowns(sys)
+        local i1w = findfirst(u -> string(u) == "I1_w(t)", unks)
+        local i1phi = findfirst(u -> string(u) == "I1_phi(t)", unks)
+        @test i1w !== nothing && i1phi !== nothing
+        if i1w !== nothing
+          @test isapprox(sol.u[1][i1w], 10.0; atol = 1e-6)
+          @test isapprox(sol.u[end][i1w], 10.0; atol = 1e-3)
+        end
+        if i1phi !== nothing
+          @test isapprox(sol.u[1][i1phi], 0.0; atol = 1e-6)
+          @test isapprox(sol.u[end][i1phi], 10.0; atol = 1e-3)
+        end
       end
     end
 

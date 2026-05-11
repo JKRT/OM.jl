@@ -74,6 +74,10 @@ OMBackend.warnMissingStartValues(false)
   @testset "Fold Regression MWEs:" begin
     include("foldRegressionTests.jl")
   end
+  @info "Testing discrete classification (when-driven Real vars)..."
+  @testset "Discrete Classification Regression:" begin
+    include("discreteClassificationTests.jl")
+  end
 
   #= Heavy MSL tests (Engine1a, DCEE/DCPM_Start, PID_Controller) add 15-30 min.
      Opt in with ENV["OM_HEAVY_TESTS"] set to anything non-empty. =#

@@ -14,3 +14,4 @@ deps/deps.jl
 .vscode/
 *.log
 Manifest.toml
+*.mat
