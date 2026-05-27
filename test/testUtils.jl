@@ -20,6 +20,7 @@ import OMBackend
 import OM
 
 using DifferentialEquations: ReturnCode, Rodas5
+import Sundials
 
 #=
   Model flattening and running utilities
@@ -162,21 +163,43 @@ testResultRetCodeSuccess(sol; symbol=:x, expectedValue=1.0)
 function testResultRetCodeSuccess(sol;
                                   variableIndex = nothing,
                                   symbol = nothing,
-                                  expectedValue,
+                                  expectedValue = nothing,
+                                  expectedValues = nothing,
                                   expectedRetCode = ReturnCode.Success,
                                   rtol = 1.0e-6,
                                   atol = 1.0e-6)
   local retcodeIsSuccess = expectedRetCode == sol.retcode
-  local valueWas = if variableIndex !== nothing
-    last(sol.u)[variableIndex]
-  elseif symbol !== nothing
-    _resolveSymbolInSol(sol, symbol)
-  else
-    error("testResultRetCodeSuccess: must provide either variableIndex or symbol")
+  if !retcodeIsSuccess
+    println("Expected retcode was:", string(expectedRetCode),
+            " but the retcode was:", string(sol.retcode))
   end
-  local lastSolEqualsReference = isapprox(expectedValue, valueWas; rtol = rtol, atol = atol)
-  valueErrorMsg(lastSolEqualsReference, valueWas, expectedValue)
-  return retcodeIsSuccess && lastSolEqualsReference
+  if expectedValue !== nothing
+    local valueWas = if variableIndex !== nothing
+      last(sol.u)[variableIndex]
+    elseif symbol !== nothing
+      _resolveSymbolInSol(sol, symbol)
+    else
+      error("testResultRetCodeSuccess: must provide either variableIndex or symbol with expectedValue")
+    end
+    local matched = isapprox(expectedValue, valueWas; rtol = rtol, atol = atol)
+    valueErrorMsg(matched, valueWas, expectedValue)
+    return retcodeIsSuccess && matched
+  end
+  if expectedValues !== nothing
+    local pairs_iter = expectedValues isa NamedTuple ? Base.pairs(expectedValues) : expectedValues
+    local allValuesOk = true
+    for (sym, expected) in pairs_iter
+      local valueWas = _resolveSymbolInSol(sol, Symbol(sym))
+      local matched = isapprox(expected, valueWas; rtol = rtol, atol = atol)
+      if !matched
+        println("Signal :", sym, " expected ", string(expected),
+                " but the value was:", string(valueWas))
+        allValuesOk = false
+      end
+    end
+    return retcodeIsSuccess && allValuesOk
+  end
+  error("testResultRetCodeSuccess: must provide expectedValue (with variableIndex or symbol) or expectedValues")
 end
 
 #= Resolve a solution value by symbol, handling both unknowns/observed and
@@ -253,7 +276,7 @@ function loadReferenceCSV(path::String)
   for (i, line) in enumerate(lines[2:end])
     vals = split(line, ',')
     for (j, v) in enumerate(vals)
-      data[i, j] = parse(Float64, strip(v))
+      data[i, j] = parse(Float64, strip(v, ['"', ' ', '\t', '\r']))
     end
   end
   time_vec = data[:, 1]

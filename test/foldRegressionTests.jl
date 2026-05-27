@@ -13,9 +13,9 @@
   - `FoldInsideIfBranch`   : parameter closure whose defining variable is
                              referenced only inside an if-equation BRANCH
                              (not the condition). The pre-fix broad
-                             `irreductableVariables` exclusion wrongly
+                             `irreducibleVariables` exclusion wrongly
                              blocked this from folding because
-                             `getIrreductableVars` flattened branch-body
+                             `getIrreducibleVars` flattened branch-body
                              vars. The narrow condition-only exclusion
                              allows it to fold.
   - `FoldBoolParamInIfCond`: parameter closure whose defining variable IS

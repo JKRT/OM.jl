@@ -49,7 +49,15 @@ import CSV
 import DataFrames
 import Pkg
 
-"""Re-export EliminationOptions for convenient access as OM.EliminationOptions."""
+"""
+    EliminationOptions
+
+Re-export of `OMBackend.SimulationCode.EliminationOptions`. Pass an instance to
+the `eliminateNonDynamic` keyword of `translate` / `simulate` for fine-grained
+control over which non-dynamic variables are removed before MTK code generation.
+
+See `OMBackend.SimulationCode.EliminationOptions` for the available fields.
+"""
 const EliminationOptions = OMBackend.SimulationCode.EliminationOptions
 
 function printWelcomeMessage()
@@ -67,7 +75,11 @@ if isinteractive()
 end
 
 """
-  List models that are currently available for direct simulation.
+    listAvailableModels()
+
+Print the names of all models currently compiled in the backend and available
+for direct calls to `simulate(modelName)` or `resimulate(modelName)`.
+Returns `nothing`.
 """
 function listAvailableModels()
   println("Lists currently compiled modules...")
@@ -109,13 +121,16 @@ function help()
   println("    ...; warnMissingStartValues=true     Show warnings for implicit 0.0 start values")
   println()
   printstyled("  Libraries:\n", color=:cyan)
-  println("    OM.loadLibrary(path)                  Load a Modelica library (.mo file)")
+  println("    OM.libraries()                        List installed Modelica libraries")
+  println("    OM.installLibrary(name; version=...)  Download and install a library")
+  println("    OM.loadInstalledLibrary(name; ...)    Load an installed library by name")
+  println("    OM.loadLibrary(path)                  Load a single .mo file")
   println("    OM.loadPackage(dir)                   Load a directory-based package")
   println("    OM.translate(n, f; libraries=[...])   Translate with user libraries")
   println("    OM.simulate(n, f; libraries=[...])    Simulate with user libraries")
   println()
   printstyled("  MSL support:\n", color=:cyan)
-  println("    OM.loadMSL(MSL_Version=\"MSL:3.2.3\") Load Modelica Standard Library")
+  println("    OM.loadInstalledLibrary(\"Modelica\"; version=\"4.0.0\")")
   println("    OM.translate(name, file; MSL=true)   Translate with MSL")
   println("    OM.translate(name; MSL_Version=...)   Translate an MSL model by name")
   println("    OM.simulate(name; MSL_Version=...)    Simulate an MSL model by name")
@@ -178,9 +193,76 @@ function loadPackage(dirPath::String; name = nothing)
 end
 
 """
-  Exports the csv of the simulation s.t it can be used by OMEdit.
-  To use the exported solution in OMEdit click
-  File in the top left corner then select Open Result(s) file.
+    libraries(; installDir = nothing) -> Dict{String, Vector{NamedTuple}}
+
+Return all Modelica libraries discovered in the OpenModelica installation
+directory (`~/.openmodelica/libraries/`) and the bundled `lib/Modelica/`
+folder (excluding the pre-packaged `MSL_*` files).
+
+Each value is a vector of `(version, path, source)` named tuples.
+
+# Example
+```julia
+avail = OM.libraries()
+# avail["Modelica"] => [(version="4.1.0", path="...", source=:installed), ...]
+```
+"""
+function libraries(; installDir = nothing)
+  OMFrontend.libraries(; installDir = installDir)
+end
+
+"""
+    loadInstalledLibrary(name; version=nothing, forceReload=false, autodeps=true) -> String
+
+Load a Modelica library discovered via `libraries()` into the cache.
+Returns the cache key for use in the `libraries` keyword argument of
+`translate` / `simulate`.
+
+# Keyword arguments
+- `version`: pin to a specific installed version (e.g. `"4.1.0"`). When
+  `nothing`, the highest discovered version is chosen.
+- `forceReload`: re-parse the library even if it is already cached.
+- `autodeps`: also load declared dependencies (e.g. `ModelicaServices`,
+  `Complex`) of the requested library.
+
+# Example
+```julia
+key = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")
+OM.simulate("Modelica.Blocks.Continuous.Integrator"; libraries = [key])
+```
+"""
+function loadInstalledLibrary(name::String; version = nothing, forceReload::Bool = false, autodeps::Bool = true)
+  OMFrontend.loadInstalledLibrary(name; version = version, forceReload = forceReload, autodeps = autodeps)
+end
+
+"""
+    installLibrary(name; version, dest = nothing) -> String
+
+Download and install a Modelica library into `~/.openmodelica/libraries/`
+(or `dest`). Performs a shallow git clone of the tagged release and extracts
+the Modelica package into `<dest>/<Name> <version>/`.
+
+After installation `libraries()` discovers it and `loadInstalledLibrary` loads it.
+
+# Example
+```julia
+OM.installLibrary("Buildings"; version = "13.0.0")
+key = OM.loadInstalledLibrary("Buildings")
+```
+"""
+function installLibrary(name::String; version = nothing, dest = nothing)
+  OMFrontend.installLibrary(name; version = version, dest = dest)
+end
+
+"""
+    exportCSV(modelName, sol; filePath = nothing)
+
+Write an OMEdit-compatible CSV with the state variables of `sol` and, when
+available, the observed (algebraic / alias) variables. If `filePath` is
+omitted, the file is written to `<modelName>_res.csv` in the current
+directory. Returns the path written by `CSV.write`.
+
+To view the result in OMEdit, choose `File > Open Result(s) file`.
 """
 function exportCSV(modelName, sol; filePath = nothing)
   local df1 = DataFrames.DataFrame(sol)
@@ -230,16 +312,18 @@ function exportCSV(modelName, sol; filePath = nothing)
 end
 
 """
-```
-exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false)
-```
-  Exports the csv of the simulation s.t it can be used by OMEdit.
-  In some cases several solutions will be generated.
-  In this case we currently generate one csv file for each subsolution.
-  To use the exported solution in OMEdit click File in the top left corner then select Open Result(s) file(s).
+    exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false)
 
-Use the coalesce keyword to specify if the solution should be coalesced or not
+Write one OMEdit-compatible CSV per solution in `sols`. This form is intended
+for variable structure systems (VSS), where simulation produces several
+subsolutions across mode transitions. Each subsolution is written to
+`<modelName>_part<i>.csv`.
 
+# Keyword arguments
+- `filePath`: when `coalesce = true`, the path of the merged file. The
+  directory portion is also used as the destination for the per-part files.
+- `coalesce`: when `true`, the per-part files are concatenated into
+  `filePath` (or `<modelName>_res.csv` if `filePath` is `nothing`).
 """
 function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false)
   local dfs = Any[]
@@ -377,17 +461,22 @@ end
 
 
 """
-    simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false, ...)
+    simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false,
+             libraries=String[], solver=Rodas5(autodiff=false), mode=OMBackend.MTK_MODE, ...)
 
-Translate and simulate a file-based Modelica model.
+Translate and simulate a file-based Modelica model in one step. Equivalent
+to `translate(modelName, modelFile; ...)` followed by
+`OMBackend.simulateModel(modelName; ...)`. Returns the simulation result.
 
 # Keyword arguments
-- `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0)
-- `MSL`: set `true` to also load the Modelica Standard Library
-- `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
-- `solver`: ODE solver (default `Rodas5(autodiff=false)`)
-- `mode`: backend mode (default `OMBackend.MTK_MODE`)
-- `warnMissingStartValues`: override missing-start-value warnings
+- `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0).
+- `MSL`: set `true` to also load the Modelica Standard Library.
+- `MSL_Version`: MSL version string (default `"MSL:3.2.3"`).
+- `libraries`: cache keys or file/directory paths for user libraries (see
+  `loadLibrary` / `loadPackage` / `loadInstalledLibrary`).
+- `solver`: ODE solver (default `Rodas5(autodiff=false)`).
+- `mode`: backend mode (default `OMBackend.MTK_MODE`).
+- `warnMissingStartValues`: override missing-start-value warnings.
 - `eliminateNonDynamic`: elimination of non-dynamic variables before
   MTK code generation, reducing ODEProblem compilation time. Accepts:
   - `true` (default): eliminate variables not reachable from state derivatives
@@ -395,10 +484,19 @@ Translate and simulate a file-based Modelica model.
   - `EliminationOptions(...)`: fine-grained control (see `EliminationOptions`)
 
   Eliminated variables are bookkept for potential later reconstruction
-  (e.g., 3D visualization). The optimization is automatically skipped for
+  (e.g. 3D visualization). The optimization is automatically skipped for
   VSS models and models with structural transitions.
-- `overwriteCache`: force re-evaluation of generated code even if the model
-  is already compiled (default `false`).
+- `observedFilter`: filter which alias variables generate observed
+  equations. Reduces MTK compilation time by limiting the observed
+  function size. Accepts `nothing` (keep all, default), `Vector{String}`
+  (regex patterns), or `Vector{Regex}`. Only alias entries whose
+  `eliminatedName` matches at least one pattern are kept.
+- `directRHS`: toggle direct-RHS code generation (default reads
+  `OMBackend.DIRECT_RHS_GENERATION[]`).
+- `overwriteCache`: force re-evaluation of generated code even if the
+  model is already compiled (default `false`).
+
+Additional keyword arguments are forwarded to `OMBackend.simulateModel`.
 """
 function simulate(modelName::String,
                   modelFile::String;
@@ -504,10 +602,16 @@ function simulate(modelName::String;
 end
 
 """
-    getMTKProblem(modelName; tspan=(0.0, 1.0), overwriteCache=false)
+    getMTKProblem(modelName; tspan=(0.0, 1.0), overwriteCache=false) -> ODEProblem
 
-Return the MTK problem for an already-translated model without solving it.
-Call `OM.translate` first.
+Build and return the `ModelingToolkit.ODEProblem` for an already-translated
+model, without invoking the solver. The model must first be compiled via
+`translate` (or implicitly by a prior `simulate`). Useful for inspection
+or for passing the problem to a custom solve.
+
+# Keyword arguments
+- `tspan`: time span used when constructing the problem.
+- `overwriteCache`: rebuild the problem even if a cached one exists.
 """
 function getMTKProblem(modelName::String; tspan = (0.0, 1.0), overwriteCache::Bool = false)
   OMBackend.getMTKProblem(modelName; tspan = tspan, overwriteCache = overwriteCache)
@@ -627,12 +731,22 @@ function translate(modelName::String;
 end
 
 """
-  Translates a model and writes the generated code to a file for debugging.
+    writeModelToFile(modelName, modelFile, filePath; MSL=false, MSL_Version="MSL:3.2.3",
+                     mode=OMBackend.MTK_MODE, keepComments=true, keepBeginBlocks=true)
 
-  Example:
-  ```julia
-  OM.writeModelToFile("MyModel", "MyModel.mo", "/tmp/MyModel_debug.jl")
-  ```
+Translate a file-based Modelica model and write the generated Julia code to
+`filePath` for inspection or debugging. Equivalent to calling `translate`
+followed by `OMBackend.writeModelToFile`.
+
+# Keyword arguments
+- `MSL`, `MSL_Version`, `mode`: forwarded to `translate`.
+- `keepComments`: keep `# ...` comments in the emitted code.
+- `keepBeginBlocks`: keep redundant `begin ... end` blocks in the emitted code.
+
+# Example
+```julia
+OM.writeModelToFile("MyModel", "MyModel.mo", "/tmp/MyModel_debug.jl")
+```
 """
 function writeModelToFile(modelName::String, modelFile::String, filePath::String;
                           MSL = false,
@@ -646,11 +760,14 @@ function writeModelToFile(modelName::String, modelFile::String, filePath::String
 end
 
 """
-    writeModelToFile(modelName, filePath; MSL_Version, mode)
+    writeModelToFile(modelName, filePath; MSL_Version="MSL:3.2.3",
+                     mode=OMBackend.MTK_MODE, keepComments=true, keepBeginBlocks=true)
 
-Translate an MSL model and write the generated Julia code to a file.
+Translate an MSL model by name and write the generated Julia code to
+`filePath`. See `writeModelToFile(modelName, modelFile, filePath; ...)` for
+the file-based form.
 
-Example:
+# Example
 ```julia
 OM.writeModelToFile("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum",
                     "/tmp/pendulum_debug.jl"; MSL_Version="MSL:3.2.3")
@@ -667,8 +784,15 @@ function writeModelToFile(modelName::String, filePath::String;
 end
 
 """
-  Resimulates an already compiled model.
-  If no compiled model with the specific name it throws an error.
+    resimulate(modelName; startTime=0.0, stopTime=1.0,
+               solver=Rodas5(autodiff=false), mode=OMBackend.MTK_MODE)
+
+Re-run an already-compiled model without rebuilding the MTK problem. The
+model must have been compiled with `translate` (or implicitly by an earlier
+`simulate`) first. Returns the simulation result.
+
+When the model is not found, the available compiled model names are printed
+and the underlying error is logged.
 """
 function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(autodiff=false), mode = OMBackend.MTK_MODE)
   try
@@ -682,35 +806,46 @@ end
 
 
 """
-  Produces the DAE representation given a modelName and a scodeProgram.
+    translateModelFromSCode(modelName, scodeProgram)
+
+Instantiate `modelName` against the supplied SCode `scodeProgram` and return
+the resulting DAE representation together with its function cache as a tuple
+`(dae, cache)`. Useful when an SCode program has already been built (for
+example via `translateToSCode`) and you want to skip parsing.
 """
 function translateModelFromSCode(modelName, scodeProgram::SCode.Program)
   (dae, cache) = OMFrontend.instantiateSCodeToDAE(modelName, scodeProgram)
 end
 
 """
-  Plots the Modelica equations like a directed acyclic graph
-"""
-function plotEquationGraph(b)
-  OMBackend.plotGraph(b)
-end
+    parseFile(file) -> Absyn.Program
 
-"""
-  Parse a Modelica file
+Parse a Modelica source file into the Absyn abstract syntax tree.
+Most callers will not need this directly: `translate` / `simulate` /
+`flatten` all run the parser internally.
 """
 function parseFile(file)
   OMFrontend.parseFile(file)
 end
 
 """
-Given the name of a model as a string and the file of said model as a string.
-Translate the model to the SCode representation.
+    translateToSCode(modelFile) -> SCode.Program
+
+Parse `modelFile` and convert the resulting Absyn tree to its SCode
+representation. SCode is the intermediate form consumed by the frontend
+instantiation passes.
 """
 function translateToSCode(modelFile::String)
   p = OMFrontend.parseFile(modelFile)
   scodeProgram = OMFrontend.translateToSCode(p)
 end
 
+"""
+    toString(flatModel) -> String
+
+Pretty-print a flat-model representation produced by `flatten` /
+`instantiateSCodeToFM`. Equivalent to `OMFrontend.toString(flatModel)`.
+"""
 toString(flatModel) = OMFrontend.toString(flatModel)
 #= S.t it can be used by base =#
 #Base.string(flatModel) = toString
@@ -812,35 +947,46 @@ end
 #= Backwards-compatible convenience wrappers =#
 
 """
-  Turns on debugging for the backend.
+    LogBackend()
+
+Enable backend debug logging. Convenience wrapper for
+`setDebug(backend = true)`.
 """
 LogBackend() = setDebug(backend=true)
 
 """
-  Turns on debugging for the frontend.
+    LogFrontend()
+
+Enable frontend debug logging. Convenience wrapper for
+`setDebug(frontend = true)`.
 """
 LogFrontend() = setDebug(frontend=true)
 
 """
-Loads the specified MSL version.
-Supported versions are:
-  MSL_3_2_3,
-  MSL_4_0_0
+    loadMSL(; MSL_Version) -> SCode.Program
+
+Load the requested MSL version into the frontend library cache and return
+its SCode program. Accepted values are `"MSL:3.2.3"` / `"MSL_3_2_3"` /
+`"3.2.3"` and `"MSL:4.0.0"` / `"MSL_4_0_0"` / `"4.0.0"`.
+
+For most workflows prefer `loadInstalledLibrary("Modelica"; version = ...)`,
+which discovers installed Modelica libraries on disk and is consistent with
+the `libraries` keyword used by `translate` / `simulate`.
 """
 function loadMSL(;MSL_Version)
   OMFrontend.loadMSL(MSL_Version = MSL_Version)
 end
 
 """
-```
-removeQuotesFromFlatModelica(flatModelicaStr::String)
-```
-This function postprocesses a flat modelica model represented as a string.
-It does so by removing quoted variables and expressions where possible.
-This function should be used on models that has ascii characters only.
-This can be useful if you wish to remove redundant clutter from flat models.
+    removeQuotesFromFlatModelica(flatModelicaStr) -> String
 
-  NOTE: Not exhaustively tested for all models.
+Post-process a flat-Modelica string by stripping quoted identifiers and
+replacing the dots inside them with underscores, producing a less noisy
+form that is friendlier to downstream tooling.
+
+Only runs when `flatModelicaStr` is pure ASCII; non-ASCII input is returned
+unchanged with a warning. Not exhaustively tested across all MSL models;
+treat the output as a debugging aid.
 """
 function removeQuotesFromFlatModelica(fmStr::String)
   local buffer::IOBuffer = IOBuffer()

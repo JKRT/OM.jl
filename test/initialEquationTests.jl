@@ -290,6 +290,76 @@ const IEQ_MSL_MODELS = [
       end
     end
 
+    @testset "IAL3: initial algorithm uses a derived parameter" begin
+      #= Regression: the inliner used inside `inlineParamsInInitialAlgorithms`
+         must substitute recursively, otherwise a parameter whose bind itself
+         references another parameter leaves the inner CREF dangling. =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationTests.IAL3_InitAlgWithDerivedParam",
+                          "./Models/InitialEquationTests.mo";
+                          startTime = 0.0, stopTime = 1.0)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IAL3 simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+        @test isapprox(sol[:T_start][end], 0.1; atol = 1e-6)
+        @test isapprox(sol[:y][end],       0.1; atol = 1e-4)
+      end
+    end
+
+    @testset "IAL2: initial algorithm + OR-with-EQUAL if-equation branching" begin
+      #= Combined regression: depends on both `initial algorithm` lowering and
+         on the boolean zero-crossing polarity for `==`. See model docstring.
+         A passing run requires both fixes — the y assertion catches the
+         polarity bug, the T_start assertion catches the init-algorithm gap. =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationTests.IAL2_InitAlgWithOrEqualIfBranching",
+                          "./Models/InitialEquationTests.mo";
+                          startTime = 0.0, stopTime = 1.0)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IAL2 simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+        @test isapprox(sol[:T_start][end], -0.5; atol = 1e-6)
+        @test isapprox(sol[:y][end],        1.0; atol = 1e-4)
+      end
+    end
+
+    @testset "IAL1: state with der=0 initialized only by initial algorithm" begin
+      #= Regression: trapezoid signal sources (and many other MSL sources) seed
+         T_start / count via `initial algorithm` rather than `initial equation`
+         or `start = ...`. If OMBackend skips `initial algorithm` lowering,
+         these states stay at their default 0 and the dependent algebra (here:
+         der(y) = T_start) integrates wrong values. The full-MSL symptom is
+         sign-flipped OpAmp / Integrator trajectories — this MWE is the
+         minimal kernel. =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationTests.IAL1_StateFromInitAlg",
+                          "./Models/InitialEquationTests.mo";
+                          startTime = 0.0, stopTime = 1.0)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IAL1 simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+        #= T_start(0) = -0.5, der(T_start) = 0  ⇒  T_start ≡ -0.5
+           der(y) = T_start = -0.5  with y(0) = 0  ⇒  y(1) = -0.5. =#
+        @test isapprox(sol[:T_start][end], -0.5; atol = 1e-6)
+        @test isapprox(sol[:y][end],       -0.5; atol = 1e-4)
+      end
+    end
+
   end
 
 end

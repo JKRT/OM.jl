@@ -87,6 +87,26 @@ package EventTests "Comprehensive test models for Modelica event handling"
     end if;
   end IfEquationParameterCondition;
 
+  model NestedTimeIfChain
+    "Reproducer: nested time-dependent IFEXPs as a single equation RHS.
+     Mirrors the acceleration signal of KinematicPTP in
+     Modelica.Blocks.Examples.PID_Controller. Without recursive lifting +
+     dedup in OMBackend.Causalize.detectIfExpressions, the inner if-exprs
+     bool-product-coerce at codegen and the inner discontinuities at
+     t=1.5, 2.5, 3.5 have no zero-crossing events, leading either to
+     solver Unstable or to a wrong integral when the solver steps through
+     the cliffs continuously. Analytic x(4.0) = 0.0."
+    Real x(start = 0, fixed = true);
+    Real a;
+  equation
+    a = if time < 0.5 then 0.0
+        else if time < 1.5 then 1.0
+        else if time < 2.5 then 0.0
+        else if time < 3.5 then -1.0
+        else 0.0;
+    der(x) = a;
+  end NestedTimeIfChain;
+
   // ========================================================================
   // SECTION 2: When-Equations (basic)
   // ========================================================================
@@ -408,5 +428,50 @@ package EventTests "Comprehensive test models for Modelica event handling"
     active = x > 0.5;
     inactive = not active;
   end BooleanNotAlias;
+
+  // ========================================================================
+  // SECTION: VariableLimiter if-condition event test
+  // ========================================================================
+
+  model VariableLimiterIfCondStartsAbove
+    "Reproducer for wrong ifCond initial value when condition is TRUE at t=0.
+     u starts at 2.0 > limit1=1.0, so condition u>limit1 is TRUE initially.
+     evalInitialCondition: ZC = limit1-u = 1-2 = -1 < 0, returns false (condition
+     TRUE), numVal=0.0, ifCond=0. But ifelse(0==1, limit1, else)=else=u=2.0,
+     not limit1=1.0. So the limiter does NOT clamp during t in [0,1].
+     der(z)=y. Correct: y=1.0 for t in [0,1], y=u=(2-t) for t>1.
+       z_correct(2) = 1.0*1 + integral_{1}^{2}(2-t)dt = 1.0 + 0.5 = 1.5
+     Bug:   y=u=(2-t) for ALL t (never clamped).
+       z_bug(2)     = integral_{0}^{2}(2-t)dt       = [2t-t^2/2]_0^2 = 4-2 = 2.0"
+    Real u(start = 2.0);
+    Real y;
+    Real z(start = 0.0);
+    Real limit1 = 1.0;
+    Real limit2 = -1.0;
+  equation
+    der(u) = -1.0;
+    y = smooth(0, if u > limit1 then limit1 elseif u < limit2 then limit2 else u);
+    der(z) = y;
+  end VariableLimiterIfCondStartsAbove;
+
+  model VariableLimiterIfCond
+    "Reproducer for VariableLimiter if-condition frozen as parameter.
+     u ramps from 0; limit1=1.0. y is the clamped value of u.
+     z integrates y, forcing y into the ODE residuals (not just observed).
+     Uses smooth(0,...) as the MSL VariableLimiter does.
+
+     Correct behaviour for t in [0,1]: y=t, z=t^2/2.
+     Correct behaviour for t in [1,1.5]: y=1, z=0.5 + (t-1) -> z(1.5)=1.0.
+     Bug: ifCondN frozen at 0 -> y=u even after crossing limit1 -> z(1.5)=1.125."
+    Real u(start = 0);
+    Real y;
+    Real z(start = 0);
+    Real limit1 = 1.0;
+    Real limit2 = -1.0;
+  equation
+    der(u) = 1.0;
+    y = smooth(0, if u > limit1 then limit1 elseif u < limit2 then limit2 else u);
+    der(z) = y;
+  end VariableLimiterIfCond;
 
 end EventTests;

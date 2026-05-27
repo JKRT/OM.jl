@@ -180,6 +180,51 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
   end
 
   #= ----------------------------------------------------------------
+     Modelica.Electrical.Digital — JK flip-flop and counter examples.
+     Root cause of failures: if-equation codegen emits relay pairs
+     (ifEq_tmp1 ~ ifEq_tmp0) where both sides are leaf symbolic
+     variables.  MTK alias_elimination calls SymReal-SymReal and
+     throws.  Fix: eliminate relay pairs before structural_simplify.
+     ---------------------------------------------------------------- =#
+  @testset verbose=true "Digital" begin
+
+    @testset "FlipFlop" begin
+      #= JK flip-flop via two NOR gates, AND gates, and a NOT gate.
+         Clock period=10; J and K inputs change at t={50,100,145,200}
+         and t={22,140,150,180} respectively.  The flip-flop output Q
+         must reach Logic.'1' (integer value 4) at some point before
+         t=200 when J goes high.
+         Delay semantics are still broken for FlipFlop; this only checks
+         that the relay-lowered model translates and simulates successfully. =#
+      @test begin
+        try
+          sol = OM.simulate("Modelica.Electrical.Digital.Examples.FlipFlop";
+                            MSL_Version = "MSL:3.2.3", stopTime = 200.0)
+          sol.retcode == _SUCCESS
+        catch e
+          false
+        end
+      end
+    end
+
+    @testset "Counter" begin
+      #= 4-bit counter with clock and enable inputs; exercises the same
+         ifEq_tmp relay crash as FlipFlop but at larger scale
+         (149 equations). =#
+      @test_broken begin
+        try
+          sol = OM.simulate("Modelica.Electrical.Digital.Examples.Counter";
+                            MSL_Version = "MSL:3.2.3", stopTime = 50.0)
+          sol.retcode == _SUCCESS
+        catch e
+          false
+        end
+      end
+    end
+
+  end
+
+  #= ----------------------------------------------------------------
      Modelica.Mechanics.Translational
      ---------------------------------------------------------------- =#
   @testset verbose=true "Translational" begin

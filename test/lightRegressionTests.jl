@@ -54,7 +54,22 @@ OMBackend.warnMissingStartValues(false)
   @testset "Initial Equation Tests:" begin
     include("initialEquationTests.jl")
   end
+  @testset "Initial Algorithm Tests:" begin
+    include("algInitTests.jl")
+  end
   @testset "Fold Regression MWEs:" begin
     include("foldRegressionTests.jl")
+  end
+  @testset "Three-phase alias-elimination MWEs:" begin
+    include("threephaseTests.jl")
+  end
+  @testset "Discrete-condition routing MWEs:" begin
+    include("discreteConditionRoutingTests.jl")
+  end
+  @testset "Discrete classification regression:" begin
+    include("discreteClassificationTests.jl")
+  end
+  @testset "Alias observation preservation MWEs:" begin
+    include("aliasObservePreservationTests.jl")
   end
 end

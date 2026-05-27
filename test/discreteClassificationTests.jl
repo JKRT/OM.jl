@@ -29,4 +29,79 @@
                                atol = 0.05)
     end
   end
+
+  @testset "AlgorithmDiscreteAssign" begin
+    #= Reproducer for the Modelica.Electrical.Digital.Examples.* validate
+       failures (INV3S, MUX2x1, NRXFER, ...) where Logic-enum outputs stay
+       stuck at their start value.
+
+       `trigger` is an Integer assigned in a when-clause (classifier marks
+       it DISCRETE; the when callback steps it 3 -> 7 at t = 0.5).
+       `out` is an Integer assigned in a non-when `algorithm` section that
+       reads `trigger`. The algorithm body must lower to a residual
+       `out - (trigger + 10) = 0` so `out` is held in lock-step with
+       `trigger`: 13 before t = 0.5, 17 after.
+
+       Before the fix the regular `algorithm` section was silently dropped
+       at the flat-model -> BDAE boundary, leaving `out` pinned at its
+       start value (0) for the entire simulation. =#
+    sol = runModelMTK("AlgorithmDiscreteAssign",
+                      "Models/AlgorithmDiscreteAssign.mo";
+                      timeSpan = (0.0, 1.0))
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.3, idxs = :trigger), 3.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = :trigger), 7.0; atol = 1e-6)
+    @test isapprox(sol(0.3, idxs = :out), 13.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = :out), 17.0; atol = 1e-6)
+  end
+
+  @testset "AlgorithmQualifiedDiscreteAssign" begin
+    sol = runModelMTK("AlgorithmQualifiedDiscreteAssign",
+                      "Models/AlgorithmQualifiedDiscreteAssign.mo";
+                      timeSpan = (0.0, 1.0))
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.3, idxs = :cell_trigger), 3.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = :cell_trigger), 7.0; atol = 1e-6)
+    @test isapprox(sol(0.3, idxs = :cell_out), 13.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = :cell_out), 17.0; atol = 1e-6)
+  end
+
+  @testset "AlgorithmArrayIfChain" begin
+    sol = runModelMTK("AlgorithmArrayIfChain",
+                      "Models/AlgorithmArrayIfChain.mo";
+                      timeSpan = (0.0, 1.0))
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.3, idxs = Symbol("yy[1]")), 2.0; atol = 1e-6)
+    @test isapprox(sol(0.3, idxs = Symbol("yy[2]")), 2.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = Symbol("yy[1]")), 3.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = Symbol("yy[2]")), 3.0; atol = 1e-6)
+  end
+
+  @testset "AlgorithmDynamicArrayWrite" begin
+    sol = runModelMTK("AlgorithmDynamicArrayWrite",
+                      "Models/AlgorithmDynamicArrayWrite.mo";
+                      timeSpan = (0.0, 1.0))
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.3, idxs = Symbol("out[1]")), 2.0; atol = 1e-6)
+    @test isapprox(sol(0.3, idxs = Symbol("out[2]")), 3.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = Symbol("out[1]")), 4.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = Symbol("out[2]")), 5.0; atol = 1e-6)
+  end
+
+  @testset "BooleanGatedIfMin" begin
+    #= Boolean `free = (f <= 0)` gates `der(v) = if free then 0.0 else -10.0`.
+       f ramps from -1 to +1 over [0,1]; the zero-crossing is at t=0.5.
+       With correct DISCRETE classification and a zero-crossing event at t=0.5:
+         v stays at 1.0 for t in [0,0.5], then drops at rate -10 → v(1.0) = -4.0.
+       Without the discrete event, the solver treats `free` as continuous and
+       goes unstable (retcode ≠ Success). =#
+    @test_broken begin
+      sol = runModelMTK("BooleanGatedIfMin",
+                        "Models/BooleanGatedIfMin.mo";
+                        timeSpan = (0.0, 1.0))
+      sol.retcode == ReturnCode.Success &&
+        isapprox(sol(1.0, idxs = :v), -4.0; atol = 0.1)
+    end
+  end
+
 end

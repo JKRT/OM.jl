@@ -53,4 +53,28 @@
       string(sol.retcode) == "Success"
     end
   end
+
+  @testset "SimCode migration boundary regressions" begin
+    local SC = OMBackend.SimulationCode
+    local realTy = DAE.T_REAL_DEFAULT
+    local xDae = DAE.CREF(DAE.CREF_IDENT("x", realTy, MetaModelica.nil), realTy)
+    local rsubDae = DAE.RSUB(xDae, 1, "re", realTy)
+    local rsubSim = SC.toSimExp(rsubDae)
+    @test rsubSim isa SC.RSUB
+    @test rsubSim.exp isa SC.EXP_CREF
+    @test SC.toDAEExp(rsubSim) isa DAE.RSUB
+
+    local sc = SC.SIM_CODE("mock",
+      SC.OrderedDict{String, Tuple{Integer, SC.SimVar}}(),
+      SC.RESIDUAL_EQUATION[], SC.Equation[], SC.WHEN_EQUATION[], SC.IF_EQUATION[],
+      false, Int[], SC.Graphs.SimpleDiGraph(0), [], SC.StructuralTransition[], [],
+      String[], String[], SC.Equation[], "mock", NONE(), NONE(), String[],
+      SC.ModelicaFunction[], false, SC.RESIDUAL_EQUATION[], String[], SC.AliasEntry[],
+      nothing, SC.INITIAL_ALGORITHM[])
+    local emitted = Expr[]
+    OMBackend.CodeGeneration._emitWhenTupleElementAssignMTK!(
+      emitted, SC.EXP_CREF(SC.SimCref(:x), SC.TYPE_REAL()), :(rhs), sc)
+    @test length(emitted) == 1
+    @test emitted[1] == :(x = rhs)
+  end
 end

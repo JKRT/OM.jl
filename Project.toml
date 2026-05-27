@@ -28,17 +28,17 @@ SCode = "350d45b0-c210-11e9-3b9e-fdad65bb3d46"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
 [sources]
-Absyn = {path = "./Absyn.jl"}
-ArrayUtil = {path = "./ArrayUtil.jl"}
-DAE = {path = "./DAE.jl"}
-ImmutableList = {path = "./ImmutableList.jl"}
-ListUtil = {path = "./ListUtil.jl"}
-MetaModelica = {path = "./MetaModelica.jl"}
-OMBackend = {path = "./OMBackend.jl"}
-OMFrontend = {path = "./OMFrontend.jl"}
-OMParser = {path = "./OMParser.jl"}
-OMRuntimeExternalC = {path = "./OMRuntimeExternalC.jl"}
-SCode = {path = "./SCode.jl"}
+Absyn = {path = "Absyn.jl"}
+ArrayUtil = {path = "ArrayUtil.jl"}
+DAE = {path = "DAE.jl"}
+ImmutableList = {path = "ImmutableList.jl"}
+ListUtil = {path = "ListUtil.jl"}
+MetaModelica = {path = "MetaModelica.jl"}
+OMBackend = {path = "OMBackend.jl"}
+OMFrontend = {path = "OMFrontend.jl"}
+OMParser = {path = "OMParser.jl"}
+OMRuntimeExternalC = {path = "OMRuntimeExternalC.jl"}
+SCode = {path = "SCode.jl"}
 
 [compat]
 ModelingToolkit = "11.21.0"

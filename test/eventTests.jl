@@ -82,6 +82,24 @@
       end
     end
 
+    @testset "NestedTimeIfChain" begin
+      # Reproducer for the PID_Controller / KinematicPTP issue: nested
+      # time-conditioned ifs on the RHS of an equation must each lower
+      # to a zero-crossing event. Without the recursive lift in
+      # OMBackend.Causalize, the inner ifs become bool-products and the
+      # solver either goes Unstable at the discontinuities or integrates
+      # past them with the wrong dt. Analytic trajectory of
+      # der(x) = pulse(0.5..1.5: +1, 2.5..3.5: -1, else 0) gives
+      # x(4.0) = 0 exactly. A tight atol catches both Unstable retcodes
+      # and post-cliff overshoot.
+      @test begin
+        sol = OM.simulate("EventTests.NestedTimeIfChain",
+                          "./Models/EventTests.mo"; stopTime=4.0)
+        sol.retcode == ReturnCode.Success &&
+          isapprox(sol[:x][end], 0.0; atol=1e-3)
+      end
+    end
+
   end
 
   # ==========================================================================
@@ -377,6 +395,45 @@
         sol.retcode == ReturnCode.Success &&
           isapprox(sol[:x][end], 1.0; atol = 0.01)
       end
+    end
+
+  end
+
+  # ============================================================
+  # VariableLimiter if-condition event detection
+  # ============================================================
+  @testset "VariableLimiter if-condition (starts above limit)" begin
+
+    # u starts at 2.0, decreases at rate -1. limit1=1.0.
+    # Condition u>limit1 is TRUE at t=0: y=limit1=1.0 for t in [0,1].
+    # At t=1 u drops below limit1: y=u=(2-t) for t in [1,2].
+    # z(2) = integral(y,0,2) = 1.0 + 0.5 = 1.5.
+    # Regression guard: ifCond correctly initialised when condition is TRUE at t=0.
+    @test begin
+      sol = OM.simulate("EventTests.VariableLimiterIfCondStartsAbove",
+                        "./Models/EventTests.mo"; stopTime = 2.0)
+      sol.retcode == ReturnCode.Success &&
+        isapprox(sol[:z][end], 1.5; atol = 0.02)
+    end
+
+  end
+
+  @testset "VariableLimiter if-condition" begin
+
+    # u ramps from 0 at rate 1; limit1=1.0, limit2=-1.0.
+    # y = smooth(0, if u>limit1 then limit1 elseif u<limit2 then limit2 else u).
+    # z integrates y, forcing y into the ODE residuals (not just observed).
+    # Correct: z(1.5) = integral of u for t in [0,1] + integral of 1 for [1,1.5]
+    #         = 0.5 + 0.5 = 1.0.
+    # Regression guard: ifCondN callbacks must fire at zero-crossings and
+    # correctly switch branches. Simple case passes; the related complex-model
+    # bug (SpeedControlledDCPM, evalInitialCondition failing on a non-constant
+    # parameter binding) is not reproduced here.
+    @test begin
+      sol = OM.simulate("EventTests.VariableLimiterIfCond",
+                        "./Models/EventTests.mo"; stopTime = 1.5)
+      sol.retcode == ReturnCode.Success &&
+        isapprox(sol[:z][end], 1.0; atol = 0.02)
     end
 
   end

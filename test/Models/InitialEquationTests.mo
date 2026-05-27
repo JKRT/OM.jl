@@ -104,4 +104,97 @@ package InitialEquationTests
     connect(I2.flange_b, I1.flange_a);
   end IEQ8b_SpringLoopFixedStart;
 
+  model IAL3_InitAlgWithDerivedParam
+    "Initial algorithm seeds a state from a derived parameter — that is, a
+     parameter whose bind expression itself references another parameter:
+       parameter Real f = 10.0;
+       parameter Real period = 1.0 / f;   // derived
+     The init alg `T_start := period` then needs the inliner to substitute
+     `period` -> 1.0/f -> 0.1 (recursively).
+
+     Expected:
+       T_start(1) = 0.1   (= period = 1.0/f)
+       y(1)       = 0.1   (= T_start, since der(y) = T_start)
+
+     Bug C (single-level inlining in `_inlineParamsInInitialAlgorithms`): only
+     one CREF substitution per node — `period` becomes the BINARY expression
+     `1.0 / f`, but the inner `f` CREF is not substituted further. At codegen
+     time `f` is referenced as a bare Julia symbol that has no module-level
+     binding, producing `UndefVarError: f not defined`. The MSL trapezoid
+     source's init alg
+       T_start := startTime + count * period
+     hits exactly this — `startTime`, `period`, and `rising`/`width`/etc.
+     are all derived from `f` and bring `f` along when substituted singly."
+    parameter Real f = 10.0;
+    parameter Real period = 1.0 / f;
+    Real T_start;
+    Real y(start = 0, fixed = true);
+  initial algorithm
+    T_start := period;
+  equation
+    der(T_start) = 0;
+    der(y) = T_start;
+  end IAL3_InitAlgWithDerivedParam;
+
+  model IAL2_InitAlgWithOrEqualIfBranching
+    "Combined regression for `initial algorithm` lowering AND boolean OR-with-
+     EQUAL polarity in if-equation zero-crossing conditions.
+
+     At t=0:
+       T_start = -0.5 (set by initial algorithm)
+       time < T_start      = 0 < -0.5    = FALSE
+       mode == 0           = -1 == 0     = FALSE
+       disjunction         = FALSE
+       → take ELSE branch  → der(y) = 1.0
+       → y(1) = 1.0
+
+     Bug A (initial algorithm not lowered into the MTK initialization system):
+       T_start stays at 0; the disjunction is still FALSE so y still
+       integrates correctly — caught only by the explicit T_start assertion.
+
+     Bug B (Bool zero-crossing polarity inverted for OR / EQUAL):
+       The encoding of `mode == 0` produces (false=0) - 0.5 = -0.5, which the
+       `min(zc_lt, zc_eq)` composition interprets as TRUE; the disjunction
+       becomes TRUE; the IF branch is taken; der(y) = 0; y(1) = 0. Caught by
+       the y assertion.
+
+     A passing run requires BOTH lowerings to be correct."
+    parameter Real init_value = -0.5;
+    parameter Integer mode = -1;
+    Real T_start;
+    Real y(start = 0, fixed = true);
+  initial algorithm
+    T_start := init_value;
+  equation
+    der(T_start) = 0;
+    if time < T_start or mode == 0 then
+      der(y) = 0.0;
+    else
+      der(y) = 1.0;
+    end if;
+  end IAL2_InitAlgWithOrEqualIfBranching;
+
+  model IAL1_StateFromInitAlg
+    "Initial algorithm assigns the initial value of a state with der = 0.
+     The state has no `start` attribute and no `initial equation`; only the
+     `initial algorithm` block sets it. Expected:
+       T_start(0) = -0.5  (set by initial algorithm)
+       der(T_start) = 0   (constant in time)
+       der(y) = T_start
+       y(1) = -0.5
+     Regression: surfaces in trapezoid signal sources (TimeTable / SignalSource)
+     where the `initial algorithm` seeds T_start and count from startTime/period.
+     If OMBackend ignores `initial algorithm`, T_start stays at 0, downstream
+     algebraic time-windowing produces wrong values, OpAmps trajectories sign-
+     flip. Same root cause as Modelica.Electrical.Analog.Examples.OpAmps.*."
+    parameter Real x_init = -0.5;
+    Real T_start;
+    Real y(start = 0, fixed = true);
+  initial algorithm
+    T_start := x_init;
+  equation
+    der(T_start) = 0;
+    der(y) = T_start;
+  end IAL1_StateFromInitAlg;
+
 end InitialEquationTests;

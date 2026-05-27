@@ -70,6 +70,10 @@ OMBackend.warnMissingStartValues(false)
   @testset "Initial Equation Tests:" begin
     include("initialEquationTests.jl")
   end
+  @info "Testing initial-algorithm construct coverage..."
+  @testset "Initial Algorithm Tests:" begin
+    include("algInitTests.jl")
+  end
   @info "Testing foldParameterClosure regression MWEs..."
   @testset "Fold Regression MWEs:" begin
     include("foldRegressionTests.jl")
