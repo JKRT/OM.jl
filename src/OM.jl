@@ -462,7 +462,7 @@ end
 
 """
     simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false,
-             libraries=String[], solver=Rodas5(autodiff=false), mode=OMBackend.MTK_MODE, ...)
+             libraries=String[], solver=Rodas5(autodiff=false), mode=OMBackend.DEFAULT_BACKEND_MODE[], ...)
 
 Translate and simulate a file-based Modelica model in one step. Equivalent
 to `translate(modelName, modelFile; ...)` followed by
@@ -506,7 +506,7 @@ function simulate(modelName::String,
                   MSL_Version = "MSL:3.2.3",
                   libraries::Vector{String} = String[],
                   solver = Rodas5(autodiff=false),
-                  mode = OMBackend.MTK_MODE,
+                  mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
@@ -577,7 +577,7 @@ function simulate(modelName::String;
                   MSL = true,
                   MSL_Version = "MSL:3.2.3",
                   solver = Rodas5(autodiff=false),
-                  mode = OMBackend.MTK_MODE,
+                  mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
@@ -657,7 +657,7 @@ function translate(modelName::String,
                    MSL = false,
                    MSL_Version = "MSL:3.2.3",
                    libraries::Vector{String} = String[],
-                   mode = OMBackend.MTK_MODE,
+                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
@@ -666,7 +666,7 @@ function translate(modelName::String,
   OMBackend.DIRECT_RHS_GENERATION[] = directRHS
   #= MTK_MODE and DEMode both consume the FlatModel-derived SIM_CODE. Only the
      deprecated DAE_MODE wants the legacy :DAE representation. =#
-  repr = (mode == OMBackend.MTK_MODE || mode == OMBackend.DEMode) ? :FM : :DAE
+  repr = (mode == OMBackend.MTK_MODE || mode == OMBackend.IMTK_MODE || mode == OMBackend.DEMode) ? :FM : :DAE
   (dae, cache) = flatten(modelName, modelFile;
                          repr = repr,
                          MSL = MSL, MSL_Version = MSL_Version,
@@ -712,7 +712,7 @@ OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
 """
 function translate(modelName::String;
                    MSL_Version = "MSL:3.2.3",
-                   mode = OMBackend.MTK_MODE,
+                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
@@ -732,7 +732,7 @@ end
 
 """
     writeModelToFile(modelName, modelFile, filePath; MSL=false, MSL_Version="MSL:3.2.3",
-                     mode=OMBackend.MTK_MODE, keepComments=true, keepBeginBlocks=true)
+                     mode=OMBackend.DEFAULT_BACKEND_MODE[], keepComments=true, keepBeginBlocks=true)
 
 Translate a file-based Modelica model and write the generated Julia code to
 `filePath` for inspection or debugging. Equivalent to calling `translate`
@@ -751,7 +751,7 @@ OM.writeModelToFile("MyModel", "MyModel.mo", "/tmp/MyModel_debug.jl")
 function writeModelToFile(modelName::String, modelFile::String, filePath::String;
                           MSL = false,
                           MSL_Version = "MSL:3.2.3",
-                          mode = OMBackend.MTK_MODE,
+                          mode = OMBackend.DEFAULT_BACKEND_MODE[],
                           keepComments = true,
                           keepBeginBlocks = true)
   translate(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, mode = mode)
@@ -761,7 +761,7 @@ end
 
 """
     writeModelToFile(modelName, filePath; MSL_Version="MSL:3.2.3",
-                     mode=OMBackend.MTK_MODE, keepComments=true, keepBeginBlocks=true)
+                     mode=OMBackend.DEFAULT_BACKEND_MODE[], keepComments=true, keepBeginBlocks=true)
 
 Translate an MSL model by name and write the generated Julia code to
 `filePath`. See `writeModelToFile(modelName, modelFile, filePath; ...)` for
@@ -775,7 +775,7 @@ OM.writeModelToFile("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum",
 """
 function writeModelToFile(modelName::String, filePath::String;
                           MSL_Version = "MSL:3.2.3",
-                          mode = OMBackend.MTK_MODE,
+                          mode = OMBackend.DEFAULT_BACKEND_MODE[],
                           keepComments = true,
                           keepBeginBlocks = true)
   translate(modelName; MSL_Version = MSL_Version, mode = mode)
@@ -785,7 +785,7 @@ end
 
 """
     resimulate(modelName; startTime=0.0, stopTime=1.0,
-               solver=Rodas5(autodiff=false), mode=OMBackend.MTK_MODE)
+               solver=Rodas5(autodiff=false), mode=OMBackend.DEFAULT_BACKEND_MODE[])
 
 Re-run an already-compiled model without rebuilding the MTK problem. The
 model must have been compiled with `translate` (or implicitly by an earlier
@@ -794,7 +794,7 @@ model must have been compiled with `translate` (or implicitly by an earlier
 When the model is not found, the available compiled model names are printed
 and the underlying error is logged.
 """
-function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(autodiff=false), mode = OMBackend.MTK_MODE)
+function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(autodiff=false), mode = OMBackend.DEFAULT_BACKEND_MODE[])
   try
     OMBackend.resimulateModel(modelName, tspan = (startTime, stopTime), solver = solver)
   catch e
