@@ -333,6 +333,30 @@ const IEQ_MSL_MODELS = [
       end
     end
 
+    @testset "IEQ9: initial equation referencing if-eq relay-aliased leaf" begin
+      #= Reproducer for the variance_u UndefVarError seen in MSL
+         Blocks.Examples.NoiseExamples.{NormalNoiseProperties,UniformNoiseProperties}.
+         u is replaced by an ifEq_tmp via the IFEXP-lifting pass; the
+         eliminateIfEqRelays codegen pass then drops u from the variable list.
+         The initial equation `mu = u` would reference the dropped name unless
+         the relay-alias map is also applied inside _buildInitialConstraintEqs.
+         Pre-fix: module eval throws UndefVarError on `u` and `sol === nothing`.
+         Post-fix: the constraint reads `mu ~ ifEq_tmp0` and the model
+         simulates to Success. =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationTests.IEQ9_InitEqViaIfRelay",
+                          IEQ_MODEL_FILE; stopTime = 0.4)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IEQ9 simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+      end
+    end
+
     @testset "IAL1: state with der=0 initialized only by initial algorithm" begin
       #= Regression: trapezoid signal sources (and many other MSL sources) seed
          T_start / count via `initial algorithm` rather than `initial equation`
@@ -357,6 +381,33 @@ const IEQ_MSL_MODELS = [
            der(y) = T_start = -0.5  with y(0) = 0  ⇒  y(1) = -0.5. =#
         @test isapprox(sol[:T_start][end], -0.5; atol = 1e-6)
         @test isapprox(sol[:y][end],       -0.5; atol = 1e-4)
+      end
+    end
+
+    @testset "IAL4: if-condition over an initial-algorithm state (trapezoid shape)" begin
+      #= Regression (OpAmps / TrapezoidVoltage cluster): an `if` condition
+         compares `time` against a discrete state `ts` seeded by an
+         `initial algorithm`. evalInitialCondition must evaluate that
+         initial-algorithm value (ts = -0.035) when choosing the lifted
+         ifEq_tmp's t0 branch; if it defaults ts to 0.0, `time < ts + 0.02`
+         is wrongly TRUE at t0 -> rising branch -> y(0) = 0 instead of 5.
+         With the fix `time < -0.015` is FALSE for all time >= 0, so y == 5. =#
+      local sol = nothing
+      try
+        sol = OM.simulate("InitialEquationTests.IAL4_InitAlgStateInIfCondition",
+                          "./Models/InitialEquationTests.mo";
+                          startTime = 0.0, stopTime = 1.0)
+      catch e
+        e isa InterruptException && rethrow()
+        @warn "IAL4 simulate failed" exception=(e, catch_backtrace())
+      end
+      @test sol !== nothing
+      if sol !== nothing
+        @test sol.retcode == ReturnCode.Success
+        #= y == 5 throughout; t0 and an early point catch the wrong (rising)
+           branch (which would give 0.0 and 2.5 respectively). =#
+        @test isapprox(sol(0.0;   idxs = sol.prob.f.sys.y), 5.0; atol = 1e-6)
+        @test isapprox(sol(0.005; idxs = sol.prob.f.sys.y), 5.0; atol = 1e-4)
       end
     end
 

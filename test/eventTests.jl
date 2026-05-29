@@ -69,6 +69,19 @@
       end
     end
 
+    @testset "CoincidentTimeEvents" begin
+      # Two time events at the same instant (t=0.5). Both branches must switch:
+      # a -> 5.0, b -> 9.0. A dropped coincident affect leaves one stuck ramping
+      # (a=2.0 or b=4.0 at t=1.0). Checks the post-switch VALUES, not just retcode.
+      @test begin
+        sol = OM.simulate("EventTests.CoincidentTimeEvents",
+                          "./Models/EventTests.mo"; stopTime=1.0)
+        sol.retcode == ReturnCode.Success &&
+          isapprox(last(sol[:a]), 5.0; atol=0.01) &&
+          isapprox(last(sol[:b]), 9.0; atol=0.01)
+      end
+    end
+
     @testset "IfEquationParameterCondition" begin
       # useHighGain=true, so der(x) = -10*x, x(0)=1.
       # x(1) = exp(-10) ~ 4.54e-5.

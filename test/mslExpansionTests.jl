@@ -369,39 +369,49 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
      ---------------------------------------------------------------- =#
   @testset verbose=true "ComplexBlocks" begin
 
-    #= ShowTransferFunction: DAE.RECORD-in-MTK-codegen regression.
-
-       The TransferFunction block uses Modelica.ComplexMath.j (a Complex
-       constant) inside `(j*w)^(i-1)`. The frontend inlines the `j`
-       constant, leaving a DAE.RECORD(IDENT("Complex"), [0.0, 1.0], [...])
-       node for the backend to lower.
-
-       Before the DAE.RECORD case was added to
-       `OMBackend.CodeGeneration.expToJuliaExpMTK`, OM.translate() on this
-       model threw `DAE.RECORD(...) not yet supported` from the fallback
-       arm of the expression match. This test pins the translate path so
-       the regression cannot come back silently.
-
-       NOTE: We only assert that translate() succeeds here. OM.simulate()
-       on this model still fails with a separate, pre-existing bug about
-       flattened complex arrays (`transferFunction_aw_re` as a whole-array
-       reference). That is tracked independently; bundling it into this
-       regression test would couple two unrelated issues. =#
-    @testset "ShowTransferFunction translate (DAE.RECORD lowering)" begin
+    #= ShowTransferFunction full chain: translate + simulate + validate against
+       the Dymola reference at t=0. After the 2026-05-28 complex-lowering
+       extension (3-arg multiply / 4-arg divide / TSUB projection added to
+       `_complexParts` / `_complexProjection`), this model translates cleanly,
+       simulates to retcode=Success on a purely-algebraic 5-equation system
+       (Rodas5 auto-switches to FBDF), and matches reference values within
+       ~3e-4 absolute. observedFilter keeps the reference signals through
+       structural_simplify so they are accessible from the sol. =#
+    @testset "ShowTransferFunction translate + simulate + validate" begin
       @test true == begin
+        local ok = false
         try
-          OM.translate("Modelica.ComplexBlocks.Examples.ShowTransferFunction";
-                       MSL_Version = "MSL:3.2.3")
-          true
-        catch e
-          msg = sprint(showerror, e)
-          if occursin("DAE.RECORD", msg)
-            @error "DAE.RECORD regression (expected: handler in expToJuliaExpMTK)" msg
-          else
-            @error "ShowTransferFunction translate failed" exception=(e, catch_backtrace())
+          local sol = OM.simulate("Modelica.ComplexBlocks.Examples.ShowTransferFunction";
+                                  MSL_Version = "MSL:3.2.3",
+                                  stopTime = 1.0,
+                                  mode = OMBackend.MTK_MODE,
+                                  observedFilter = ["^transferFunction_y", "^logFrequencySweep_y"])
+          if sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+            local mtk = OMBackend.Runtime.ModelingToolkit
+            local sys = sol.prob.f.sys
+            local syms = vcat(mtk.unknowns(sys), [eq.lhs for eq in mtk.observed(sys)])
+            local lookup = Dict(string(s) => s for s in syms)
+            local find = name -> begin
+              local flat = replace(name, "." => "_") * "(t)"
+              haskey(lookup, flat) ? lookup[flat] : nothing
+            end
+            local re_sym    = find("transferFunction.y.re")
+            local im_sym    = find("transferFunction.y.im")
+            local logfs_sym = find("logFrequencySweep.y")
+            if re_sym !== nothing && im_sym !== nothing && logfs_sym !== nothing
+              #= Reference row at t=0 from Dymola CSV:
+                 logFrequencySweep.y      = 0.01
+                 transferFunction.y.re    = 0.999899990001
+                 transferFunction.y.im    = -0.0141421354823096 =#
+              ok = isapprox(sol(0.0; idxs = logfs_sym), 0.01;             atol = 1e-4) &&
+                   isapprox(sol(0.0; idxs = re_sym),    0.999899990001;   atol = 1e-3) &&
+                   isapprox(sol(0.0; idxs = im_sym),    -0.0141421354823; atol = 1e-3)
+            end
           end
-          false
+        catch e
+          @error "ShowTransferFunction simulate / validate failed" exception = (e, catch_backtrace())
         end
+        ok
       end
     end
   end

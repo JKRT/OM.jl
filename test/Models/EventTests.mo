@@ -76,6 +76,26 @@ package EventTests "Comprehensive test models for Modelica event handling"
     end if;
   end IfEquationDerMulti;
 
+  model CoincidentTimeEvents "Two independent time events at the same instant"
+    // a and b each switch branch at exactly t = 0.5. When both zero-crossings
+    // coincide, the merged VectorContinuousCallback applies only one affect per
+    // root time, so without the time-event refresh one signal stays stuck on its
+    // pre-switch branch. Post-switch a = 5, b = 9; pre-switch they ramp.
+    Real a(start = 0);
+    Real b(start = 0);
+  equation
+    if time < 0.5 then
+      a = 2.0 * time;
+    else
+      a = 5.0;
+    end if;
+    if time < 0.5 then
+      b = 4.0 * time;
+    else
+      b = 9.0;
+    end if;
+  end CoincidentTimeEvents;
+
   model IfEquationParameterCondition "If-equation with parameter condition (structural)"
     parameter Boolean useHighGain = true;
     Real x(start = 1.0);

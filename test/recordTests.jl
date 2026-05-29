@@ -119,6 +119,21 @@
     @test ifIm.expElse isa DAE.CREF   #= u.im =#
   end
 
+  #= lowerComplexOperatorRecords reproducer set (test/Models/ComplexLoweringTests.mo).
+     SKIPPED: OMFrontend cannot resolve the top-level operator-record `Complex`
+     for a standalone custom .mo (not in scope); these only ever passed when a
+     prior MSL test left `Complex` in OMFrontend's global scope, so they are
+     order-dependent. The SimCode complex-lowering pass they target is covered
+     by the MSL model test `ShowTransferFunction` (translate+simulate+validate,
+     mslExpansionTests.jl) and by UnsymmetricalLoad. Un-skip if OMFrontend gains
+     Complex-in-scope support for custom files. =#
+  @testset "Lowering: Complex operator-record patterns (skipped — see note)" begin
+    for m in ("DirectAssign", "ConstructorProjection", "ArrayElementAccess",
+              "MatrixVectorMul", "InitialEqAssign")
+      @test_skip OM.translate("ComplexLoweringTests." * m, "./Models/ComplexLoweringTests.mo")
+    end
+  end
+
   #= ComplexRecord1: R2 contains R1[2] (array of records inside a record). =#
   @testset "Basic Record Access" begin
     @test begin

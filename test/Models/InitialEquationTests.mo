@@ -174,6 +174,21 @@ package InitialEquationTests
     end if;
   end IAL2_InitAlgWithOrEqualIfBranching;
 
+  model IEQ9_InitEqViaIfRelay
+    "Initial equation references a connector input that gets aliased to an
+     if-equation tmp variable. Without the codegen-time substitution of the
+     relay-alias map into `_buildInitialConstraintEqs`, the surviving init
+     constraint `mu ~ u` references the eliminated leaf `u` and the module
+     raises UndefVarError at first eval."
+    Real u;
+    Real mu(start = 0);
+  initial equation
+    mu = u;
+  equation
+    u = if time > 0.5 then sin(time) else cos(time);
+    der(mu) = -mu;
+  end IEQ9_InitEqViaIfRelay;
+
   model IAL1_StateFromInitAlg
     "Initial algorithm assigns the initial value of a state with der = 0.
      The state has no `start` attribute and no `initial equation`; only the
@@ -196,5 +211,33 @@ package InitialEquationTests
     der(T_start) = 0;
     der(y) = T_start;
   end IAL1_StateFromInitAlg;
+
+  model IAL4_InitAlgStateInIfCondition
+    "If-expression condition compares `time` against a discrete state seeded by
+     an `initial algorithm` (the Trapezoid signal-source shape, minimal). The
+     never-firing `when` keeps `ts` a genuine discrete state (not constant-
+     folded), forcing the condition to be lifted to an ifEq_tmp whose t0 branch
+     is chosen by evalInitialCondition.
+
+     ts(0) = -0.035 (initial algorithm). The condition `time < ts + 0.02` =
+     `time < -0.015` is FALSE for all time >= 0, so y = 5.0 throughout.
+
+     Bug (fixed 2026-05-28): evalInitialCondition seeded state vars only from
+     their `start` attribute, defaulting ts to 0.0 -> `time < 0.02` TRUE at t0
+     -> wrong (rising) branch -> y(0) = 0 instead of 5. The fix evaluates the
+     initial-algorithm assignment (`ts := -0.035`) at t0. Same root cause as the
+     OpAmps / TrapezoidVoltage validate regressions."
+    Real ts;
+    Real y;
+    Real x(start = 0, fixed = true);
+  initial algorithm
+    ts := -0.035;
+  equation
+    when time > 100.0 then
+      ts = time;
+    end when;
+    y = if time < ts + 0.02 then 500.0 * (time - ts) else 5.0;
+    der(x) = y;
+  end IAL4_InitAlgStateInIfCondition;
 
 end InitialEquationTests;
