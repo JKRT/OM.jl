@@ -38,6 +38,8 @@ using PrecompileTools
   using DifferentialEquations
 end
 
+include("precompile_statements.jl")
+
 PrecompileTools.@compile_workload begin
   @info "Precompiling OM.jl..."
 
@@ -114,6 +116,17 @@ PrecompileTools.@compile_workload begin
     end
   end
   @info "Backend precompilation done."
+
+  # iMTK mode (IMTK_MODE, the default backend mode) builds the System and runs
+  # structural_simplify in the backend at translate time, then reuses the cached
+  # build at simulate. This warms generateIMTKCode/_buildAndCache and simulateIMTK
+  # on the tiny scalar-ODE model so first iMTK build+solve latency is reduced.
+  timedPrecompileStep("iMTK build/simulate warmup") do
+    simulate("HelloWorld", helloWorldPath;
+             mode = OMBackend.IMTK_MODE, overwriteCache = true)
+    nothing
+  end
+  @info "iMTK precompilation done."
 
   timedPrecompileStep("MTK symbolic construction warmup") do
     ModelingToolkit.@independent_variables t
