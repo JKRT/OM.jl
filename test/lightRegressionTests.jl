@@ -72,4 +72,7 @@ OMBackend.warnMissingStartValues(false)
   @testset "Alias observation preservation MWEs:" begin
     include("aliasObservePreservationTests.jl")
   end
+  @testset "Model-feature MWEs:" begin
+    include("modelFeatureMWEs.jl")
+  end
 end

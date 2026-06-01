@@ -91,21 +91,12 @@ const _HEAVY_SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
   end
 
   @testset verbose=true "MSL MultiBody Loops (heavy)" begin
-    # Engine1a: closed-loop crank/rod/piston engine with `Inertia.w(start=10,
-    # fixed=true)`. OM.jl currently returns retcode == Success but the
-    # simulation is silently stuck — every state stays at its initial value
-    # for the full window because OM.jl's MTK codegen does not lower
-    # `fixed=true` start attributes into MTK `initialization_eqs` (hard
-    # constraints). The init solver picks the trivial fixed-point
-    # `Inertia_w = 0` instead of the user-specified `start = 10`, the
-    # closed-loop kinematic chain is consistent at zero, and the integrator
-    # exits in 3 steps with no motion. See `.claude/CLAUDE.md`
-    # "Engine1a silently stuck-at-IC" for the full root-cause writeup.
-    #
-    # The trajectory comparison below uses OMC reference values captured
-    # 2026-05-06 from `omc /tmp/probe_engine1a.mos` (DASSL, tol=1e-6). The
-    # @test_broken arms flip to passing once the start-attribute /
-    # initialization_eqs codegen gap is fixed.
+    # Engine1a: closed-loop crank/rod/piston engine. `Inertia.w` is
+    # stateSelect=always, fixed=true, start=10, so the crank spins at ~10.9 rad/s.
+    # The earlier stuck-at-IC (every state collapsing to 0) came from
+    # eliminateRHSEquivalentEquations aliasing the stateSelect=always velocity
+    # away and dropping its init constraint; it is preserved now. Trajectory
+    # compared against OMC reference values (DASSL, tol=1e-6).
     @testset "MSL Engine1a" begin
       sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a";
                         MSL_Version = "MSL:3.2.3", stopTime = 1.0,

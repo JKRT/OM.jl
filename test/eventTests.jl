@@ -139,10 +139,9 @@
       @test begin
         sol = OM.simulate("EventTests.WhenAssignment",
                           "./Models/EventTests.mo"; stopTime=1.0)
-        uEnd = last(sol.u)
         sol.retcode == ReturnCode.Success &&
-          isapprox(uEnd[1], 1.0; atol=0.01) &&
-          isapprox(uEnd[2], 1.0; atol=0.01)
+          isapprox(_resolveSymbolInSol(sol, :x), 1.0; atol=0.01) &&
+          isapprox(_resolveSymbolInSol(sol, :eventCount), 1.0; atol=0.01)
       end
     end
 
@@ -208,10 +207,9 @@
       @test begin
         sol = OM.simulate("EventTests.ElseWhenBasic",
                           "./Models/EventTests.mo"; stopTime=1.0)
-        uEnd = last(sol.u)
         sol.retcode == ReturnCode.Success &&
-          isapprox(uEnd[1], 2.0; atol=0.01) &&
-          isapprox(uEnd[2], 1.0; atol=0.01)
+          isapprox(_resolveSymbolInSol(sol, :mode), 2.0; atol=0.01) &&
+          isapprox(_resolveSymbolInSol(sol, :x), 1.0; atol=0.01)
       end
     end
 
@@ -256,10 +254,9 @@
       @test begin
         sol = OM.simulate("EventTests.SwitchedOscillator",
                           "./Models/EventTests.mo"; stopTime=2.0)
-        uEnd = last(sol.u)
         sol.retcode == ReturnCode.Success &&
-          isapprox(uEnd[1], 2.0; atol=0.01) &&  # damping switched to 2.0
-          abs(uEnd[2]) < 1.0                     # x amplitude decayed from 1.0
+          isapprox(_resolveSymbolInSol(sol, :damping), 2.0; atol=0.01) &&
+          abs(_resolveSymbolInSol(sol, :x)) < 1.0
       end
     end
 
@@ -273,7 +270,8 @@
       @test begin
         sol = OM.simulate("IntegerStepHold", "./Models/IntegerStepHold.mo";
                           startTime = 0.0, stopTime = 1.0)
-        sol.retcode == ReturnCode.Success &&
+        local ok = sol.retcode == ReturnCode.Success
+        ok &&
           sol(0.25, idxs = :mode) == 3.0 &&
           sol(0.499, idxs = :mode) == 3.0 &&
           sol(0.501, idxs = :mode) == 1.0 &&
@@ -304,9 +302,10 @@
     end
 
     @testset "EnumForTableLookup (OMFrontend constant-table eager fold)" begin
-      # auxiliary[2] = AndTable[auxiliary[1], in2] should stay symbolic.
-      # in1=in2=Logic.'1' → auxiliary[2] should be AndTable[1,1]=Logic.'1' (idx 4).
-      @test_broken begin
+      # auxiliary[2] = AndTable[auxiliary[1], in2] stays symbolic via a Real-typed
+      # ConstTableLookupFn; the model variable `t` is renamed away from MTK's iv.
+      # in1=in2=Logic.'1' → auxiliary[2] = AndTable[1,1] = Logic.'1' (idx 4).
+      @test begin
         sol = OM.simulate("EnumForTableLookup", "./Models/EnumForTableLookup.mo";
                           startTime = 0.0, stopTime = 1.0)
         sol.retcode == ReturnCode.Success &&

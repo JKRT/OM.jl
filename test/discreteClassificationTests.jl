@@ -50,8 +50,8 @@
                       timeSpan = (0.0, 1.0))
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(0.3, idxs = :trigger), 3.0; atol = 1e-6)
-    @test isapprox(sol(0.7, idxs = :trigger), 7.0; atol = 1e-6)
     @test isapprox(sol(0.3, idxs = :out), 13.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = :trigger), 7.0; atol = 1e-6)
     @test isapprox(sol(0.7, idxs = :out), 17.0; atol = 1e-6)
   end
 
@@ -61,8 +61,8 @@
                       timeSpan = (0.0, 1.0))
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(0.3, idxs = :cell_trigger), 3.0; atol = 1e-6)
-    @test isapprox(sol(0.7, idxs = :cell_trigger), 7.0; atol = 1e-6)
     @test isapprox(sol(0.3, idxs = :cell_out), 13.0; atol = 1e-6)
+    @test isapprox(sol(0.7, idxs = :cell_trigger), 7.0; atol = 1e-6)
     @test isapprox(sol(0.7, idxs = :cell_out), 17.0; atol = 1e-6)
   end
 
@@ -91,16 +91,34 @@
   @testset "BooleanGatedIfMin" begin
     #= Boolean `free = (f <= 0)` gates `der(v) = if free then 0.0 else -10.0`.
        f ramps from -1 to +1 over [0,1]; the zero-crossing is at t=0.5.
-       With correct DISCRETE classification and a zero-crossing event at t=0.5:
-         v stays at 1.0 for t in [0,0.5], then drops at rate -10 → v(1.0) = -4.0.
-       Without the discrete event, the solver treats `free` as continuous and
-       goes unstable (retcode ≠ Success). =#
-    @test_broken begin
+       With the discrete-Boolean event lowering (OMBACKEND_DISCRETE_BOOL_LIFT),
+       `free` is held discrete and updated by a zero-crossing event at t=0.5:
+       v stays at 1.0 for t in [0,0.5], then drops at rate -10 → v(1.0) = -4.0.
+       The lowering is opt-in (default off) while the coupled-cluster / broad-MSL
+       work lands; this testset enables it explicitly. =#
+    withenv("OMBACKEND_DISCRETE_BOOL_LIFT" => "true") do
       sol = runModelMTK("BooleanGatedIfMin",
                         "Models/BooleanGatedIfMin.mo";
                         timeSpan = (0.0, 1.0))
-      sol.retcode == ReturnCode.Success &&
-        isapprox(sol(1.0, idxs = :v), -4.0; atol = 0.1)
+      @test sol.retcode == ReturnCode.Success
+      @test isapprox(sol(1.0, idxs = :v), -4.0; atol = 0.1)
+    end
+  end
+
+  @testset "IntegerFSMMin" begin
+    #= Integer (multi-valued) discrete FSM: `mode` advances 0→1→2 as `x` ramps
+       past its thresholds, using `pre(mode)` for memory. Exercises the
+       Integer/enum lowering (held value not 0/1-clamped; pre() via Pre so the
+       self-referential affect is solvable). `y = ∫mode` ⇒ y(4)=3. Refs from OMC. =#
+    withenv("OMBACKEND_DISCRETE_BOOL_LIFT" => "true") do
+      sol = runModelMTK("IntegerFSMMin",
+                        "Models/IntegerFSMMin.mo";
+                        timeSpan = (0.0, 4.0))
+      @test sol.retcode == ReturnCode.Success
+      @test isapprox(sol(2.5, idxs = :mode), 1.0; atol = 0.1)
+      @test isapprox(sol(3.5, idxs = :mode), 2.0; atol = 0.1)
+      @test isapprox(sol(4.0, idxs = :mode), 2.0; atol = 0.1)
+      @test isapprox(sol(4.0, idxs = :y), 3.0; atol = 0.1)
     end
   end
 

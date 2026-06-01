@@ -82,6 +82,10 @@ OMBackend.warnMissingStartValues(false)
   @testset "Discrete Classification Regression:" begin
     include("discreteClassificationTests.jl")
   end
+  @info "Testing model-feature MWEs (fixed-start / nested-der / nonlinear-loop)..."
+  @testset "Model-feature MWEs:" begin
+    include("modelFeatureMWEs.jl")
+  end
 
   #= Heavy MSL tests (Engine1a, DCEE/DCPM_Start, PID_Controller) add 15-30 min.
      Opt in with ENV["OM_HEAVY_TESTS"] set to anything non-empty. =#
