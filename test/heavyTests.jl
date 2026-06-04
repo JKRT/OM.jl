@@ -138,4 +138,44 @@ const _HEAVY_SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
     end
   end
 
+  @testset verbose=true "MSL Electrical Digital (heavy)" begin
+    #= Combinational / tri-state Digital examples unblocked by the when-callback
+       constant-cref lookup fix (skip constant-array element crefs absent from the
+       simvar table). 9-value Logic enum outputs validated against the OMC reference. =#
+    local digitalCases = [
+      ("Adder4",    20.0, 0.05, 4.0),
+      ("HalfAdder",  1.0, 0.5,  5.0),
+      ("NXFER",      1.0, 0.5,  2.0),
+      ("NRXFER",     1.0, 0.5,  2.0),
+      ("BUF3S",      1.0, 0.5,  8.0),
+      ("INV3S",      1.0, 0.5,  2.0),
+    ]
+    for (nm, st, rtol, atol) in digitalCases
+      @testset "MSL Digital $nm" begin
+        sol = nothing
+        @test true == begin
+          try
+            sol = OM.simulate("Modelica.Electrical.Digital.Examples.$nm";
+                              MSL_Version = "MSL:3.2.3", stopTime = st)
+            sol.retcode == _HEAVY_SUCCESS
+          catch e
+            @info "Failed to simulate MSL Digital $nm" exception=(e, catch_backtrace())
+            false
+          end
+        end
+        if sol !== nothing && sol.retcode == _HEAVY_SUCCESS
+          @test begin
+            passed, details = validateMSLModel(sol,
+              "Electrical_Digital_Examples_$nm";
+              stopTime = st, reltol = rtol, atol = atol)
+            if !passed
+              @warn "Digital $nm validation failed" details
+            end
+            passed
+          end
+        end
+      end
+    end
+  end
+
 end

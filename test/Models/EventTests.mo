@@ -494,4 +494,52 @@ package EventTests "Comprehensive test models for Modelica event handling"
     der(z) = y;
   end VariableLimiterIfCond;
 
+  // ========================================================================
+  // SECTION: Periodic sample() events
+  // ========================================================================
+
+  model SampleCounter
+    "Sample-driven discrete consumed only by a continuous equation. cnt should
+     step every 0.1s (reaching ~9 by t=1.0), but currently freezes at 0: a
+     sample() when-target read only continuously (der(x)=cnt) does not update.
+     Contrast PreOperator, where a discrete-referenced sample target fires."
+    Real x(start = 0.0);
+    discrete Real cnt(start = 0.0);
+  equation
+    der(x) = cnt;
+    when sample(0.0, 0.1) then
+      cnt = pre(cnt) + 1.0;
+    end when;
+  end SampleCounter;
+
+  model IntegerWhenCounter
+    "Pulse-style count update: when integer(time/period) > pre(count). count
+     should reach ~5 by t=1.0 (period=0.2). Same shape as SampleCounter but the
+     event condition is integer(time/period) > pre(count) instead of sample().
+     Mirrors Modelica.Blocks.Sources.Pulse, whose count freezes."
+    Real x(start = 0.0);
+    discrete Real cnt(start = 0.0);
+    parameter Real period = 0.2;
+  equation
+    der(x) = cnt;
+    when integer(time/period) > pre(cnt) then
+      cnt = pre(cnt) + 1.0;
+    end when;
+  end IntegerWhenCounter;
+
+  model TimeThresholdCounter
+    "Same self-counter as IntegerWhenCounter but a smooth time-threshold
+     condition (no integer()). Isolates whether integer() is the culprit:
+     if this steps but IntegerWhenCounter freezes, integer()-of-time
+     conditions are the gap."
+    Real x(start = 0.0);
+    discrete Real cnt(start = 0.0);
+    parameter Real period = 0.2;
+  equation
+    der(x) = cnt;
+    when time > period*(pre(cnt) + 1.0) then
+      cnt = pre(cnt) + 1.0;
+    end when;
+  end TimeThresholdCounter;
+
 end EventTests;

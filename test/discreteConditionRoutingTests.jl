@@ -15,13 +15,9 @@
 
 @testset "Discrete condition routing" begin
   @testset "StickSlipMin (no t=0 chatter)" begin
-    # The per-branch routing fix that made this pass landed and was
-    # later reverted because it caused regressions on Boolean
-    # if-equations (CharacteristicIdealDiodes / ElastoGap / etc).
-    # The model is back to its pre-fix chatter behaviour. Keeping the
-    # test as @test_broken so the assertion comes back the day the
-    # underlying Friction-FSM lowering is properly addressed.
-    @test_broken begin
+    # Coulomb-friction stick-slip: discrete-condition routing must not
+    # chatter at t=0. Simulates to completion under bool-lift.
+    @test begin
       sol = OM.simulate("StickSlipMin",
                         "./Models/StickSlipMin.mo";
                         stopTime = 0.4)

@@ -145,6 +145,7 @@
       end
     end
 
+
     @testset "WhenMultipleStatements" begin
       # Bouncing ball + bounceCount. der(x)=v, der(v)=-9.81, x(0)=1, v(0)=0.
       # when x <= 0: reinit(v, -0.7*pre(v)); bounceCount = pre(bounceCount)+1
@@ -326,34 +327,59 @@
   # the operator leaked into a residual or callback expression (e.g.
   # Electrical.Analog.Examples.SwitchWithArc, ControlledSwitchWithArc).
   #
-  # These tests only assert that the model compiles and simulates to the end
-  # without an UndefVarError. They do not yet assert that the when-clause
-  # fires correctly: that requires when-clause infrastructure to detect the
-  # rising edge of the inner argument independently of the operator stub.
+  # These tests assert the when-clause actually FIRES, not just that the model
+  # reaches the end without an UndefVarError. A retcode-only check passes on a
+  # frozen/never-firing operator (the counter stays at its start value 0), which
+  # silently hides the gap. The trajectory assertions below catch that: each
+  # counter must increment. Where the operator does not yet fire (edge/change
+  # have no when-trigger infrastructure; sample() is dropped on the IMTK path)
+  # the assertion is `@test_broken` with the root cause, so the gap is visible
+  # and flips to a failure the moment it is implemented.
   # ==========================================================================
   @testset "State Operators" begin
 
     @testset "PreOperator" begin
+      # when sample(0.0, 0.2): stepped = pre(stepped) + 1 -> ~5 fires by t=1.0.
       @test begin
         sol = OM.simulate("EventTests.PreOperator",
                           "./Models/EventTests.mo"; stopTime = 1.0)
-        sol.retcode == ReturnCode.Success
+        sol.retcode == ReturnCode.Success &&
+          _resolveSymbolInSol(sol, :stepped) >= 4.0
       end
     end
 
     @testset "EdgeOperator" begin
+      # x oscillates (der(x)=sin(6.28t)); above=x>0.1 has one rising edge in
+      # [0,1], so `when edge(above): edgeCount = pre(edgeCount)+1` reaches 1.
+      # edge() over an observed Boolean routes through an MTK
+      # SymbolicContinuousCallback (rising-only) on the resolved relation.
       @test begin
         sol = OM.simulate("EventTests.EdgeOperator",
                           "./Models/EventTests.mo"; stopTime = 1.0)
-        sol.retcode == ReturnCode.Success
+        sol.retcode == ReturnCode.Success &&
+          _resolveSymbolInSol(sol, :edgeCount) >= 1.0
       end
     end
 
     @testset "ChangeOperator" begin
+      # level steps 0->1->2 (sampled); when change(level): changeCount = pre + 1
+      # must reach >= 1 (two changes expected).
       @test begin
         sol = OM.simulate("EventTests.ChangeOperator",
                           "./Models/EventTests.mo"; stopTime = 1.0)
-        sol.retcode == ReturnCode.Success
+        sol.retcode == ReturnCode.Success &&
+          _resolveSymbolInSol(sol, :changeCount) >= 1.0
+      end
+    end
+
+    @testset "SampleContinuousConsumed" begin
+      # when sample(0.0,0.1): cnt = pre(cnt)+1, consumed only by der(x)=cnt.
+      # cnt advances each period and reaches ~9 by t=1.0.
+      @test begin
+        sol = OM.simulate("EventTests.SampleCounter",
+                          "./Models/EventTests.mo"; stopTime = 1.0)
+        sol.retcode == ReturnCode.Success &&
+          _resolveSymbolInSol(sol, :cnt) >= 8.0
       end
     end
 

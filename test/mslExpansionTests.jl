@@ -88,63 +88,64 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
       end
     end
 
-    #= Rotational.Friction: friction elements with stuck/sliding modes.
-       Frontend/backend translation succeed and MTK structural_simplify
-       reduces the system to a balanced 31 equations / 31 unknowns.
-       The real failure is a rank-deficient Jacobian during integration,
-       reported by LinearSolve as `BLAS/LAPACK dgetrf ... U(17,17) is exactly
-       zero` on the 31x31 Jacobian. Root cause: the friction FSM equations
-       `startForward`, `startBackward`, `locked` are Boolean discrete
-       variables in Modelica PartialFriction driven by `pre(mode)` and
-       `(sa > tau0_max)` crossings, but OMBackend lowers them to a
-       polynomial Boolean encoding of shape
-         `0 = -h + x*(1 - h + h^2)`  with  `h = (sa > tau0_max)`
-       that forces `x = h` when `h` is Boolean-valued, yet exposes zero
-       symbolic gradient with respect to `sa` because the comparison
-       `<` has Heaviside derivative. The Modelica definition also includes
-       `pre(mode) == Stuck and (...)` and other disjuncts that are silently
-       dropped in the lowering. Newton's method inside the DAE solver
-       therefore sees a structurally singular column and cannot equilibrate.
-       Proper fix requires discrete-variable + event handling (`pre()` with
-       previous-event-value, zero-crossing events on the `<` predicates),
-       not a patch at the tearing or codegen layer. Kept as broken to
-       track progress. =#
+    #= Rotational.Friction: two coupled PartialFriction elements (clutch + brake).
+       The discrete `mode` FSM is updated through the per-model pre-memory path
+       (OMBACKEND_DISCRETE_PRE_MEMORY), so the stuck<->sliding breakaway at
+       w_relfric=0 resolves without Zeno chatter. Matches the OMC 3.2.3 reference:
+       inertia1 brakes to ~0 by t~1, the clutch slides (w_rel~-53 at t=1) then
+       relocks, and the inertias decay together. =#
     @testset "Rotational.Friction" begin
-      @test_broken begin
-        sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.Friction";
-                          MSL_Version = "MSL:3.2.3", stopTime = 5.0)
-        sol.retcode == _SUCCESS
-      end
-    end
-
-    #= OneWayClutchDisengaged: the freewheel's coupled discrete Booleans
-       {startForward, locked, stuck} are event-lowered (OMBACKEND_DISCRETE_BOOL_LIFT)
-       so the integrator holds them step-valued instead of interpolating. The
-       freewheel alternately locks (w_rel→0) and overruns (w_rel>0) every quarter
-       period; values checked against the Dymola v3.2.3 reference. =#
-    @testset "Rotational.OneWayClutchDisengaged" begin
-      withenv("OMBACKEND_DISCRETE_BOOL_LIFT" => "true") do
+      withenv("OMBACKEND_DISCRETE_PRE_MEMORY" => "true") do
         local sol = nothing
         @test true == begin
           try
-            sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.OneWayClutchDisengaged";
-                              MSL_Version = "MSL:3.2.3", tspan = (0.0, 1.0),
+            sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.Friction";
+                              MSL_Version = "MSL:3.2.3", stopTime = 5.0,
                               overwriteCache = true)
             sol.retcode == _SUCCESS
           catch e
-            @info "Failed: Rotational.OneWayClutchDisengaged" exception=(e, catch_backtrace())
+            @info "Failed: Rotational.Friction" exception=(e, catch_backtrace())
             false
           end
         end
         if sol !== nothing && sol.retcode == _SUCCESS
-          #= Overrun (free) phase: inertiaIn.w and w_rel match the reference. =#
-          @test isapprox(sol(0.5; idxs = :inertiaIn_w), -0.9715, atol = 0.03)
-          @test isapprox(sol(1.0; idxs = :inertiaIn_w), -0.9715, atol = 0.03)
-          @test isapprox(sol(0.5; idxs = :oneWayClutch_w_rel), 1.443, atol = 0.05)
-          #= Locked phase: the freewheel holds w_rel at 0. =#
-          @test isapprox(sol(0.25; idxs = :oneWayClutch_w_rel), 0.0, atol = 0.05)
-          @test isapprox(sol(0.75; idxs = :oneWayClutch_w_rel), 0.0, atol = 0.05)
+          #= Sliding window (clutch slips, inertia1 braked to rest). =#
+          @test isapprox(sol(1.0; idxs = :inertia1_w), 0.0; atol = 0.5)
+          @test isapprox(sol(1.0; idxs = :inertia3_w), 53.1; atol = 3.0)
+          @test isapprox(sol(1.0; idxs = :clutch_w_rel), -53.2; atol = 3.0)
+          #= Re-locked long tail: clutch held at w_rel=0, inertia1 at rest. =#
+          @test isapprox(sol(2.0; idxs = :inertia1_w), 0.0; atol = 0.5)
+          @test isapprox(sol(2.0; idxs = :clutch_w_rel), 0.0; atol = 0.5)
         end
+      end
+    end
+
+    #= OneWayClutchDisengaged: the freewheel's coupled discrete Booleans
+       {startForward, locked, stuck} are event-lowered so the integrator holds
+       them step-valued instead of interpolating. The freewheel alternately locks
+       (w_rel→0) and overruns (w_rel>0) every quarter period; values checked
+       against the Dymola v3.2.3 reference. =#
+    @testset "Rotational.OneWayClutchDisengaged" begin
+      local sol = nothing
+      @test true == begin
+        try
+          sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.OneWayClutchDisengaged";
+                            MSL_Version = "MSL:3.2.3", tspan = (0.0, 1.0),
+                            overwriteCache = true)
+          sol.retcode == _SUCCESS
+        catch e
+          @info "Failed: Rotational.OneWayClutchDisengaged" exception=(e, catch_backtrace())
+          false
+        end
+      end
+      if sol !== nothing && sol.retcode == _SUCCESS
+        #= Overrun (free) phase: inertiaIn.w and w_rel match the reference. =#
+        @test isapprox(sol(0.5; idxs = :inertiaIn_w), -0.9715, atol = 0.03)
+        @test isapprox(sol(1.0; idxs = :inertiaIn_w), -0.9715, atol = 0.03)
+        @test isapprox(sol(0.5; idxs = :oneWayClutch_w_rel), 1.443, atol = 0.05)
+        #= Locked phase: the freewheel holds w_rel at 0. =#
+        @test isapprox(sol(0.25; idxs = :oneWayClutch_w_rel), 0.0, atol = 0.05)
+        @test isapprox(sol(0.75; idxs = :oneWayClutch_w_rel), 0.0, atol = 0.05)
       end
     end
   end
@@ -222,18 +223,18 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
   @testset verbose=true "Digital" begin
 
     @testset "FlipFlop" begin
-      #= JK flip-flop via two NOR gates, AND gates, and a NOT gate.
-         Clock period=10; J and K inputs change at t={50,100,145,200}
-         and t={22,140,150,180} respectively.  The flip-flop output Q
-         must reach Logic.'1' (integer value 4) at some point before
-         t=200 when J goes high.
-         Delay semantics are still broken for FlipFlop; this only checks
-         that the relay-lowered model translates and simulates successfully. =#
+      #= JK flip-flop (clock period=10). Flip-flop output Q delay semantics are
+         still broken; this asserts the model simulates and the sample-driven
+         clock toggles (CLK_y spans both Logic levels) and advances (CLK_t_i). =#
       @test begin
         try
           sol = OM.simulate("Modelica.Electrical.Digital.Examples.FlipFlop";
                             MSL_Version = "MSL:3.2.3", stopTime = 200.0)
-          sol.retcode == _SUCCESS
+          local clk = Float64.(sol[:CLK_y])
+          local ti  = Float64.(sol[:CLK_t_i])
+          sol.retcode == _SUCCESS &&
+            minimum(clk) < maximum(clk) &&
+            last(ti) > first(ti)
         catch e
           false
         end
