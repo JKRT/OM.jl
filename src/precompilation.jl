@@ -117,13 +117,12 @@ PrecompileTools.@compile_workload begin
   end
   @info "Backend precompilation done."
 
-  # iMTK mode (IMTK_MODE, the default backend mode) builds the System and runs
-  # structural_simplify in the backend at translate time, then reuses the cached
-  # build at simulate. This warms generateIMTKCode/_buildAndCache and simulateIMTK
-  # on the tiny scalar-ODE model so first iMTK build+solve latency is reduced.
-  timedPrecompileStep("iMTK build/simulate warmup") do
-    simulate("HelloWorld", helloWorldPath;
-             mode = OMBackend.IMTK_MODE, overwriteCache = true)
+  # iMTK mode (IMTK_MODE, default). Translate only: generated model-module eval is
+  # invalid during package image generation, and the iMTK build's Core.eval is
+  # skipped under precompile (see generateIMTKCode), so this warms the iMTK codegen
+  # path without the in-backend build+solve.
+  timedPrecompileStep("iMTK translate warmup") do
+    translate("HelloWorld", helloWorldPath; mode = OMBackend.IMTK_MODE)
     nothing
   end
   @info "iMTK precompilation done."
