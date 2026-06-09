@@ -69,6 +69,9 @@ OMBackend.warnMissingStartValues(false)
   @testset "Discrete classification regression:" begin
     include("discreteClassificationTests.jl")
   end
+  @testset "Backend bug-audit reproducers:" begin
+    include("backendBugReproTests.jl")
+  end
   @testset "Alias observation preservation MWEs:" begin
     include("aliasObservePreservationTests.jl")
   end

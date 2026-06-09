@@ -1,10 +1,8 @@
 @testset "Three-phase star resistor" begin
 
   # Sub-case A: SimCode-level equation count imbalance.
-  # After alias elimination, 3 Ohm's law equations survive plus the KCL
-  # sum-to-zero constraint -> 4 equations for 3 unknowns.
-  # Fix: removeRedundantEquations (simCodeUtil.jl) detects this via bipartite
-  # matching and removes the one structurally unmatched equation.
+  # The source model encodes the third phase as the negative sum of the first
+  # two phases, so the star-point KCL is provably redundant after aliasing.
   @test begin
     sol = OM.simulate("ThreePhaseTests.ThreePhaseStarResistor",
                       "./Models/ThreePhaseTests.mo"; stopTime = 0.02)

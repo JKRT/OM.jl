@@ -3,7 +3,7 @@ model NoEventSatOsc "noEvent saturation in a Schmitt-trigger feedback loop"
   parameter Real Vns = -1.0;
   parameter Real V0 = 1e4;
   Real y "saturated output";
-  Real c(start = 0.0, fixed = true) "feedback state";
+  Real c(start = 0.3, fixed = true) "feedback state";
   Real vin "differential input";
 equation
   vin = 0.5 * y - c;

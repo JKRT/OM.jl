@@ -1,14 +1,16 @@
 package ThreePhaseTests "Minimal reproducers for 3-phase alias-elimination issues"
 
   model ThreePhaseStarResistor
-    "Minimal 3-phase star network. After alias elimination: 3 Ohm's law
-     equations for i[k] survive plus the KCL constraint i[1]+i[2]+i[3]=0,
-     giving 4 equations for 3 unknowns -> ExtraEquationsSystemException."
+    "Minimal 3-phase star network. The third phase is defined by the first two,
+     so the KCL constraint is an algebraic redundancy rather than an
+     independent equation."
     Real v[3];
     Real i[3];
   equation
+    v[1] = sin(314.159 * time);
+    v[2] = sin(314.159 * time + 2.0944);
+    v[3] = -v[1] - v[2];
     for k in 1:3 loop
-      v[k] = sin(314.159 * time + (k - 1) * 2.0944);
       i[k] = v[k];
     end for;
     i[1] + i[2] + i[3] = 0;

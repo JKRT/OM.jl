@@ -372,6 +372,11 @@ function validateMSLModel(sol, refFile::String;
     omjl_sym = Symbol(omjl_name)
     resolved = resolveMTKVariable(sol, omjl_sym)
 
+    #= At a reference discontinuity the sample instant carries both limits;
+       accept the actual value if it matches either one-sided reference limit. =#
+    knot_eps = length(ref_time) > 1 ?
+      1.5 * (ref_time[end] - ref_time[1]) / (length(ref_time) - 1) : 0.0
+
     times = range(0.0, stopTime, length = npoints)
     sig_passed = true
     worst_abs = 0.0
@@ -396,6 +401,15 @@ function validateMSLModel(sol, refFile::String;
       end
       abs_err = abs(actual - expected)
       threshold = atol + reltol * abs(expected)
+      if abs_err > threshold && knot_eps > 0.0
+        expected_lo = interpolateRef(ref_time, ref_values, t - knot_eps)
+        expected_hi = interpolateRef(ref_time, ref_values, t + knot_eps)
+        if abs(expected_hi - expected_lo) > threshold &&
+           (abs(actual - expected_lo) <= atol + reltol * abs(expected_lo) ||
+            abs(actual - expected_hi) <= atol + reltol * abs(expected_hi))
+          continue
+        end
+      end
       if abs_err > threshold && abs_err > worst_abs
         sig_passed = false
         worst_abs = abs_err

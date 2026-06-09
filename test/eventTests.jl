@@ -302,6 +302,24 @@
       end
     end
 
+    @testset "InitialDiscreteActive (initial() term of lifted discrete-bool when)" begin
+      # Regression for SwitchWithArc / BooleanPulse-at-startTime-0: a discrete
+      # Boolean whose defining relation (time < 0.5) is ALREADY true at t=0 has
+      # no zero-crossing there, so the lifted when did not fire and the discrete
+      # stayed at its default false -> der(x)=0 -> x frozen at 0. The fix adds an
+      # `initialize` affect (the initial() term) to the discrete-bool when
+      # callbacks in createDiscreteBoolWhenEvents, setting the discrete from its
+      # full rhs at t0. With it, `active` is true on [0,0.5) so x integrates to
+      # 0.5, then freezes when `active` falls at t=0.5.
+      @test begin
+        sol = OM.simulate("EventTests.InitialDiscreteActive",
+                          "./Models/EventTests.mo"; stopTime = 1.0)
+        sol.retcode == ReturnCode.Success &&
+          sol(0.4, idxs = :x) > 0.3 &&                     # integrating (bug => 0)
+          isapprox(sol(1.0, idxs = :x), 0.5; atol = 0.05)  # frozen at half-window integral
+      end
+    end
+
     @testset "EnumForTableLookup (OMFrontend constant-table eager fold)" begin
       # auxiliary[2] = AndTable[auxiliary[1], in2] stays symbolic via a Real-typed
       # ConstTableLookupFn; the model variable `t` is renamed away from MTK's iv.
@@ -472,6 +490,26 @@
                         "./Models/EventTests.mo"; stopTime = 1.5)
       sol.retcode == ReturnCode.Success &&
         isapprox(sol[:z][end], 1.0; atol = 0.02)
+    end
+
+  end
+
+  @testset "noEvent saturation feedback oscillator" begin
+
+    # Schmitt-trigger relaxation oscillator (minimal Multivibrator):
+    #   y = noEvent(if V0*vin>Vps then Vps elseif V0*vin<Vns then Vns else V0*vin)
+    #   vin = 0.5*y - c ;  der(c) = y - c.
+    # noEvent => the saturation must be lowered inline (continuous ifelse), NOT
+    # lifted to an event-latched if-equation. With the lift, ifCond freezes at
+    # its first value because the event condition never re-crosses zero, so c
+    # sticks near its start. Inline, the loop relaxation-oscillates and c sweeps
+    # both signs.
+    @test begin
+      sol = runModelMTK("NoEventSatOsc", "Models/NoEventSatOsc.mo";
+                        timeSpan = (0.0, 5.0))
+      cs = [sol(t, idxs = :c) for t in 0.0:0.05:5.0]
+      sol.retcode == ReturnCode.Success &&
+        minimum(cs) < -0.2 && maximum(cs) > 0.4
     end
 
   end

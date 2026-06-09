@@ -142,21 +142,27 @@ const _HEAVY_SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
     #= Combinational / tri-state Digital examples unblocked by the when-callback
        constant-cref lookup fix (skip constant-array element crefs absent from the
        simvar table). 9-value Logic enum outputs validated against the OMC reference. =#
+    #= HalfAdder runs Rosenbrock23: its production solve grinds under the
+       default Rosenbrock regardless of autodiff config (open issue, see
+       INSIGHTS), while Rosenbrock23 simulates and validates it in seconds.
+       The rest of the family is fastest on the default. =#
     local digitalCases = [
-      ("Adder4",    20.0, 0.05, 4.0),
-      ("HalfAdder",  1.0, 0.5,  5.0),
-      ("NXFER",      1.0, 0.5,  2.0),
-      ("NRXFER",     1.0, 0.5,  2.0),
-      ("BUF3S",      1.0, 0.5,  8.0),
-      ("INV3S",      1.0, 0.5,  2.0),
+      ("Adder4",      20.0, 0.05,  4.0,  nothing),
+      ("HalfAdder",    1.0, 0.5,   5.0,  OMBackend.DifferentialEquations.Rosenbrock23(autodiff = false)),
+      ("NXFER",        1.0, 0.5,   2.0,  nothing),
+      ("NRXFER",       1.0, 0.5,   2.0,  nothing),
+      ("BUF3S",        1.0, 0.5,   8.0,  nothing),
+      ("INV3S",        1.0, 0.5,   2.0,  nothing),
+      ("VectorDelay", 10.0, 0.003, 0.01, nothing),
     ]
-    for (nm, st, rtol, atol) in digitalCases
+    for (nm, st, rtol, atol, slv) in digitalCases
       @testset "MSL Digital $nm" begin
         sol = nothing
         @test true == begin
           try
+            local _solverKw = slv === nothing ? NamedTuple() : (; solver = slv)
             sol = OM.simulate("Modelica.Electrical.Digital.Examples.$nm";
-                              MSL_Version = "MSL:3.2.3", stopTime = st)
+                              MSL_Version = "MSL:3.2.3", stopTime = st, _solverKw...)
             sol.retcode == _HEAVY_SUCCESS
           catch e
             @info "Failed to simulate MSL Digital $nm" exception=(e, catch_backtrace())

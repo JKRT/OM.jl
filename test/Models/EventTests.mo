@@ -542,4 +542,16 @@ package EventTests "Comprehensive test models for Modelica event handling"
     end when;
   end TimeThresholdCounter;
 
+  model InitialDiscreteActive
+    "Discrete Boolean whose condition is already TRUE at t=0. The lifted when's
+     initial() term must set 'active' true at init; otherwise the time<0.5
+     relation never crosses at t=0, 'active' is stuck at its default false, and
+     x never integrates. Regression for SwitchWithArc / BooleanPulse-at-start-0."
+    Real x(start = 0.0, fixed = true);
+    Boolean active;
+  equation
+    active = time < 0.5;
+    der(x) = if active then 1.0 else 0.0;
+  end InitialDiscreteActive;
+
 end EventTests;
