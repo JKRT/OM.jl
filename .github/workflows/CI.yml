@@ -80,6 +80,9 @@ jobs:
               "../OMRuntimeExternalC.jl", "../SCode.jl",
             ]
             Pkg.develop([Pkg.PackageSpec(path = p) for p in siblings])
+            # Test-only deps used by test/testUtils.jl but absent from OM [deps]
+            # (already in the resolved manifest transitively; promote to direct).
+            Pkg.add(["ADTypes", "Sundials", "Logging", "Test"])
             Pkg.build(["OMParser", "OMRuntimeExternalC"]; verbose=true)
             Pkg.resolve()
             Pkg.precompile()'
