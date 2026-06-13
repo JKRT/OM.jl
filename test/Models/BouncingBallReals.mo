@@ -1,5 +1,5 @@
 model BouncingBallReals
-  parameter Real e=0.3;
+  parameter Real e=0.7;
   parameter Real g=9.81;
   Real h(start = 1);
   Real v(start = 0);
