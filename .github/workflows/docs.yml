@@ -38,7 +38,7 @@ jobs:
             Pkg.Registry.add("General")
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
             Pkg.instantiate()
-            Pkg.build(; verbose=true)
+            Pkg.build(["OMParser", "OMRuntimeExternalC", "OMFrontend"]; verbose=true)
             Pkg.precompile()'
 
       - name: Build and deploy
