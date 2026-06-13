@@ -459,6 +459,21 @@ function flatten(modelName::String; MSL_Version = "MSL:3.2.3")::Tuple
   return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version)
 end
 
+"""
+    withDirectRHS(f, value)
+
+Run `f()` with `OMBackend.DIRECT_RHS_GENERATION[]` set to `value`, restoring
+the previous value afterwards so a per-call override cannot leak into later calls.
+"""
+function withDirectRHS(f::Function, value::Bool)
+  local previous = OMBackend.DIRECT_RHS_GENERATION[]
+  OMBackend.DIRECT_RHS_GENERATION[] = value
+  try
+    return f()
+  finally
+    OMBackend.DIRECT_RHS_GENERATION[] = previous
+  end
+end
 
 """
     simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false,
@@ -513,19 +528,20 @@ function simulate(modelName::String,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
                   kwargs...)
-  OMBackend.DIRECT_RHS_GENERATION[] = directRHS
-  translate(modelName, modelFile;
-            MSL = MSL,
-            libraries = libraries,
-            mode = mode,
-            MSL_Version = MSL_Version,
-            warnMissingStartValues = warnMissingStartValues,
-            eliminateNonDynamic = eliminateNonDynamic,
-            observedFilter = observedFilter)
-  OMBackend.simulateModel(modelName;
-                          MODE = mode, tspan = (startTime, stopTime),
-                          solver = solver, overwriteCache = overwriteCache,
-                          kwargs...)
+  return withDirectRHS(directRHS) do
+    translate(modelName, modelFile;
+              MSL = MSL,
+              libraries = libraries,
+              mode = mode,
+              MSL_Version = MSL_Version,
+              warnMissingStartValues = warnMissingStartValues,
+              eliminateNonDynamic = eliminateNonDynamic,
+              observedFilter = observedFilter)
+    OMBackend.simulateModel(modelName;
+                            MODE = mode, tspan = (startTime, stopTime),
+                            solver = solver, overwriteCache = overwriteCache,
+                            kwargs...)
+  end
 end
 
 """
@@ -584,21 +600,22 @@ function simulate(modelName::String;
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
                   kwargs...)
-  OMBackend.DIRECT_RHS_GENERATION[] = directRHS
-  internalName = OMBackend.canonicalName(modelName)
-  alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
-  if (!alreadyCompiled || overwriteCache) && MSL
-    translate(modelName;
-              MSL_Version = MSL_Version,
-              mode = mode,
-              warnMissingStartValues = warnMissingStartValues,
-              eliminateNonDynamic = eliminateNonDynamic,
-              observedFilter = observedFilter)
+  return withDirectRHS(directRHS) do
+    internalName = OMBackend.canonicalName(modelName)
+    alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
+    if (!alreadyCompiled || overwriteCache) && MSL
+      translate(modelName;
+                MSL_Version = MSL_Version,
+                mode = mode,
+                warnMissingStartValues = warnMissingStartValues,
+                eliminateNonDynamic = eliminateNonDynamic,
+                observedFilter = observedFilter)
+    end
+    OMBackend.simulateModel(modelName;
+                            MODE = mode, tspan = (startTime, stopTime),
+                            solver = solver, overwriteCache = overwriteCache,
+                            kwargs...)
   end
-  OMBackend.simulateModel(modelName;
-                          MODE = mode, tspan = (startTime, stopTime),
-                          solver = solver, overwriteCache = overwriteCache,
-                          kwargs...)
 end
 
 """
@@ -663,22 +680,23 @@ function translate(modelName::String,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true)
-  OMBackend.DIRECT_RHS_GENERATION[] = directRHS
-  #= MTK_MODE and DEMode both consume the FlatModel-derived SIM_CODE. Only the
-     deprecated DAE_MODE wants the legacy :DAE representation. =#
-  repr = (mode == OMBackend.MTK_MODE || mode == OMBackend.IMTK_MODE || mode == OMBackend.DEMode) ? :FM : :DAE
-  (dae, cache) = flatten(modelName, modelFile;
-                         repr = repr,
-                         MSL = MSL, MSL_Version = MSL_Version,
-                         libraries = libraries)
-  functionList = OMFrontend.cacheToFunctionList(cache)
-  OMBackend.translate(dae;
-                      functionList = functionList,
-                      BackendMode = mode,
-                      warnMissingStartValues = warnMissingStartValues,
-                      eliminateNonDynamic = eliminateNonDynamic,
-                      observedFilter = observedFilter,
-                      checkSimCode = checkSimCode)
+  return withDirectRHS(directRHS) do
+    #= MTK_MODE and DEMode both consume the FlatModel-derived SIM_CODE. Only the
+       deprecated DAE_MODE wants the legacy :DAE representation. =#
+    repr = (mode == OMBackend.MTK_MODE || mode == OMBackend.IMTK_MODE || mode == OMBackend.DEMode) ? :FM : :DAE
+    (dae, cache) = flatten(modelName, modelFile;
+                           repr = repr,
+                           MSL = MSL, MSL_Version = MSL_Version,
+                           libraries = libraries)
+    functionList = OMFrontend.cacheToFunctionList(cache)
+    OMBackend.translate(dae;
+                        functionList = functionList,
+                        BackendMode = mode,
+                        warnMissingStartValues = warnMissingStartValues,
+                        eliminateNonDynamic = eliminateNonDynamic,
+                        observedFilter = observedFilter,
+                        checkSimCode = checkSimCode)
+  end
 end
 
 """
@@ -718,16 +736,17 @@ function translate(modelName::String;
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true)
-  OMBackend.DIRECT_RHS_GENERATION[] = directRHS
-  (dae, cache) = flatten(modelName; MSL_Version = MSL_Version)
-  functionList = OMFrontend.cacheToFunctionList(cache)
-  OMBackend.translate(dae;
-                      functionList = functionList,
-                      BackendMode = mode,
-                      warnMissingStartValues = warnMissingStartValues,
-                      eliminateNonDynamic = eliminateNonDynamic,
-                      observedFilter = observedFilter,
-                      checkSimCode = checkSimCode)
+  return withDirectRHS(directRHS) do
+    (dae, cache) = flatten(modelName; MSL_Version = MSL_Version)
+    functionList = OMFrontend.cacheToFunctionList(cache)
+    OMBackend.translate(dae;
+                        functionList = functionList,
+                        BackendMode = mode,
+                        warnMissingStartValues = warnMissingStartValues,
+                        eliminateNonDynamic = eliminateNonDynamic,
+                        observedFilter = observedFilter,
+                        checkSimCode = checkSimCode)
+  end
 end
 
 """

@@ -169,6 +169,30 @@ PrecompileTools.@compile_workload begin
     nothing
   end
 
+  #= The default simulate path: direct-RHS problem with a sparse symbolic
+     Jacobian and sparse mass matrix. RuntimeGeneratedFunctions are valid
+     during image generation (unlike generated-module eval), so the real
+     pipeline can be exercised end to end. The cubic residual cannot be torn
+     symbolically, which keeps a genuine algebraic unknown and therefore a
+     nontrivial mass matrix. =#
+  timedPrecompileStep("DirectRHS sparse-W warmup") do
+    ModelingToolkit.@independent_variables t
+    local D = ModelingToolkit.Differential(t)
+    ModelingToolkit.@variables x(t) y(t)
+    local sys = ModelingToolkit.ODESystem([D(x) ~ -x + y, 0 ~ y^3 + y + x - 1.0], t;
+                                          name = :_OMDirectRHSWarmupSystem)
+    local reduced = OMBackend.CodeGeneration.structural_simplify(sys; simplify = true,
+                                                                 allow_parameter = true,
+                                                                 split = false)
+    local prob = OMBackend.CodeGeneration.buildDirectRHSProblem(
+      reduced, Pair{Any, Any}[], Pair{Any, Any}[], (0.0, 0.1), nothing)
+    DifferentialEquations.solve(prob, DifferentialEquations.Rodas5(autodiff = false);
+                                abstol = 1e-3, reltol = 1e-3)
+    DifferentialEquations.solve(prob, DifferentialEquations.FBDF(autodiff = false);
+                                abstol = 1e-3, reltol = 1e-3)
+    nothing
+  end
+
   if extendedPrecompile
     timedPrecompileStep("MTK structural warmup") do
       ModelingToolkit.@independent_variables t

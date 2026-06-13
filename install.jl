@@ -1,40 +1,44 @@
-using Pkg
+#!/usr/bin/env julia
 
-@info "Developing sub-packages"
-subPkgs = joinpath.(
-  pwd(),
-  [
-    "ImmutableList.jl",
-    "MetaModelica.jl",
-    "Absyn.jl",
-    "SCode.jl",
-    "DAE.jl",
-    "ArrayUtil.jl",
-    "DoubleEnded.jl",
-    "ListUtil.jl",
-    "OMParser.jl",
-    "OMFrontend.jl",
-    "OMBackend.jl",
-    "OMRuntimeExternalC.jl",
-  ])
+# Regular user install: install OM from the configured Julia registries.
+# For working directly in this checkout, use install_dev.jl instead.
 
+import Pkg
 
-for pkg in subPkgs
-  @info "Developing" pkg
-  Pkg.develop(path=pkg)
+const OPENMODELICA_REGISTRY_URL = "https://github.com/OpenModelica/OpenModelicaRegistry.git"
+
+function add_registry_if_needed(spec, name::AbstractString)
+  try
+    Pkg.Registry.add(spec)
+  catch err
+    message = sprint(showerror, err)
+    if occursin("already installed", message) ||
+       occursin("already exists", message) ||
+       occursin("has already been added", message)
+      @info "Registry already available" name
+    else
+      rethrow()
+    end
+  end
 end
 
-@info "Developing OM.jl"
-@time Pkg.develop(path=pwd())
+function install()
+  @info "Activating Julia default environment"
+  Pkg.activate()
 
-@info "The parser needs some external libraries. Build the parser"
-@time Pkg.build("OMParser")
+  add_registry_if_needed("General", "General")
+  add_registry_if_needed(Pkg.RegistrySpec(url = OPENMODELICA_REGISTRY_URL),
+                         "OpenModelicaRegistry")
 
-@info "Installing auxilary dependencies"
-@time Pkg.add("Revise")
+  @info "Installing OM from Julia registries"
+  Pkg.add("OM")
 
-@info "precompiling and running tests"
-@time include("run.jl")
+  @info "Building native parser dependencies"
+  Pkg.build("OMParser")
 
-@info "Running tests again (but much faster)"
-@time include("run.jl")
+  @info "Precompiling active environment"
+  Pkg.precompile()
+  return nothing
+end
+
+install()
