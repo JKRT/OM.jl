@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write        # deploydocs pushes the built site to the gh-pages branch
+  contents: write
   statuses: write
 
 jobs:
@@ -30,12 +30,16 @@ jobs:
 
       - name: Instantiate docs environment
         shell: bash
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: '0'
         run: |
           julia --project=docs --color=yes -e '
             import Pkg
             Pkg.Registry.add("General")
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
-            Pkg.instantiate()'
+            Pkg.instantiate()
+            Pkg.build(; verbose=true)
+            Pkg.precompile()'
 
       - name: Build and deploy
         shell: bash

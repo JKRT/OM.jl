@@ -34,15 +34,22 @@ jobs:
 
       - uses: julia-actions/cache@v2
 
-      - name: Add registries + instantiate
+      - name: Add registries, build native libs, precompile
         shell: bash
+        # Build BEFORE precompile: OMParser downloads its native shared
+        # libraries in the build step, and OMBackend's precompile workload
+        # loads OMParser. Disable auto-precompile during instantiate, build,
+        # then precompile so the native libs exist first.
+        env:
+          JULIA_PKG_PRECOMPILE_AUTO: '0'
         run: |
           julia --color=yes --project -e '
             import Pkg
             Pkg.Registry.add("General")
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
             Pkg.instantiate()
-            Pkg.build(; verbose=true)'
+            Pkg.build(; verbose=true)
+            Pkg.precompile()'
 
       - uses: julia-actions/julia-runtest@v1
 
