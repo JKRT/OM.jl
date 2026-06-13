@@ -9,7 +9,7 @@
 	url = git@github.com:OpenModelica/SCode.jl.git
 [submodule "DAE.jl"]
 	path = DAE.jl
-	url = git@github.com:JKRT/DAE.jl.git
+	url = git@github.com:OpenModelica/DAE.jl.git
 [submodule "OMBackend.jl"]
 	path = OMBackend.jl
 	url = git@github.com:JKRT/OMBackend.jl.git
@@ -18,16 +18,16 @@
 	url = git@github.com:OpenModelica/DoubleEnded.jl.git
 [submodule "ListUtil.jl"]
 	path = ListUtil.jl
-	url = git@github.com:JKRT/ListUtil.jl.git
+	url = git@github.com:OpenModelica/ListUtil.jl.git
 [submodule "ArrayUtil.jl"]
 	path = ArrayUtil.jl
-	url = git@github.com:JKRT/ArrayUtil.jl.git
+	url = git@github.com:OpenModelica/ArrayUtil.jl.git
 [submodule "ImmutableList.jl"]
 	path = ImmutableList.jl
 	url = git@github.com:OpenModelica/ImmutableList.jl.git
 [submodule "OMFrontend.jl"]
 	path = OMFrontend.jl
-	url = git@github.com:JKRT/OMFrontend.jl.git
+	url = git@github.com:OpenModelica/OMFrontend.jl.git
 [submodule "OMParser.jl"]
 	path = OMParser.jl
 	url = https://github.com/OpenModelica/OMParser.jl.git
