@@ -43,6 +43,6 @@ jobs:
             Pkg.Registry.add("General")
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
             Pkg.instantiate()
-            Pkg.build(["OMParser", "OMRuntimeExternalC", "OMFrontend"]; verbose=true)
+            Pkg.build(["OMParser", "OMRuntimeExternalC"]; verbose=true)
             Pkg.precompile()'
       - uses: julia-actions/julia-runtest@v1
