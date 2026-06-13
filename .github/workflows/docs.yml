@@ -17,19 +17,36 @@ jobs:
   docs:
     name: Build and deploy docs
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout OM.jl
+        uses: actions/checkout@v4
         with:
-          submodules: recursive
+          path: OM.jl
+      - { name: Checkout Absyn.jl,              uses: actions/checkout@v4, with: { repository: OpenModelica/Absyn.jl,              ref: master, path: Absyn.jl } }
+      - { name: Checkout ArrayUtil.jl,          uses: actions/checkout@v4, with: { repository: JKRT/ArrayUtil.jl,                 ref: master, path: ArrayUtil.jl } }
+      - { name: Checkout DAE.jl,                uses: actions/checkout@v4, with: { repository: JKRT/DAE.jl,                       ref: master, path: DAE.jl } }
+      - { name: Checkout DoubleEnded.jl,        uses: actions/checkout@v4, with: { repository: OpenModelica/DoubleEnded.jl,        ref: master, path: DoubleEnded.jl } }
+      - { name: Checkout ImmutableList.jl,      uses: actions/checkout@v4, with: { repository: OpenModelica/ImmutableList.jl,      ref: master, path: ImmutableList.jl } }
+      - { name: Checkout ListUtil.jl,           uses: actions/checkout@v4, with: { repository: JKRT/ListUtil.jl,                   ref: master, path: ListUtil.jl } }
+      - { name: Checkout MetaModelica.jl,       uses: actions/checkout@v4, with: { repository: OpenModelica/MetaModelica.jl,       ref: master, path: MetaModelica.jl } }
+      - { name: Checkout OMBackend.jl,          uses: actions/checkout@v4, with: { repository: JKRT/OMBackend.jl,                 ref: master, path: OMBackend.jl } }
+      - { name: Checkout OMFrontend.jl,         uses: actions/checkout@v4, with: { repository: OpenModelica/OMFrontend.jl,         ref: master, path: OMFrontend.jl } }
+      - { name: Checkout OMParser.jl,           uses: actions/checkout@v4, with: { repository: OpenModelica/OMParser.jl,           ref: master, path: OMParser.jl } }
+      - { name: Checkout OMRuntimeExternalC.jl, uses: actions/checkout@v4, with: { repository: OpenModelica/OMRuntimeExternalC.jl, ref: master, path: OMRuntimeExternalC.jl } }
+      - { name: Checkout SCode.jl,              uses: actions/checkout@v4, with: { repository: OpenModelica/SCode.jl,              ref: master, path: SCode.jl } }
 
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.12'
 
       - uses: julia-actions/cache@v2
+        with:
+          cache-name: om-docs
 
-      - name: Instantiate docs environment
+      - name: Instantiate docs env (sibling develop + native build)
         shell: bash
+        working-directory: OM.jl
         env:
           JULIA_PKG_PRECOMPILE_AUTO: '0'
         run: |
@@ -37,12 +54,21 @@ jobs:
             import Pkg
             Pkg.Registry.add("General")
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
-            Pkg.instantiate()
+            siblings = [
+              "../Absyn.jl", "../ArrayUtil.jl", "../DAE.jl", "../DoubleEnded.jl",
+              "../ImmutableList.jl", "../ListUtil.jl", "../MetaModelica.jl",
+              "../OMBackend.jl", "../OMFrontend.jl", "../OMParser.jl",
+              "../OMRuntimeExternalC.jl", "../SCode.jl",
+            ]
+            Pkg.develop([Pkg.PackageSpec(path = p) for p in siblings])
+            Pkg.develop(Pkg.PackageSpec(path = "."))
             Pkg.build(["OMParser", "OMRuntimeExternalC"]; verbose=true)
+            Pkg.resolve()
             Pkg.precompile()'
 
       - name: Build and deploy
         shell: bash
+        working-directory: OM.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}

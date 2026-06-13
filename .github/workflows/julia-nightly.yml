@@ -1,7 +1,6 @@
 name: Julia nightly
-# Forward-guard against the next Julia. Not part of PR gating: runs on a
-# weekly schedule and manual dispatch only, so a break here never blocks a
-# merge.
+# Forward-guard against the next Julia. Not part of PR gating: weekly +
+# manual dispatch only, so a break here never blocks a merge.
 on:
   workflow_dispatch:
   schedule:
@@ -14,10 +13,16 @@ concurrency:
 permissions:
   contents: read
 
+env:
+  # OM's Project.toml lives in the OM.jl subdir of the workspace; pin it so the
+  # cache action and inline julia calls key off the same project.
+  JULIA_PROJECT: OM.jl
+
 jobs:
   test-nightly:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
@@ -25,16 +30,43 @@ jobs:
         os: [ubuntu-latest, windows-latest]
         arch: [x64]
     steps:
-      - uses: actions/checkout@v4
+      # OM and every sub-package are checked out as SIBLINGS in the workspace.
+      # The packages' [sources] reference ../<name>.jl, and we Pkg.develop them
+      # explicitly below. This mirrors OMFrontend.jl's working CI and avoids the
+      # submodule-pointer + nested-path issues entirely.
+      - name: Checkout OM.jl
+        uses: actions/checkout@v4
         with:
-          submodules: recursive
+          path: OM.jl
+      - { name: Checkout Absyn.jl,              uses: actions/checkout@v4, with: { repository: OpenModelica/Absyn.jl,              ref: master, path: Absyn.jl } }
+      - { name: Checkout ArrayUtil.jl,          uses: actions/checkout@v4, with: { repository: JKRT/ArrayUtil.jl,                 ref: master, path: ArrayUtil.jl } }
+      - { name: Checkout DAE.jl,                uses: actions/checkout@v4, with: { repository: JKRT/DAE.jl,                       ref: master, path: DAE.jl } }
+      - { name: Checkout DoubleEnded.jl,        uses: actions/checkout@v4, with: { repository: OpenModelica/DoubleEnded.jl,        ref: master, path: DoubleEnded.jl } }
+      - { name: Checkout ImmutableList.jl,      uses: actions/checkout@v4, with: { repository: OpenModelica/ImmutableList.jl,      ref: master, path: ImmutableList.jl } }
+      - { name: Checkout ListUtil.jl,           uses: actions/checkout@v4, with: { repository: JKRT/ListUtil.jl,                   ref: master, path: ListUtil.jl } }
+      - { name: Checkout MetaModelica.jl,       uses: actions/checkout@v4, with: { repository: OpenModelica/MetaModelica.jl,       ref: master, path: MetaModelica.jl } }
+      - { name: Checkout OMBackend.jl,          uses: actions/checkout@v4, with: { repository: JKRT/OMBackend.jl,                 ref: master, path: OMBackend.jl } }
+      - { name: Checkout OMFrontend.jl,         uses: actions/checkout@v4, with: { repository: OpenModelica/OMFrontend.jl,         ref: master, path: OMFrontend.jl } }
+      - { name: Checkout OMParser.jl,           uses: actions/checkout@v4, with: { repository: OpenModelica/OMParser.jl,           ref: master, path: OMParser.jl } }
+      - { name: Checkout OMRuntimeExternalC.jl, uses: actions/checkout@v4, with: { repository: OpenModelica/OMRuntimeExternalC.jl, ref: master, path: OMRuntimeExternalC.jl } }
+      - { name: Checkout SCode.jl,              uses: actions/checkout@v4, with: { repository: OpenModelica/SCode.jl,              ref: master, path: SCode.jl } }
+
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
+
       - uses: julia-actions/cache@v2
-      - name: Add registries, build native libs, precompile
+        with:
+          cache-name: om-nightly
+
+      - name: Develop siblings, build native libs, precompile
         shell: bash
+        working-directory: OM.jl
+        # Disable auto-precompile so the native-lib build runs before precompile
+        # (OMParser/OMRuntimeExternalC download shared libs in their build step).
+        # Build only those two: OMBackend/OMFrontend build.jl are standalone-dev
+        # scripts that Pkg.add deps from git and clobber the dev'd path sources.
         env:
           JULIA_PKG_PRECOMPILE_AUTO: '0'
         run: |
@@ -42,7 +74,21 @@ jobs:
             import Pkg
             Pkg.Registry.add("General")
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
-            Pkg.instantiate()
+            siblings = [
+              "../Absyn.jl", "../ArrayUtil.jl", "../DAE.jl", "../DoubleEnded.jl",
+              "../ImmutableList.jl", "../ListUtil.jl", "../MetaModelica.jl",
+              "../OMBackend.jl", "../OMFrontend.jl", "../OMParser.jl",
+              "../OMRuntimeExternalC.jl", "../SCode.jl",
+            ]
+            Pkg.develop([Pkg.PackageSpec(path = p) for p in siblings])
+            # Test-only deps used by test/testUtils.jl but absent from OM [deps]
+            # (already in the resolved manifest transitively; promote to direct).
+            Pkg.add(["ADTypes", "Sundials", "Logging", "Test"])
             Pkg.build(["OMParser", "OMRuntimeExternalC"]; verbose=true)
+            Pkg.resolve()
             Pkg.precompile()'
-      - uses: julia-actions/julia-runtest@v1
+
+      - name: Test
+        shell: bash
+        working-directory: OM.jl/test     # runtests.jl guards pwd() == @__DIR__
+        run: julia --color=yes --project=.. -e 'include("runtests.jl")'
