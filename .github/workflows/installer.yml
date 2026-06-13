@@ -1,0 +1,33 @@
+name: Installer
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  curl-installer:
+    name: Curl installer
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.12'
+
+      - name: Run curl installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          install_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/install.sh"
+          curl -fsSL "${install_url}" | sh
+
+      - name: Verify OM is importable
+        shell: bash
+        run: julia --startup-file=no -e 'import OM; OM.help()'

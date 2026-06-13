@@ -1,8 +1,7 @@
-# OM.jl [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
-A Modelica Compiler in Julia.
+# OpenModelicaJL (OM.jl) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
+A Modelica Environment in Julia.
 
 Please leave a star or make an issue to support the repository!
-
 * Note that this package is still under development
 
 ## Developer instructions
@@ -34,12 +33,12 @@ Using same procedure as above for:
 Once this is done develop SCode and last but not least the DAE.
 
 ## Core modules
-	- Develop the OpenModelicaParser.jl
-	- Develop OMFrontend.jl
-	- Develop OMBackend.jl
-	- Develop the OM package
+    - Develop the OpenModelicaParser.jl
+    - Develop OMFrontend.jl
+    - Develop OMBackend.jl
+    - Develop the OM package
 
-Since this is currently work in progress expect some warnings:)
+(Since this is currently work in progress expect some warnings)
 
 ## Adding the OpenModelicRegistry
 To work with the package manager and manage dependencies of these packages
@@ -66,6 +65,9 @@ using Plots
 import OM
 OM.translate("HelloWorld", "./Models/HelloWorld.mo");
 res = OM.simulate("HelloWorld");
+# Optional debugging aid:
+# OM.translate("HelloWorld", "./Models/HelloWorld.mo"; warnMissingStartValues = true)
+# OM.simulate("HelloWorld"; warnMissingStartValues = true)
 plot(res)
 #= Resimulate the same model, from 0.0 to 2.0 =#
 sol = OM.resimulate("HelloWorld"; startTime = 0.0, stopTime = 2.0)
@@ -176,9 +178,113 @@ end Influenza;
 To export this model to flat Modelica. Execute the following command:
 
 ```julia
-flatModelica = OM.generateFlatModelica("Influenza", "./Models/Influenza.mo")
+flatModelica = OM.exportModelica("Influenza", "./Models/Influenza.mo")
 print(modelName)
 ```
+### Using different versions of the Modelica Standard Library
+Currently two versions of the MSL can be used by executing the following commands:
+
+```julia
+jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_VERSION = "MSL_4_0_0.mo")
+```
+
+Or if you would like to use the old 3.2.3
+
+```julia
+jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_VERSION = "MSL_4_0_0.mo")
+```
+
+These libraries are currently a part of this package.
+It is possible to include more libraries by adding them to the lib folder in the frontend submodule.
+
+### Additional notes
+There are some code examples in the test folder at the root of the repository `OM/test/runtests.jl`
+To run the test and get more ideas on how to use this package you can run the test and see how the code is defined there.
+
+```julia
+include("runtests.jl")
+```
+
+## How do I export my simulation result to OpenModelica?
+To export your simulation result you can use the exportCSV function.
+For more information about the function type `julia>? OM.exportCSV` in your terminal.
+
+Example:
+```julia
+julia> OM.translate("HelloWorld", "./Models/HelloWorld.mo");
+julia> sol = OM.simulate("HelloWorld");
+julia> OM.exportCSV("HelloWorld", sol)
+"HelloWorld_res.csv"
+```
+You can then open `HelloWorld_res.csv` using OMEdit and view the simulation results.
+
+Furthermore, you can of course you can use the Plots.jl package to plot as well.
+
+```julia
+julia> begin
+import OM
+import CSV
+import DataFrames
+using Plots
+sol = OM.simulate("HelloWorld", "./Models/HelloWorld.mo")
+OM.exportCSV("modelName", sol; filePath = "filename.csv")
+f = CSV.read("./filename.csv", DataFrame)
+DataFrames.DataFrame(f)
+plot(f.time, f.x)
+end
+```
+
+## Other useful commands
+```julia
+#Lists compiled models
+OM.OMBackend.availableModels()
+#Prints a compiled model
+OM.OMBackend.printModel(<model name>)
+#Write a model to file with redundant begin blocks and comments removed.
+OM.OMBackend.writeModelToFile("model", "model.jl"; keepComments = true, keepBeginBlocks=false)
+# Plotting a specific variable from an obtained solution if you are using Plots.jl
+using Plots
+plot(sol[:t], sol[:x])
+```
+
+## Troubleshooting
+
+### Debug logging
+
+Backend and VSS (Variable Structure Systems) debug logging can be enabled via environment variables.
+These are checked at module load time, so they must be set before starting Julia:
+
+```bash
+# Enable backend logging
+ENABLE_BACKEND_LOGGING=true julia
+
+# Enable VSS runtime debug logging
+ENABLE_VSS_DEBUG=true julia
+
+# Enable both
+ENABLE_BACKEND_LOGGING=true ENABLE_VSS_DEBUG=true julia
+```
+
+## Submodules
+
+OM.jl is composed of several submodules, each in its own directory:
+
+| Submodule | Description |
+|-----------|-------------|
+| **Absyn.jl** | Abstract syntax tree representation for Modelica (output of the parser) |
+| **SCode.jl** | Simplified code representation (intermediate form between Absyn and the frontend) |
+| **OMParser.jl** | Modelica parser that produces Absyn |
+| **OMFrontend.jl** | The new frontend (NF) that performs instantiation, typing, flattening, and simplification |
+| **OMBackend.jl** | Backend that performs matching, sorting, index reduction, code generation, and simulation via ModelingToolkit.jl |
+| **DAE.jl** | Data structures for the DAE (Differential-Algebraic Equation) intermediate representation |
+| **MetaModelica.jl** | Julia implementation of MetaModelica language constructs (uniontypes, pattern matching, immutable lists) |
+| **ImmutableList.jl** | Immutable cons-list implementation used throughout the compiler |
+| **ArrayUtil.jl** | Array utility functions (fold, map, etc.) |
+| **ListUtil.jl** | Utility functions for immutable list operations |
+| **OMRuntimeExternalC.jl** | Runtime bindings to external C libraries (ModelicaIO, ModelicaStandardTables, ModelicaExternalC) used by compiled models |
+| **OMLibraryTesting.jl** | Test harness for running MSL coverage and regression tests |
+
+All submodules are fetched via `git submodule update --init --recursive`.
 
 ## Collaboration & Contact
 Please email me at the email located here [LiU-page](https://liu.se/en/employee/johti17)

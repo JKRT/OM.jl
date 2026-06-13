@@ -1,0 +1,7 @@
+scratch.jl
+test.mo
+test.mos
+test.log
+*.log
+*.csv
+alloc-profile.pb.gz
