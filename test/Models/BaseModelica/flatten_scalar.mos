@@ -1,4 +1,0 @@
-loadFile("BaseModelicaDemo.mo");
-setCommandLineOptions("--BaseModelica");
-instantiateModel(BaseModelicaDemo.ExampleScalar)
-//writeFile("BaseModelicaDemoFlat.mo", instantiateModel(BaseModelicaDemo.ExampleScalar));

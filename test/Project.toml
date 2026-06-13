@@ -1,6 +1,0 @@
-[deps]
-OMLibraryTesting = "4866894a-ca78-4bef-9a5c-0d35f2f81ce1"
-SnoopCompile = "aa65fe97-06da-5843-b5b1-d5d13cad87d2"
-SnoopCompileCore = "e2b509da-e806-4183-be48-004708413034"
-Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
-Symbolics = "0c5d862f-8b57-4792-8d23-62f2024744c7"

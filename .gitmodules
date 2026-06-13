@@ -9,7 +9,7 @@
 	url = http://github.com/OpenModelica/SCode.jl.git
 [submodule "DAE.jl"]
 	path = DAE.jl
-	url = http://github.com/OpenModelica/DAE.jl.git
+	url = http://github.com/JKRT/DAE.jl.git
 [submodule "OMBackend.jl"]
 	path = OMBackend.jl
 	url = http://github.com/JKRT/OMBackend.jl.git

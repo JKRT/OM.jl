@@ -5,13 +5,7 @@
 deps/deps.jl
 ~*
 .#*
-# Ignore root-level dotfiles and dot-directories used by local tooling.
-/.*
-!/.gitattributes
-!/.gitignore
-!/.gitmodules
-!/.github/
 .vscode/
 *.log
 Manifest.toml
-*.mat
+

@@ -1,5 +1,4 @@
 // Influenza model
-package InfluenzaTest
 
 connector Port = Real;
 
@@ -70,12 +69,12 @@ end Minimum;
 
 
 model Influenza
-  parameter Real Introduction = 77;
+  input Real Introduction = 77;
 
-  Population Immune_Popul(p = 10);
-  Population Non_Infected_Popul(p = 100);
-  Population Infected_Popul(p = 50);
-  Population Sick_Popul(p = 0);
+  Population Immune_Popul(p(start = 10));
+  Population Non_Infected_Popul(p(start = 100));
+  Population Infected_Popul(p(start = 50));
+  Population Sick_Popul(p(start = 0));
 
   Division Incubation;
   Division Cure_Rate;
@@ -134,4 +133,3 @@ equation
 
 end Influenza;
 
-end InfluenzaTest;
