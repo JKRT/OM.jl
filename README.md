@@ -16,6 +16,14 @@ PI controllers, a path planner, and the multibody mechanics. See
 [`examples/RobotAnimation`](examples/RobotAnimation) for the runnable example and
 the forward-kinematics walkthrough.
 
+The one-cylinder engine (`Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a`),
+a planar slider-crank loop solved by OM.jl and animated from the crankshaft angle:
+
+![Engine1a slider-crank animation](examples/EngineAnimation/engine.gif)
+
+See [`examples/EngineAnimation`](examples/EngineAnimation) for the runnable
+example and the slider-crank walkthrough.
+
 ## Developer instructions
 ---
 
