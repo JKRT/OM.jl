@@ -36,7 +36,7 @@ The example needs OM (this repository) and `Plots`:
 ```julia
 using Pkg
 Pkg.add("Plots")
-include("examples/EngineAnimation/engine_animation.jl")
+include("examples/Animation/Engine/engine_animation.jl")
 ```
 
 This regenerates `engine.gif` in this directory.

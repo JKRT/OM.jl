@@ -43,7 +43,7 @@ The example needs OM (this repository) and `Plots`:
 ```julia
 using Pkg
 Pkg.add("Plots")
-include("examples/RobotAnimation/robot_animation.jl")
+include("examples/Animation/Robot/robot_animation.jl")
 ```
 
 This regenerates `robot.gif` in this directory. The simulation is heavy on the

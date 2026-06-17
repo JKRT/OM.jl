@@ -4,24 +4,24 @@ A Modelica Environment in Julia.
 Please leave a star or make an issue to support the repository!
 * Note that this package is still under development
 
-## Showcase: animating an industrial robot
+## Showcase: animating MultiBody models
 
 The Manutec r3 robot (`Modelica.Mechanics.MultiBody.Examples.Systems.RobotR3.fullRobot`)
 simulated end-to-end with OM.jl and animated from the resulting joint angles:
 
-![Manutec r3 animation](examples/RobotAnimation/robot.gif)
+![Manutec r3 animation](examples/Animation/Robot/robot.gif)
 
 This is a full electro-mechanical model: six motor drives with gear friction and
 PI controllers, a path planner, and the multibody mechanics. See
-[`examples/RobotAnimation`](examples/RobotAnimation) for the runnable example and
+[`examples/Animation/Robot`](examples/Animation/Robot) for the runnable example and
 the forward-kinematics walkthrough.
 
 The one-cylinder engine (`Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a`),
 a planar slider-crank loop solved by OM.jl and animated from the crankshaft angle:
 
-![Engine1a slider-crank animation](examples/EngineAnimation/engine.gif)
+![Engine1a slider-crank animation](examples/Animation/Engine/engine.gif)
 
-See [`examples/EngineAnimation`](examples/EngineAnimation) for the runnable
+See [`examples/Animation/Engine`](examples/Animation/Engine) for the runnable
 example and the slider-crank walkthrough.
 
 ## Developer instructions

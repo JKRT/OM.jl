@@ -16,7 +16,7 @@
 #
 # Requirements: OM (this repository) and Plots. From an environment that has
 # OM available, add Plots and run:
-#   julia> include("examples/RobotAnimation/robot_animation.jl")
+#   julia> include("examples/Animation/Robot/robot_animation.jl")
 
 using OM
 using LinearAlgebra

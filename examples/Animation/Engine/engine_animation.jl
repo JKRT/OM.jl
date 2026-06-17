@@ -13,7 +13,7 @@
 #
 # Requirements: OM (this repository) and Plots. From an environment that has
 # OM available, add Plots and run:
-#   julia> include("examples/EngineAnimation/engine_animation.jl")
+#   julia> include("examples/Animation/Engine/engine_animation.jl")
 
 using OM
 using Plots
