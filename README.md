@@ -4,6 +4,18 @@ A Modelica Environment in Julia.
 Please leave a star or make an issue to support the repository!
 * Note that this package is still under development
 
+## Showcase: animating an industrial robot
+
+The Manutec r3 robot (`Modelica.Mechanics.MultiBody.Examples.Systems.RobotR3.fullRobot`)
+simulated end-to-end with OM.jl and animated from the resulting joint angles:
+
+![Manutec r3 animation](examples/RobotAnimation/robot.gif)
+
+This is a full electro-mechanical model: six motor drives with gear friction and
+PI controllers, a path planner, and the multibody mechanics. See
+[`examples/RobotAnimation`](examples/RobotAnimation) for the runnable example and
+the forward-kinematics walkthrough.
+
 ## Developer instructions
 ---
 
