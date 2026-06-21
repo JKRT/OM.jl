@@ -29,16 +29,17 @@
     @test isapprox(sol(1.0; idxs = :w), 10.0; atol = 1e-4)
   end
 
-  #= Nested / second-order derivative der(der(x)): errors in DAE_identifierToString.
-     Modelica permits nth-order der; it should be order-lowered upstream. =#
+  #= der(der(x)) = -x is order-lowered to first-order auxiliary states by
+     Causalize.lowerHigherOrderDerivatives; the solution is x(t) = cos(t). =#
   @testset "nested der (der(der(x)))" begin
-    @test_broken begin
+    @test begin
       local sol = try
         runModelMTK("NestedDerUnsupported", "Models/NestedDerUnsupported.mo"; timeSpan = (0.0, 1.0))
       catch
         nothing
       end
-      sol !== nothing && sol.retcode == ReturnCode.Success
+      sol !== nothing && sol.retcode == ReturnCode.Success &&
+        isapprox(sol(1.0; idxs = :x), cos(1.0); atol = 1.0e-2)
     end
   end
 
