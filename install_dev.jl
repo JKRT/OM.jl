@@ -95,6 +95,13 @@ function install_dev()
 
     step(4, "Building native parser dependencies (OMParser)") do
       Pkg.build("OMParser")
+      # OMParser bakes `const installedLibPath` at precompile time. If it was ever
+      # precompiled before the native DLL existed (empty path), `Pkg.precompile`
+      # below won't rebuild it — the source is unchanged so the stale, empty-path
+      # cache is reused and OMFrontend/OMBackend then fail with
+      # "OMParser native library not found". Force a fresh compile cache now that
+      # the library is present so the correct path is baked in.
+      Base.compilecache(Base.identify_package("OMParser"))
     end
 
     step(5, "Precompiling OM.jl checkout (this is the slow one)") do
