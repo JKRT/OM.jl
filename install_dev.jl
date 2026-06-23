@@ -46,6 +46,19 @@ function add_registry_if_needed(spec, name::AbstractString)
   end
 end
 
+# Total number of top-level steps, used for the "[i/N]" progress prefix.
+const TOTAL_STEPS = 5
+
+# Run `body` as step `i` of `TOTAL_STEPS`, logging a banner before and the
+# elapsed wall-clock time after, so a developer can see live progress and tell
+# which phase a long-running install is currently in.
+function step(body::Function, i::Int, title::AbstractString)
+  @info "[$i/$TOTAL_STEPS] $title ..."
+  elapsed = @elapsed body()
+  @info "[$i/$TOTAL_STEPS] $title done" elapsed = string(round(elapsed; digits = 1), " s")
+  return nothing
+end
+
 function check_submodules()
   missing = String[]
   for dir in REQUIRED_SUBMODULES
@@ -59,27 +72,37 @@ function check_submodules()
     error("Missing submodule checkouts: $(join(missing, ", ")). " *
           "Run `git submodule update --init --recursive` from $(REPO_ROOT).")
   end
+  @info "All $(length(REQUIRED_SUBMODULES)) required submodules present"
   return nothing
 end
 
 function install_dev()
-  check_submodules()
+  @info "Starting OM.jl developer install" project = REPO_ROOT julia = string(VERSION)
+  total = @elapsed begin
+    step(check_submodules, 1, "Checking submodule checkouts")
 
-  add_registry_if_needed("General", "General")
-  add_registry_if_needed(Pkg.RegistrySpec(url = OPENMODELICA_REGISTRY_URL),
-                         "OpenModelicaRegistry")
+    step(2, "Adding package registries") do
+      add_registry_if_needed("General", "General")
+      add_registry_if_needed(Pkg.RegistrySpec(url = OPENMODELICA_REGISTRY_URL),
+                             "OpenModelicaRegistry")
+    end
 
-  @info "Activating OM.jl checkout" project = REPO_ROOT
-  Pkg.activate(REPO_ROOT)
+    step(3, "Instantiating local OM.jl environment") do
+      Pkg.activate(REPO_ROOT)
+      # Pkg prints its own download/resolve progress bars here.
+      Pkg.instantiate()
+    end
 
-  @info "Instantiating local OM.jl environment"
-  Pkg.instantiate()
+    step(4, "Building native parser dependencies (OMParser)") do
+      Pkg.build("OMParser")
+    end
 
-  @info "Building native parser dependencies"
-  Pkg.build("OMParser")
-
-  @info "Precompiling OM.jl checkout"
-  Pkg.precompile()
+    step(5, "Precompiling OM.jl checkout (this is the slow one)") do
+      # Pkg.precompile renders a live progress bar of packages remaining.
+      Pkg.precompile()
+    end
+  end
+  @info "OM.jl developer install complete" total_elapsed = string(round(total; digits = 1), " s")
   return nothing
 end
 
