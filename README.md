@@ -65,7 +65,7 @@ To work with the package manager and manage dependencies of these packages
 you also need to add the OpenModelicaRegistry.
 To do this issue:
 ```
-registry add https://github.com/JKRT/OpenModelicaRegistry.git
+registry add https://github.com/OpenModelica/OpenModelicaRegistry.git
 ```
 This will add this additional registry.
 

@@ -5,14 +5,18 @@ makedocs(
     sitename = "OM.jl",
     authors = "John Tinnerholm and contributors",
     modules = [OM],
+    repo = Documenter.Remotes.GitHub("OpenModelica", "OM.jl"),
     format = Documenter.HTML(
         prettyurls = get(ENV, "CI", "false") == "true",
-        canonical = "https://JKRT.github.io/OM.jl",
+        canonical = "https://OpenModelica.github.io/OM.jl",
+        edit_link = "master",
+        repolink = "https://github.com/OpenModelica/OM.jl",
     ),
     pages = [
         "Home" => "index.md",
         "Installation" => "installation.md",
         "Examples" => "examples.md",
+        "Scripting (.mos)" => "scripting.md",
         "API reference" => "api.md",
     ],
     # Keep the first deploys from hard-failing on as-yet-undocumented bindings
@@ -21,7 +25,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/JKRT/OM.jl.git",
+    repo = "github.com/OpenModelica/OM.jl.git",
     devbranch = "master",
     push_preview = true,
 )

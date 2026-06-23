@@ -30,3 +30,11 @@ OM.exportCSV
 OM.writeModelToFile
 OM.exportModelica
 ```
+
+## Scripting
+
+See [Scripting (`.mos`)](scripting.md) for the full engine description.
+
+```@docs
+OM.runScript
+```

@@ -65,7 +65,7 @@
     @test SC.toDAEExp(rsubSim) isa DAE.RSUB
 
     local sc = SC.SIM_CODE("mock",
-      SC.OrderedDict{String, Tuple{Integer, SC.SimVar}}(),
+      SC.OrderedDict{String, Tuple{Int, SC.SimVar}}(),
       SC.RESIDUAL_EQUATION[], SC.Equation[], SC.WHEN_EQUATION[], SC.IF_EQUATION[],
       false, Int[], SC.Graphs.SimpleDiGraph(0), [], SC.StructuralTransition[], [],
       String[], String[], SC.Equation[], "mock", NONE(), NONE(), String[],

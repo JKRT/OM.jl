@@ -14,7 +14,7 @@ Those sub-packages are git **submodules**, so they must be checked out.
 ## Clone with submodules
 
 ```bash
-git clone --recurse-submodules https://github.com/JKRT/OM.jl.git
+git clone --recurse-submodules https://github.com/OpenModelica/OM.jl.git
 cd OM.jl
 ```
 
@@ -48,6 +48,24 @@ sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
 
 The first call compiles a large dependency tree (ModelingToolkit,
 DifferentialEquations); subsequent runs in the same session are fast.
+
+## Keep a warm Julia session
+
+For both regular use and development, start Julia in the project environment
+(`julia --project=.` from this repository) and keep that REPL running. Repeated
+translation and simulation calls then reuse compiled compiler and SciML code.
+
+During development, install Revise in your default Julia environment and load
+it before OM:
+
+```julia
+using Revise
+using OM
+```
+
+Revise applies most source edits without a restart. Run `Revise.revise()` when
+needed, and call `OM.clearCaches!()` after changes that can invalidate generated
+models or backend caches.
 
 ## Other MSL versions and third-party libraries
 

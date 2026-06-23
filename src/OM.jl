@@ -49,6 +49,10 @@ import CSV
 import DataFrames
 import Pkg
 
+#= OpenModelica-compatible .mos scripting engine. Kept as a submodule so the
+   parser/evaluator can be tested independently from compiler initialization. =#
+include("MosScripting/mosScripting.jl")
+
 """
     EliminationOptions
 
@@ -114,6 +118,7 @@ function help()
   println("    OM.flatten(name; MSL_Version=...)     Flatten an MSL model by name")
   println("    OM.parseFile(file)                    Parse a Modelica file to AST")
   println("    OM.translateToSCode(file)             Parse and convert to SCode")
+  println("    OM.runScript(file)                    Execute an OpenModelica .mos script")
   println()
   printstyled("  Debugging:\n", color=:cyan)
   println("    OM.LogBackend()                      Enable backend debug logging")
@@ -508,8 +513,8 @@ to `translate(modelName, modelFile; ...)` followed by
   `eliminatedName` matches at least one pattern are kept.
 - `directRHS`: toggle direct-RHS code generation (default reads
   `OMBackend.DIRECT_RHS_GENERATION[]`).
-- `overwriteCache`: force re-evaluation of generated code even if the
-  model is already compiled (default `false`).
+- `overwriteCache`: force a fresh rebuild of the cached problem (bypassing the
+  codeHash reuse check) even if the model is already built (default `false`).
 
 Additional keyword arguments are forwarded to `OMBackend.simulateModel`.
 """
@@ -570,9 +575,10 @@ Translate and simulate an MSL model by name. Defaults to `MSL=true`.
   or `Vector{Regex}`. Only alias entries whose `eliminatedName` matches at
   least one pattern are kept. Use component-level patterns like
   `["^rev_", "^body_"]` to observe specific components.
-- `overwriteCache`: force re-translation and re-evaluation even if the model
-  is already compiled (default `false`). Useful when code generation logic has
-  changed and the cached compiled model is stale.
+- `overwriteCache`: force a fresh rebuild of the cached problem (bypassing the
+  codeHash reuse check) even if the model is already built (default `false`).
+  Does not re-run the frontend; call `translate` explicitly if codegen logic
+  changed.
 
 # Example
 ```julia
@@ -603,7 +609,11 @@ function simulate(modelName::String;
   return withDirectRHS(directRHS) do
     internalName = OMBackend.canonicalName(modelName)
     alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
-    if (!alreadyCompiled || overwriteCache) && MSL
+    #= overwriteCache forces a rebuild of the cached problem (in simulateModel),
+       not a by-name re-translation — re-translating by name throws a lookup error
+       for file-based / non-MSL models. Call translate explicitly to re-run the
+       frontend. =#
+    if !alreadyCompiled && MSL
       translate(modelName;
                 MSL_Version = MSL_Version,
                 mode = mode,
@@ -1049,6 +1059,34 @@ function _registerGUIAPIDelegates!()
 end
 
 _registerGUIAPIDelegates!()
+
+"""
+    runScript(path; context=nothing, output=stdout, maxLoopIterations=1_000_000)
+        -> MosScripting.ScriptResult
+
+Execute an OpenModelica-style `.mos` script. Relative paths used by scripting
+commands are resolved from the script's directory. A supplied
+`MosScripting.ScriptContext` may be reused to preserve variables, loaded
+libraries, and the last simulation between scripts.
+
+The returned `ScriptResult` contains each evaluated statement value, the final
+script variables, and the execution context.
+
+# Example
+```julia
+result = OM.runScript("experiment.mos")
+result.variables
+```
+"""
+function runScript(path::AbstractString;
+                   context::Union{Nothing, MosScripting.ScriptContext}=nothing,
+                   output::IO=stdout,
+                   maxLoopIterations::Integer=1_000_000)
+  return MosScripting.runfile(path, @__MODULE__;
+                              context=context,
+                              output=output,
+                              maxLoopIterations=maxLoopIterations)
+end
 
 #= Precompilation script=#
 include("precompilation.jl")
