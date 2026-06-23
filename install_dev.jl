@@ -6,6 +6,13 @@
 
 import Pkg
 
+# Defer auto-precompilation until after `Pkg.build("OMParser")` has downloaded the
+# native parser library. Otherwise `Pkg.instantiate()` eagerly precompiles
+# OMFrontend/OMBackend before the DLL exists and fails with
+# "OMParser native library not found"; the explicit `Pkg.precompile()` below then
+# does the precompile once the library is in place.
+ENV["JULIA_PKG_PRECOMPILE_AUTO"] = "0"
+
 const REPO_ROOT = @__DIR__
 const OPENMODELICA_REGISTRY_URL = "https://github.com/OpenModelica/OpenModelicaRegistry.git"
 
