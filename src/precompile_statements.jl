@@ -31,12 +31,6 @@ precompile(Tuple{typeof(OMBackend.Backend.BDAECreate.structuralHash), String, UI
 precompile(Tuple{typeof(OMBackend.Backend.BDAECreate.synthesizeFromInitialAlgorithms), Array{OMFrontend.Frontend.NFAlgorithm, 1}})
 precompile(Tuple{typeof(OMBackend.Backend.BDAECreate.synthesizeInitialWhenFromAlgorithms), Array{OMFrontend.Frontend.NFAlgorithm, 1}})
 
-precompile(Tuple{typeof(OMBackend.Backend.Causalize.detectStateExpression), DAE.BINARY, Base.Dict{DAE.ComponentRef, Bool}})
-precompile(Tuple{typeof(OMBackend.Backend.Causalize.detectStateExpression), DAE.CALL, Base.Dict{DAE.ComponentRef, Bool}})
-precompile(Tuple{typeof(OMBackend.Backend.Causalize.detectStateExpression), DAE.CREF, Base.Dict{DAE.ComponentRef, Bool}})
-precompile(Tuple{typeof(OMBackend.Backend.Causalize.detectStateExpression), DAE.RCONST, Base.Dict{DAE.ComponentRef, Bool}})
-precompile(Tuple{typeof(OMBackend.Backend.Causalize.detectStateExpression), DAE.RELATION, Base.Dict{DAE.ComponentRef, Bool}})
-precompile(Tuple{typeof(OMBackend.Backend.Causalize.detectStateExpression), DAE.UNARY, Base.Dict{DAE.ComponentRef, Bool}})
 precompile(Tuple{typeof(OMBackend.Backend.Causalize.hasFinalArrayWithSubscripts), DAE.CREF_IDENT})
 precompile(Tuple{typeof(OMBackend.Backend.Causalize.transformASUBInDer), DAE.BINARY, Nothing})
 precompile(Tuple{typeof(OMBackend.Backend.Causalize.transformASUBInDer), DAE.CALL, Nothing})
@@ -68,7 +62,6 @@ precompile(Tuple{typeof(OMBackend.FrontendUtil.Util.getAllCrefs2), DAE.RCONST, I
 precompile(Tuple{typeof(OMBackend.FrontendUtil.Util.getAllCrefs2), DAE.RELATION, ImmutableList.ListDef.Nil{Any}})
 precompile(Tuple{typeof(OMBackend.FrontendUtil.Util.getAllCrefs2), DAE.UNARY, ImmutableList.ListDef.Cons{DAE.ComponentRef}})
 precompile(Tuple{typeof(OMBackend.FrontendUtil.Util.traverseExpTopDown), DAE.Exp, typeof(OMBackend.Backend.BDAEUtil.detectStateExpression), Base.Dict{DAE.ComponentRef, Bool}})
-precompile(Tuple{typeof(OMBackend.FrontendUtil.Util.traverseExpTopDown), DAE.Exp, typeof(OMBackend.Backend.Causalize.detectStateExpression), Base.Dict{DAE.ComponentRef, Bool}})
 precompile(Tuple{typeof(OMBackend.FrontendUtil.Util.traverseExpTopDown), DAE.Exp, typeof(OMBackend.Backend.Causalize.transformASUBInDer), Nothing})
 precompile(Tuple{typeof(OMBackend.FrontendUtil.Util.traverseExpTopDown), DAE.Exp, typeof(OMBackend.FrontendUtil.Util.getAllCrefs2), ImmutableList.ListDef.Cons{DAE.ComponentRef}})
 precompile(Tuple{typeof(OMBackend.FrontendUtil.Util.traverseExpTopDown), DAE.Exp, typeof(OMBackend.FrontendUtil.Util.getAllCrefs2), ImmutableList.ListDef.Nil{Any}})
@@ -115,3 +108,18 @@ precompile(Tuple{typeof(OMBackend.canonicalName), DAE.CREF_IDENT})
 precompile(Tuple{typeof(OMBackend._subscriptSuffix), ImmutableList.ListDef.Nil{Any}})
 precompile(Tuple{typeof(OMBackend.logRunModelName), OMFrontend.Frontend.FLAT_MODEL})
 precompile(Tuple{typeof(MetaModelica.referenceEq), ImmutableList.ListDef.Nil{Any}, ImmutableList.ListDef.Nil{Any}})
+
+# --- SnoopCompile @snoop_inference over OM.translate of multi-equation models ---
+# Generic translate/typing specializations a single-equation model does not
+# exercise: multi-term coupled-equation operand type checking plus a codegen
+# helper. These are model-independent, so one set covers every model.
+precompile(Tuple{typeof(translate), String, String})
+precompile(Tuple{typeof(OMBackend.CodeGeneration._algebraicCoupledVarStrs), ModelingToolkit.System})
+precompile(Tuple{typeof(OMFrontend.Frontend.lookupLocalSimpleName), String, OMFrontend.Frontend.CLASS_NODE})
+precompile(Tuple{typeof(OMFrontend.Frontend.checkBinaryOperation), OMFrontend.Frontend.INTEGER_EXPRESSION{Int64}, OMFrontend.Frontend.TYPE_INTEGER, Int8, OMFrontend.Frontend.OPERATOR{Int64}, OMFrontend.Frontend.CREF_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, MetaModelica.SOURCEINFO})
+precompile(Tuple{typeof(OMFrontend.Frontend.checkBinaryOperation), OMFrontend.Frontend.BINARY_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, OMFrontend.Frontend.OPERATOR{Int64}, OMFrontend.Frontend.CREF_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, MetaModelica.SOURCEINFO})
+precompile(Tuple{typeof(OMFrontend.Frontend.checkBinaryOperation), OMFrontend.Frontend.UNARY_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, OMFrontend.Frontend.OPERATOR{Int64}, OMFrontend.Frontend.CREF_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, MetaModelica.SOURCEINFO})
+precompile(Tuple{typeof(OMFrontend.Frontend.checkBinaryOperation), OMFrontend.Frontend.REAL_EXPRESSION{Float64}, OMFrontend.Frontend.TYPE_REAL, Int8, OMFrontend.Frontend.OPERATOR{Int64}, OMFrontend.Frontend.CREF_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, MetaModelica.SOURCEINFO})
+precompile(Tuple{typeof(OMFrontend.Frontend.checkBinaryOperation), OMFrontend.Frontend.CREF_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, OMFrontend.Frontend.OPERATOR{Int64}, OMFrontend.Frontend.BINARY_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, MetaModelica.SOURCEINFO})
+precompile(Tuple{typeof(OMFrontend.Frontend.checkBinaryOperation), OMFrontend.Frontend.BINARY_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, OMFrontend.Frontend.OPERATOR{Int64}, OMFrontend.Frontend.BINARY_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, MetaModelica.SOURCEINFO})
+precompile(Tuple{typeof(OMFrontend.Frontend.checkBinaryOperation), OMFrontend.Frontend.UNARY_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, OMFrontend.Frontend.OPERATOR{Int64}, OMFrontend.Frontend.BINARY_EXPRESSION, OMFrontend.Frontend.TYPE_REAL, Int8, MetaModelica.SOURCEINFO})

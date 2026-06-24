@@ -685,8 +685,11 @@ end
     sol = nothing
     @test true == begin
       try
+        # Zener breakdown is too sharp for the Rodas5 default tolerance; tighten
+        # the solve so CL.v resolves the breakdown and matches the reference.
         sol = OM.simulate("Modelica.Electrical.Analog.Examples.OvervoltageProtection";
-                          MSL_Version = "MSL:3.2.3", stopTime = 0.4)
+                          MSL_Version = "MSL:3.2.3", stopTime = 0.4,
+                          reltol = 1e-6, abstol = 1e-8)
         sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
       catch e
         @info "Failed to simulate MSL OvervoltageProtection" exception=(e, catch_backtrace())

@@ -39,13 +39,13 @@ jobs:
         with:
           path: OM.jl
       - { name: Checkout Absyn.jl,              uses: actions/checkout@v4, with: { repository: OpenModelica/Absyn.jl,              ref: master, path: Absyn.jl } }
-      - { name: Checkout ArrayUtil.jl,          uses: actions/checkout@v4, with: { repository: JKRT/ArrayUtil.jl,                 ref: master, path: ArrayUtil.jl } }
-      - { name: Checkout DAE.jl,                uses: actions/checkout@v4, with: { repository: JKRT/DAE.jl,                       ref: master, path: DAE.jl } }
+      - { name: Checkout ArrayUtil.jl,          uses: actions/checkout@v4, with: { repository: OpenModelica/ArrayUtil.jl,         ref: master, path: ArrayUtil.jl } }
+      - { name: Checkout DAE.jl,                uses: actions/checkout@v4, with: { repository: OpenModelica/DAE.jl,               ref: master, path: DAE.jl } }
       - { name: Checkout DoubleEnded.jl,        uses: actions/checkout@v4, with: { repository: OpenModelica/DoubleEnded.jl,        ref: master, path: DoubleEnded.jl } }
       - { name: Checkout ImmutableList.jl,      uses: actions/checkout@v4, with: { repository: OpenModelica/ImmutableList.jl,      ref: master, path: ImmutableList.jl } }
-      - { name: Checkout ListUtil.jl,           uses: actions/checkout@v4, with: { repository: JKRT/ListUtil.jl,                   ref: master, path: ListUtil.jl } }
+      - { name: Checkout ListUtil.jl,           uses: actions/checkout@v4, with: { repository: OpenModelica/ListUtil.jl,           ref: master, path: ListUtil.jl } }
       - { name: Checkout MetaModelica.jl,       uses: actions/checkout@v4, with: { repository: OpenModelica/MetaModelica.jl,       ref: master, path: MetaModelica.jl } }
-      - { name: Checkout OMBackend.jl,          uses: actions/checkout@v4, with: { repository: JKRT/OMBackend.jl,                 ref: master, path: OMBackend.jl } }
+      - { name: Checkout OMBackend.jl,          uses: actions/checkout@v4, with: { repository: OpenModelica/OMBackend.jl,         ref: master, path: OMBackend.jl } }
       - { name: Checkout OMFrontend.jl,         uses: actions/checkout@v4, with: { repository: OpenModelica/OMFrontend.jl,         ref: master, path: OMFrontend.jl } }
       - { name: Checkout OMParser.jl,           uses: actions/checkout@v4, with: { repository: OpenModelica/OMParser.jl,           ref: master, path: OMParser.jl } }
       - { name: Checkout OMRuntimeExternalC.jl, uses: actions/checkout@v4, with: { repository: OpenModelica/OMRuntimeExternalC.jl, ref: master, path: OMRuntimeExternalC.jl } }

@@ -1,0 +1,8 @@
+loaded := loadFile("HelloWorld.mo");
+flatModel := instantiateModel(HelloWorld);
+simulation := simulate(HelloWorld,
+                       startTime=0.0,
+                       stopTime=1.0,
+                       numberOfIntervals=100,
+                       tolerance=1e-6);
+print(simulation.messages, "\n");
