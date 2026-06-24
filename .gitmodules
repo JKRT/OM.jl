@@ -28,3 +28,12 @@
 [submodule "OMParser.jl"]
 	path = OMParser.jl
 	url = http://github.com/OpenModelica/OMParser.jl.git
+[submodule "DoubleEnded.jl"]
+	path = DoubleEnded.jl
+	url = http://github.com/OpenModelica/DoubleEnded.jl.git
+[submodule "OMRuntimeExternalC.jl"]
+	path = OMRuntimeExternalC.jl
+	url = http://github.com/OpenModelica/OMRuntimeExternalC.jl.git
+[submodule "OMLibraryTesting.jl"]
+	path = OMLibraryTesting.jl
+	url = http://github.com/OpenModelica/OMLibraryTesting.jl.git
