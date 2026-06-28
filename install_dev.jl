@@ -87,8 +87,15 @@ function install_dev()
                              "OpenModelicaRegistry")
     end
 
-    step(3, "Instantiating local OM.jl environment") do
+    step(3, "Resolving and instantiating local OM.jl environment") do
       Pkg.activate(REPO_ROOT)
+      # Resolve BEFORE instantiate: the dev'd submodules are path-deps, so when one
+      # of them gains a dependency in its Project.toml (e.g. OMBackend adding
+      # PrecompileTools), the committed Manifest.toml is stale and `Pkg.instantiate`
+      # alone fails later with "Package X does not have <dep> in its dependencies".
+      # `Pkg.resolve()` updates the Manifest to match the current submodule
+      # Project.tomls first. (The older setup_dev.jl resolved here too.)
+      Pkg.resolve()
       # Pkg prints its own download/resolve progress bars here.
       Pkg.instantiate()
     end
