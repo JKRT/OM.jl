@@ -36,6 +36,15 @@ jobs:
       - { name: Checkout OMRuntimeExternalC.jl, uses: actions/checkout@v4, with: { repository: OpenModelica/OMRuntimeExternalC.jl, ref: master, path: OMRuntimeExternalC.jl } }
       - { name: Checkout SCode.jl,              uses: actions/checkout@v4, with: { repository: OpenModelica/SCode.jl,              ref: master, path: SCode.jl } }
 
+      # libSimulationRuntimeC.so in the OMRuntimeExternalC.jl libs-v0.1.0 Linux zip
+      # has DT_NEEDED entries for liblapack.so.3, libblas.so.3 and libgfortran.so.5.
+      # ubuntu does not ship those by default, so without this the umbrella precompile
+      # that Documenter needs fails with "liblapack.so.3: cannot open shared object
+      # file". Mirrors the same step in CI.yml.
+      - name: Install OMC runtime system deps (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends liblapack3 libblas3 libgfortran5
+
       - uses: julia-actions/setup-julia@v2
         with:
           version: '1.12'
