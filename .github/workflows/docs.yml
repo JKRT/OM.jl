@@ -13,6 +13,12 @@ permissions:
   contents: write
   statuses: write
 
+env:
+  # Clone registries/packages straight from git instead of the Julia PkgServer.
+  # pkg.julialang.org intermittently returns HTTP 404 for a registry treehash it
+  # hasn't synced yet, which fails `Pkg.Registry.add`; bypassing it avoids the flake.
+  JULIA_PKG_SERVER: ""
+
 jobs:
   docs:
     name: Build and deploy docs

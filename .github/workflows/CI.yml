@@ -16,6 +16,11 @@ env:
   # OM's Project.toml lives in the OM.jl subdir of the workspace; pin it so the
   # cache action and inline julia calls key off the same project.
   JULIA_PROJECT: OM.jl
+  # Clone registries/packages straight from git instead of the Julia PkgServer.
+  # pkg.julialang.org intermittently returns HTTP 404 for a registry treehash it
+  # hasn't synced yet, which fails `Pkg.Registry.add`/`develop`; bypassing it
+  # avoids that flake at the cost of slightly slower fetches.
+  JULIA_PKG_SERVER: ""
 
 jobs:
   test:
