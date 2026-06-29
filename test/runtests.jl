@@ -23,6 +23,14 @@ end
 # hanging the headless runner on a modal dialog.
 @static if Sys.iswindows()
   ccall((:SetErrorMode, "kernel32.dll"), UInt32, (UInt32,), 0x8003)
+  # Pin BLAS to a single thread on Windows. A couple of marginal initialization
+  # solves (DifferenceAmplifier, OneWayClutchDisengaged) converge on Linux and on
+  # a local Windows box but diverge to InitialFailure on the GitHub Windows runner,
+  # whose multi-threaded OpenBLAS32 build yields slightly different numerics that
+  # tip the nonlinear init over its iteration limit. Single-threaded BLAS makes the
+  # numerics deterministic across runners.
+  import LinearAlgebra
+  LinearAlgebra.BLAS.set_num_threads(1)
 end
 import Plots
 
