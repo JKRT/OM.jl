@@ -15,6 +15,17 @@ if pwd() != @__DIR__
   error("Working directory incorrect. Change it to $(@__DIR__)")
 end
 
+# Windows: OMRuntimeExternalC loads its bundled libintl-8.dll into the process;
+# if that happens before Glib loads, Glib's libgio-2.0-0.dll later fails with "the
+# specified procedure could not be found". Load Plots (hence Glib's gettext) FIRST,
+# before testUtils.jl pulls in OM/OMBackend/OMRuntimeExternalC. Also suppress the
+# Windows hard-error popup so a failed DLL load reports in the log instead of
+# hanging the headless runner on a modal dialog.
+@static if Sys.iswindows()
+  ccall((:SetErrorMode, "kernel32.dll"), UInt32, (UInt32,), 0x8003)
+end
+import Plots
+
 include("testUtils.jl")
 OM.clearCaches!()
 OMBackend.warnMissingStartValues(false)

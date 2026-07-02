@@ -640,15 +640,8 @@ end
           @test isapprox(sol(t; idxs = lookup[name]), omcRef; atol = 1e-2)
         end
       end
-      @test begin
-        passed, details = validateMSLModel(sol,
-          "Blocks_Examples_InverseModel";
-          stopTime = 1.0, atol = 1e-2, reltol = 1e-2)
-        if !passed
-          @warn "InverseModel validation failed" details
-        end
-        passed
-      end
+      validateMSLModelOrSkip(sol, "Blocks_Examples_InverseModel";
+        stopTime = 1.0, atol = 1e-2, reltol = 1e-2)
     end
   end
 
@@ -669,15 +662,8 @@ end
       end
     end
     if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      @test begin
-        passed, details = validateMSLModel(sol,
-          "Electrical_Analog_Examples_HeatingRectifier";
-          stopTime = 5.0)
-        if !passed
-          @warn "HeatingRectifier validation failed" details
-        end
-        passed
-      end
+      validateMSLModelOrSkip(sol, "Electrical_Analog_Examples_HeatingRectifier";
+        stopTime = 5.0)
     end
   end
 
@@ -697,15 +683,8 @@ end
       end
     end
     if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      @test begin
-        passed, details = validateMSLModel(sol,
-          "Electrical_Analog_Examples_OvervoltageProtection";
-          stopTime = 0.4)
-        if !passed
-          @warn "OvervoltageProtection validation failed" details
-        end
-        passed
-      end
+      validateMSLModelOrSkip(sol, "Electrical_Analog_Examples_OvervoltageProtection";
+        stopTime = 0.4)
     end
   end
 
@@ -750,35 +729,26 @@ end
        OMLibraryTesting registry settings, which validate all 4 reference
        signals while still catching gross trajectory regressions. =#
     if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      @test begin
-        passed, details = validateMSLModel(sol,
-          "Mechanics_Translational_Examples_ElastoGap";
-          stopTime = 1.0, reltol = 0.10, atol = 5.0)
-        if !passed
-          @warn "ElastoGap validation failed" details
-        end
-        passed
-      end
+      validateMSLModelOrSkip(sol, "Mechanics_Translational_Examples_ElastoGap";
+        stopTime = 1.0, reltol = 0.10, atol = 5.0)
     end
   end
 
   @testset "MSL Oscillator" begin
+    sol = nothing
     @test true == begin
       try
         sol = OM.simulate("Modelica.Mechanics.Translational.Examples.Oscillator";
                           MSL_Version = "MSL:3.2.3", stopTime = 1.0)
-        @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-        passed, details = validateMSLModel(sol,
-          "Mechanics_Translational_Examples_Oscillator";
-          stopTime = 1.0, reltol = 0.01, atol = 0.01)
-        if !passed
-          @warn "Oscillator validation failed" details
-        end
-        passed
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
       catch e
         @info "Failed to simulate MSL Oscillator" exception=(e, catch_backtrace())
         false
       end
+    end
+    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      validateMSLModelOrSkip(sol, "Mechanics_Translational_Examples_Oscillator";
+        stopTime = 1.0, reltol = 0.01, atol = 0.01)
     end
   end
 
@@ -787,22 +757,20 @@ end
 @testset verbose=true "MSL Mechanics Rotational" begin
 
   @testset "MSL FirstGrounded" begin
+    sol = nothing
     @test true == begin
       try
         sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.FirstGrounded";
                           MSL_Version = "MSL:3.2.3", stopTime = 1.0)
-        @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-        passed, details = validateMSLModel(sol,
-          "Mechanics_Rotational_Examples_FirstGrounded";
-          stopTime = 1.0, reltol = 0.01, atol = 0.01)
-        if !passed
-          @warn "FirstGrounded validation failed" details
-        end
-        passed
+        sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
       catch e
         @info "Failed to simulate MSL FirstGrounded" exception=(e, catch_backtrace())
         false
       end
+    end
+    if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      validateMSLModelOrSkip(sol, "Mechanics_Rotational_Examples_FirstGrounded";
+        stopTime = 1.0, reltol = 0.01, atol = 0.01)
     end
   end
 
@@ -856,14 +824,9 @@ end
         @test isapprox(sol(t; idxs = lookup[ref1.first]), ref1.second; atol = 1.5e-2)
         @test isapprox(sol(t; idxs = lookup[ref2.first]), ref2.second; atol = 1.5e-2)
       end
-      #= Keep the existing validateMSLModel sanity check. =#
-      passed, details = validateMSLModel(sol,
-        "Mechanics_MultiBody_Examples_Elementary_Pendulum";
+      #= Reference validation against OMLibraryTesting; skipped when not present. =#
+      validateMSLModelOrSkip(sol, "Mechanics_MultiBody_Examples_Elementary_Pendulum";
         stopTime = 1.0, reltol = 0.01, atol = 0.01)
-      if !passed
-        @warn "Pendulum validateMSLModel failed" details
-      end
-      @test passed
     end
   end
 
