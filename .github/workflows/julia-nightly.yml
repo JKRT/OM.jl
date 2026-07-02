@@ -1,9 +1,10 @@
-name: CI
+name: Julia nightly
+# Forward-guard against the next Julia. Not part of PR gating: weekly +
+# manual dispatch only, so a break here never blocks a merge.
 on:
-  pull_request:
-  push:
-    branches: [master]
-    tags: ['*']
+  workflow_dispatch:
+  schedule:
+    - cron: '11 7 * * 1'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -16,21 +17,16 @@ env:
   # OM's Project.toml lives in the OM.jl subdir of the workspace; pin it so the
   # cache action and inline julia calls key off the same project.
   JULIA_PROJECT: OM.jl
-  # Clone registries/packages straight from git instead of the Julia PkgServer.
-  # pkg.julialang.org intermittently returns HTTP 404 for a registry treehash it
-  # hasn't synced yet, which fails `Pkg.Registry.add`/`develop`; bypassing it
-  # avoids that flake at the cost of slightly slower fetches.
-  JULIA_PKG_SERVER: ""
 
 jobs:
-  test:
+  test-nightly:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        version: ['1.12']
+        version: ['nightly']
         os: [ubuntu-latest, windows-latest]
         arch: [x64]
     steps:
@@ -55,17 +51,6 @@ jobs:
       - { name: Checkout OMRuntimeExternalC.jl, uses: actions/checkout@v4, with: { repository: OpenModelica/OMRuntimeExternalC.jl, ref: master, path: OMRuntimeExternalC.jl } }
       - { name: Checkout SCode.jl,              uses: actions/checkout@v4, with: { repository: OpenModelica/SCode.jl,              ref: master, path: SCode.jl } }
 
-      # libSimulationRuntimeC.so in the OMRuntimeExternalC.jl libs-v0.1.0
-      # Linux zip has DT_NEEDED entries for liblapack.so.3, libblas.so.3 and
-      # libgfortran.so.5. ubuntu-24.04 does not ship those by default, so
-      # dlopen fails and every MSL / Spice3 / external-builtin test that goes
-      # through structural_simplify chains down to it. The Windows
-      # x86_64-mingw32 zip ships its own MinGW DLLs (libgfortran-5.dll,
-      # libopenblas.dll, ...) so no install step is needed there.
-      - name: Install OMC runtime system deps (Linux)
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends liblapack3 libblas3 libgfortran5
-
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
@@ -73,7 +58,7 @@ jobs:
 
       - uses: julia-actions/cache@v2
         with:
-          cache-name: om-ci
+          cache-name: om-nightly
 
       - name: Develop siblings, build native libs, precompile
         shell: bash

@@ -120,17 +120,20 @@
   end
 
   #= lowerComplexOperatorRecords reproducer set (test/Models/ComplexLoweringTests.mo).
-     SKIPPED: OMFrontend cannot resolve the top-level operator-record `Complex`
-     for a standalone custom .mo (not in scope); these only ever passed when a
-     prior MSL test left `Complex` in OMFrontend's global scope, so they are
-     order-dependent. The SimCode complex-lowering pass they target is covered
-     by the MSL model test `ShowTransferFunction` (translate+simulate+validate,
-     mslExpansionTests.jl) and by UnsymmetricalLoad. Un-skip if OMFrontend gains
-     Complex-in-scope support for custom files. =#
-  @testset "Lowering: Complex operator-record patterns (skipped — see note)" begin
+     Each model isolates one Complex operator-record pattern the SimCode complex
+     lowering pass must scalarize. `MSL = true` brings the top-level `Complex`
+     operator record into scope so the standalone file resolves it independently
+     of test order, mirroring the MSL coverage in ShowTransferFunction /
+     UnsymmetricalLoad. =#
+  @testset "Lowering: Complex operator-record patterns" begin
     for m in ("DirectAssign", "ConstructorProjection", "ArrayElementAccess",
               "MatrixVectorMul", "InitialEqAssign")
-      @test_skip OM.translate("ComplexLoweringTests." * m, "./Models/ComplexLoweringTests.mo")
+      @test begin
+        sol = OM.simulate(string("ComplexLoweringTests.", m),
+                          "./Models/ComplexLoweringTests.mo";
+                          MSL = true, startTime = 0.0, stopTime = 1.0)
+        sol.retcode == ReturnCode.Success
+      end
     end
   end
 

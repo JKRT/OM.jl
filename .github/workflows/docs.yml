@@ -1,43 +1,30 @@
-name: CI
+name: Documentation
 on:
-  pull_request:
   push:
     branches: [master]
     tags: ['*']
+  pull_request:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
+  statuses: write
 
 env:
-  # OM's Project.toml lives in the OM.jl subdir of the workspace; pin it so the
-  # cache action and inline julia calls key off the same project.
-  JULIA_PROJECT: OM.jl
   # Clone registries/packages straight from git instead of the Julia PkgServer.
   # pkg.julialang.org intermittently returns HTTP 404 for a registry treehash it
-  # hasn't synced yet, which fails `Pkg.Registry.add`/`develop`; bypassing it
-  # avoids that flake at the cost of slightly slower fetches.
+  # hasn't synced yet, which fails `Pkg.Registry.add`; bypassing it avoids the flake.
   JULIA_PKG_SERVER: ""
 
 jobs:
-  test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
+  docs:
+    name: Build and deploy docs
+    runs-on: ubuntu-latest
     timeout-minutes: 120
-    strategy:
-      fail-fast: false
-      matrix:
-        version: ['1.12']
-        os: [ubuntu-latest, windows-latest]
-        arch: [x64]
     steps:
-      # OM and every sub-package are checked out as SIBLINGS in the workspace.
-      # The packages' [sources] reference ../<name>.jl, and we Pkg.develop them
-      # explicitly below. This mirrors OMFrontend.jl's working CI and avoids the
-      # submodule-pointer + nested-path issues entirely.
       - name: Checkout OM.jl
         uses: actions/checkout@v4
         with:
@@ -55,37 +42,30 @@ jobs:
       - { name: Checkout OMRuntimeExternalC.jl, uses: actions/checkout@v4, with: { repository: OpenModelica/OMRuntimeExternalC.jl, ref: master, path: OMRuntimeExternalC.jl } }
       - { name: Checkout SCode.jl,              uses: actions/checkout@v4, with: { repository: OpenModelica/SCode.jl,              ref: master, path: SCode.jl } }
 
-      # libSimulationRuntimeC.so in the OMRuntimeExternalC.jl libs-v0.1.0
-      # Linux zip has DT_NEEDED entries for liblapack.so.3, libblas.so.3 and
-      # libgfortran.so.5. ubuntu-24.04 does not ship those by default, so
-      # dlopen fails and every MSL / Spice3 / external-builtin test that goes
-      # through structural_simplify chains down to it. The Windows
-      # x86_64-mingw32 zip ships its own MinGW DLLs (libgfortran-5.dll,
-      # libopenblas.dll, ...) so no install step is needed there.
+      # libSimulationRuntimeC.so in the OMRuntimeExternalC.jl libs-v0.1.0 Linux zip
+      # has DT_NEEDED entries for liblapack.so.3, libblas.so.3 and libgfortran.so.5.
+      # ubuntu does not ship those by default, so without this the umbrella precompile
+      # that Documenter needs fails with "liblapack.so.3: cannot open shared object
+      # file". Mirrors the same step in CI.yml.
       - name: Install OMC runtime system deps (Linux)
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends liblapack3 libblas3 libgfortran5
 
       - uses: julia-actions/setup-julia@v2
         with:
-          version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
+          version: '1.12'
 
       - uses: julia-actions/cache@v2
         with:
-          cache-name: om-ci
+          cache-name: om-docs
 
-      - name: Develop siblings, build native libs, precompile
+      - name: Instantiate docs env (sibling develop + native build)
         shell: bash
         working-directory: OM.jl
-        # Disable auto-precompile so the native-lib build runs before precompile
-        # (OMParser/OMRuntimeExternalC download shared libs in their build step).
-        # Build only those two: OMBackend/OMFrontend build.jl are standalone-dev
-        # scripts that Pkg.add deps from git and clobber the dev'd path sources.
         env:
           JULIA_PKG_PRECOMPILE_AUTO: '0'
         run: |
-          julia --color=yes --project -e '
+          julia --project=docs --color=yes -e '
             import Pkg
             Pkg.Registry.add("General")
             Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
@@ -96,14 +76,15 @@ jobs:
               "../OMRuntimeExternalC.jl", "../SCode.jl",
             ]
             Pkg.develop([Pkg.PackageSpec(path = p) for p in siblings])
-            # Test-only deps used by test/testUtils.jl but absent from OM [deps]
-            # (already in the resolved manifest transitively; promote to direct).
-            Pkg.add(["ADTypes", "Sundials", "Logging", "Test"])
+            Pkg.develop(Pkg.PackageSpec(path = "."))
             Pkg.build(["OMParser", "OMRuntimeExternalC"]; verbose=true)
             Pkg.resolve()
             Pkg.precompile()'
 
-      - name: Test
+      - name: Build and deploy
         shell: bash
-        working-directory: OM.jl/test     # runtests.jl guards pwd() == @__DIR__
-        run: julia --color=yes --project=.. -e 'include("runtests.jl")'
+        working-directory: OM.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+        run: julia --project=docs --color=yes docs/make.jl

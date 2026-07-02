@@ -4,6 +4,26 @@ A Modelica Environment in Julia.
 Please leave a star or make an issue to support the repository!
 * Note that this package is still under development
 
+## Showcase: animating MultiBody models
+
+The Manutec r3 robot (`Modelica.Mechanics.MultiBody.Examples.Systems.RobotR3.fullRobot`)
+simulated end-to-end with OM.jl and animated from the resulting joint angles:
+
+![Manutec r3 animation](examples/Animation/Robot/robot.gif)
+
+This is a full electro-mechanical model: six motor drives with gear friction and
+PI controllers, a path planner, and the multibody mechanics. See
+[`examples/Animation/Robot`](examples/Animation/Robot) for the runnable example and
+the forward-kinematics walkthrough.
+
+The one-cylinder engine (`Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a`),
+a planar slider-crank loop solved by OM.jl and animated from the crankshaft angle:
+
+![Engine1a slider-crank animation](examples/Animation/Engine/engine.gif)
+
+See [`examples/Animation/Engine`](examples/Animation/Engine) for the runnable
+example and the slider-crank walkthrough.
+
 ## Developer instructions
 ---
 
@@ -45,7 +65,7 @@ To work with the package manager and manage dependencies of these packages
 you also need to add the OpenModelicaRegistry.
 To do this issue:
 ```
-registry add https://github.com/JKRT/OpenModelicaRegistry.git
+registry add https://github.com/OpenModelica/OpenModelicaRegistry.git
 ```
 This will add this additional registry.
 

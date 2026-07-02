@@ -1,0 +1,23 @@
+// name: LotkaVolterraSimulation
+// keywords: simulation, nonlinear, population-dynamics, instantiateModel, val
+// status: correct
+//
+// Nonlinear predator-prey dynamics must keep both populations positive.
+
+loaded := loadFile("LotkaVolterra.mo");
+flatModel := instantiateModel(LotkaVolterra);
+simulation := simulate(LotkaVolterra, stopTime=20.0,
+                       numberOfIntervals=200, tolerance=1e-8);
+preyFinal := val(prey, 20.0);
+predatorsFinal := val(predators, 20.0);
+print(loaded, "\n");
+print(size(flatModel) > 100, "\n");
+print(preyFinal > 0.0 and predatorsFinal > 0.0, "\n");
+print(preyFinal <> 10.0 and predatorsFinal <> 10.0, "\n");
+
+// Result:
+// true
+// true
+// true
+// true
+// endResult

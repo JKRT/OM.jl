@@ -443,6 +443,33 @@ function validateMSLModel(sol, refFile::String;
 end
 
 """
+    validateMSLModelOrSkip(sol, refFile; kwargs...)
+
+Validate `sol` against the OMLibraryTesting MSL reference CSV when it is present,
+otherwise register a *skipped* test instead of a failure.
+
+The MSL reference trajectories are produced and stored by the separate
+OMLibraryTesting.jl project (its `reference/download_refs.sh` fetches the official
+Modelica Association results). That project is NOT a dependency of the OM.jl test
+suite, so a missing reference must not fail OM.jl's own tests — the model has
+already been simulated and checked against the inline reference points above. When
+OMLibraryTesting.jl is checked out and its references are downloaded, the full
+CSV validation runs.
+"""
+function validateMSLModelOrSkip(sol, refFile::String; kwargs...)
+  csv_path = joinpath(MSL_REF_DIR, "csv", refFile * ".csv")
+  if !isfile(csv_path)
+    @info "Skipping MSL reference validation: OMLibraryTesting reference not present" refFile
+    @test_skip validateMSLModel(sol, refFile; kwargs...)
+    return nothing
+  end
+  passed, details = validateMSLModel(sol, refFile; kwargs...)
+  passed || @warn "$(refFile) validation failed" details
+  @test passed
+  return nothing
+end
+
+"""
 Run a VSS model and test a specific solution index.
 Returns (passed::Bool, numSolutions::Int, message::String).
 Suppresses large solution output.

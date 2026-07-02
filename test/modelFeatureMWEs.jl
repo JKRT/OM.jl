@@ -6,8 +6,9 @@
   than collapsing to the trivial zero. (A stuck-at-IC failure only shows up once a
   nonlinear loop is involved.)
 
-  The two @test_broken cases are separate codegen gaps caught while building these:
-  nested second-order derivatives, and a nonlinear holonomic loop closure.
+  Two formerly-broken codegen gaps caught while building these now pass: nested
+  second-order derivatives (Causalize order-lowering) and a nonlinear holonomic
+  loop closure (output-only sinks defined nonlinearly stay in the residual system).
 =#
 
 @testset "Model-feature MWEs" begin
@@ -29,29 +30,28 @@
     @test isapprox(sol(1.0; idxs = :w), 10.0; atol = 1e-4)
   end
 
-  #= Nested / second-order derivative der(der(x)): errors in DAE_identifierToString.
-     Modelica permits nth-order der; it should be order-lowered upstream. =#
+  #= der(der(x)) = -x is order-lowered to first-order auxiliary states by
+     Causalize.lowerHigherOrderDerivatives; the solution is x(t) = cos(t). =#
   @testset "nested der (der(der(x)))" begin
-    @test_broken begin
+    @test begin
       local sol = try
         runModelMTK("NestedDerUnsupported", "Models/NestedDerUnsupported.mo"; timeSpan = (0.0, 1.0))
       catch
         nothing
       end
-      sol !== nothing && sol.retcode == ReturnCode.Success
+      sol !== nothing && sol.retcode == ReturnCode.Success &&
+        isapprox(sol(1.0; idxs = :x), cos(1.0); atol = 1.0e-2)
     end
   end
 
-  #= Nonlinear holonomic loop closure ((s - r*cos(phi))^2 + (r*sin(phi))^2 = L^2):
-     AssertionError: islinear during structural handling of the nonlinear loop. =#
+  #= Nonlinear holonomic loop closure: s is an output-only sink defined by an
+     equation quadratic in itself, so it stays in the residual system (MTK solves
+     the closure numerically) instead of being eliminated via a linear solve_for.
+     The crank spins at the fixed start velocity w=10, so phi(1)=10. =#
   @testset "nonlinear loop closure" begin
-    @test_broken begin
-      local sol = try
-        runModelMTK("CrankSliderStuck", "Models/CrankSliderStuck.mo"; timeSpan = (0.0, 1.0))
-      catch
-        nothing
-      end
-      sol !== nothing && sol.retcode == ReturnCode.Success
-    end
+    local sol = runModelMTK("CrankSliderStuck", "Models/CrankSliderStuck.mo"; timeSpan = (0.0, 1.0))
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :w), 10.0; atol = 1e-4)
+    @test isapprox(sol(1.0; idxs = :phi), 10.0; atol = 1e-3)
   end
 end
