@@ -19,16 +19,25 @@ env:
 
 jobs:
   test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }}
+    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        version: ['1.12']
-        os: [ubuntu-latest, windows-latest]
-        arch: [x64]
+        include:
+          - { os: ubuntu-latest,  arch: x64,   version: '1.12' }
+          - { os: macos-latest,   arch: arm64, version: '1.12' }
+          - { os: windows-latest, arch: x64,   version: '1.12' }
     steps:
+      # macOS runners OOM under the umbrella's heavy parallel precompile; cap it.
+      # (External-C tests that need OMRuntimeExternalC's native libs — unavailable
+      # on macOS — are already guarded in externalBuiltinTests.jl.)
+      - name: Cap precompile concurrency (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: echo "JULIA_NUM_PRECOMPILE_TASKS=2" >> "$GITHUB_ENV"
+
       # OM and every sub-package are checked out as SIBLINGS in the workspace.
       # The packages' [sources] reference ../<name>.jl, and we Pkg.develop them
       # explicitly below. This mirrors OMFrontend.jl's working CI and avoids the
