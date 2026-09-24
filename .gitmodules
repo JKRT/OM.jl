@@ -1,39 +1,52 @@
 [submodule "MetaModelica.jl"]
 	path = MetaModelica.jl
 	url = https://github.com/OpenModelica/MetaModelica.jl.git
+	branch = master
 [submodule "Absyn.jl"]
 	path = Absyn.jl
 	url = https://github.com/OpenModelica/Absyn.jl.git
+	branch = master
 [submodule "SCode.jl"]
 	path = SCode.jl
 	url = https://github.com/OpenModelica/SCode.jl.git
+	branch = master
 [submodule "DAE.jl"]
 	path = DAE.jl
 	url = https://github.com/OpenModelica/DAE.jl.git
+	branch = master
 [submodule "OMBackend.jl"]
 	path = OMBackend.jl
 	url = https://github.com/OpenModelica/OMBackend.jl.git
+	branch = master
 [submodule "ListUtil.jl"]
 	path = ListUtil.jl
 	url = https://github.com/OpenModelica/ListUtil.jl.git
+	branch = master
 [submodule "ArrayUtil.jl"]
 	path = ArrayUtil.jl
 	url = https://github.com/OpenModelica/ArrayUtil.jl.git
+	branch = master
 [submodule "ImmutableList.jl"]
 	path = ImmutableList.jl
 	url = https://github.com/OpenModelica/ImmutableList.jl.git
+	branch = master
 [submodule "OMFrontend.jl"]
 	path = OMFrontend.jl
 	url = https://github.com/OpenModelica/OMFrontend.jl.git
+	branch = master
 [submodule "OMParser.jl"]
 	path = OMParser.jl
 	url = https://github.com/OpenModelica/OMParser.jl.git
+	branch = master
 [submodule "DoubleEnded.jl"]
 	path = DoubleEnded.jl
 	url = https://github.com/OpenModelica/DoubleEnded.jl.git
+	branch = master
 [submodule "OMRuntimeExternalC.jl"]
 	path = OMRuntimeExternalC.jl
 	url = https://github.com/OpenModelica/OMRuntimeExternalC.jl.git
+	branch = master
 [submodule "OMLibraryTesting.jl"]
 	path = OMLibraryTesting.jl
 	url = https://github.com/OpenModelica/OMLibraryTesting.jl.git
+	branch = master
