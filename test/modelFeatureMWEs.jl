@@ -29,10 +29,10 @@
     @test isapprox(sol(1.0; idxs = :w), 10.0; atol = 1e-4)
   end
 
-  #= Nested / second-order derivative der(der(x)): errors in DAE_identifierToString.
-     Modelica permits nth-order der; it should be order-lowered upstream. =#
+  #= Nested / second-order derivative der(der(x)). Used to error in
+     DAE_identifierToString; simulates since the 1.13 working line. =#
   @testset "nested der (der(der(x)))" begin
-    @test_broken begin
+    @test begin
       local sol = try
         runModelMTK("NestedDerUnsupported", "Models/NestedDerUnsupported.mo"; timeSpan = (0.0, 1.0))
       catch
@@ -42,10 +42,11 @@
     end
   end
 
-  #= Nonlinear holonomic loop closure ((s - r*cos(phi))^2 + (r*sin(phi))^2 = L^2):
-     AssertionError: islinear during structural handling of the nonlinear loop. =#
+  #= Nonlinear holonomic loop closure ((s - r*cos(phi))^2 + (r*sin(phi))^2 = L^2).
+     Used to fail with AssertionError: islinear during structural handling of
+     the nonlinear loop; simulates since the 1.13 working line. =#
   @testset "nonlinear loop closure" begin
-    @test_broken begin
+    @test begin
       local sol = try
         runModelMTK("CrankSliderStuck", "Models/CrankSliderStuck.mo"; timeSpan = (0.0, 1.0))
       catch

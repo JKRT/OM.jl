@@ -685,8 +685,14 @@ end
     sol = nothing
     @test true == begin
       try
+        #= The reference check below allows 0.3 % relative error; at the default
+           solver tolerance (reltol 1e-3) CL.v at t = 0.3 is off by 1.7 % for
+           some of the equivalent systems ModelingToolkit's structural_simplify
+           can pick. It picks a different one on Julia 1.13 than on 1.12 from
+           the same generated model code, so solve tighter. =#
         sol = OM.simulate("Modelica.Electrical.Analog.Examples.OvervoltageProtection";
-                          MSL_Version = "MSL:3.2.3", stopTime = 0.4)
+                          MSL_Version = "MSL:3.2.3", stopTime = 0.4,
+                          reltol = 1e-6, abstol = 1e-9)
         sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
       catch e
         @info "Failed to simulate MSL OvervoltageProtection" exception=(e, catch_backtrace())
