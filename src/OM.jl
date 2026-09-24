@@ -804,18 +804,22 @@ end
 
 """
     resimulate(modelName; startTime=0.0, stopTime=1.0,
-               solver=Rodas5(autodiff=false), mode=OMBackend.DEFAULT_BACKEND_MODE[])
+               solver=Rodas5(autodiff=false), parameters=Dict(), kwargs...)
 
 Re-run an already-compiled model without rebuilding the MTK problem. The
 model must have been compiled with `translate` (or implicitly by an earlier
-`simulate`) first. Returns the simulation result.
+`simulate`) first. `parameters` (name => value) changes parameters that were
+kept tunable at compile time (`OMBackend.withTunableParameters`); other
+keyword arguments go to the solver. Returns the simulation result.
 
 When the model is not found, the available compiled model names are printed
 and the underlying error is logged.
 """
-function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(autodiff=false), mode = OMBackend.DEFAULT_BACKEND_MODE[])
+function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(autodiff=false),
+                    mode = OMBackend.DEFAULT_BACKEND_MODE[], parameters::AbstractDict = Dict(), kwargs...)
   try
-    OMBackend.resimulateModel(modelName, tspan = (startTime, stopTime), solver = solver)
+    OMBackend.resimulateModel(modelName; tspan = (startTime, stopTime), solver = solver, MODE = mode,
+                              parameters = parameters, kwargs...)
   catch e
     @error "Failed to resimulate '$(modelName)'. Make sure the model is compiled by calling 'translate'." exception=(e, catch_backtrace())
     println("Available models are:\n")
