@@ -1,0 +1,36 @@
+name: Update submodules
+
+# Git submodules are always pinned to a commit. This job moves every pin to
+# the head of the branch set in .gitmodules (master) once a night and commits
+# the result, so OM.jl follows the latest master of all its packages.
+on:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Move submodules to the latest master
+        # Top level only: OMFrontend.jl has a large test submodule (Buildings)
+        # that is not needed to record the new pins.
+        run: git submodule update --init --remote
+
+      - name: Commit updated pins
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add $(git config -f .gitmodules --get-regexp '^submodule\..*\.path$' | awk '{print $2}')
+          if git diff --cached --quiet; then
+            echo "All submodules already at the latest master."
+            exit 0
+          fi
+          git commit -m "Update submodules to latest master" \
+                     -m "$(git diff --cached --submodule=log | grep '^Submodule')"
+          git push
