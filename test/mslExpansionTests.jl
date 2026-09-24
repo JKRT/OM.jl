@@ -148,6 +148,34 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
         @test isapprox(sol(0.75; idxs = :oneWayClutch_w_rel), 0.0, atol = 0.05)
       end
     end
+
+    #= Event chattering regression. `w_rel <= 0` and `w_rel > 0` had one event
+       callback each on the same root; where the integrator stopped on it they
+       fired alternately and flipped {startForward, locked, stuck} back and
+       forth without time advancing, until maxiters (Rodas5 at these tolerances
+       stopped at t = 0.437; which settings hit it depended on package versions).
+       Now relations with one zero set share a callback, and its affect
+       iterates the cluster to a fixpoint (Modelica event iteration), which the
+       second callback used to stand in for: `locked = pre(stuck) and ...` needs
+       the second pass. =#
+    @testset "Rotational.OneWayClutchDisengaged, tight tolerances" begin
+      local sol = nothing
+      @test true == begin
+        try
+          sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.OneWayClutchDisengaged";
+                            MSL_Version = "MSL:3.2.3", tspan = (0.0, 1.0),
+                            solver = Rodas5(autodiff = false), reltol = 1e-6, abstol = 1e-9)
+          sol.retcode == _SUCCESS
+        catch e
+          @info "Failed: Rotational.OneWayClutchDisengaged, tight tolerances" exception=(e, catch_backtrace())
+          false
+        end
+      end
+      if sol !== nothing && sol.retcode == _SUCCESS
+        @test isapprox(sol(0.5; idxs = :oneWayClutch_w_rel), 1.443, atol = 0.05)
+        @test isapprox(sol(0.75; idxs = :oneWayClutch_w_rel), 0.0, atol = 0.05)
+      end
+    end
   end
 
   #= ----------------------------------------------------------------
