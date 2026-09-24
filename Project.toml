@@ -11,6 +11,7 @@ DAE = "0174eeea-c361-11e9-3d0d-a9ca8048aff6"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
+DoubleEnded = "1bc4e7c2-c1e1-11e9-03fe-315bbef43fde"
 ExportAll = "ad2082ca-a69e-11e9-38fa-e96309a31fe4"
 ImmutableList = "4a558cac-c1ed-11e9-20da-3584bcd8709a"
 ListUtil = "b2a72b7e-c1ef-11e9-3a87-6ddc5900c366"
@@ -31,6 +32,7 @@ SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 Absyn = {path = "Absyn.jl"}
 ArrayUtil = {path = "ArrayUtil.jl"}
 DAE = {path = "DAE.jl"}
+DoubleEnded = {path = "DoubleEnded.jl"}
 ImmutableList = {path = "ImmutableList.jl"}
 ListUtil = {path = "ListUtil.jl"}
 MetaModelica = {path = "MetaModelica.jl"}
