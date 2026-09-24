@@ -38,7 +38,21 @@ using PrecompileTools
   using DifferentialEquations
 end
 
-include("precompile_statements.jl")
+#= The hints come from --trace-compile runs and go stale when a signature
+   changes (a renamed function, a uniontype variant that became a constructor
+   function). They are only hints, so evaluate each one on its own and skip
+   the ones that no longer resolve instead of failing the whole precompile. =#
+let hintsFile = joinpath(@__DIR__, "precompile_statements.jl")
+  include_dependency(hintsFile)
+  for hint in Meta.parseall(read(hintsFile, String); filename = hintsFile).args
+    hint isa Expr || continue
+    try
+      Core.eval(@__MODULE__, hint)
+    catch err
+      @debug "Skipping stale precompile hint" hint exception = err
+    end
+  end
+end
 
 PrecompileTools.@compile_workload begin
   @info "Precompiling OM.jl..."
