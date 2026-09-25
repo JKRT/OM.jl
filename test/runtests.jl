@@ -51,6 +51,7 @@ OMBackend.warnMissingStartValues(false)
     include("vssTests.jl")
     include("tunableParameterTests.jl")
     include("assertTests.jl")
+    include("eventSemanticsTests.jl")
   end
   @info "Testing procedural/algorithmic Modelica..."
   @testset "Procedural Modelica:" begin
