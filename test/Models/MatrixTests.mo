@@ -82,3 +82,23 @@ equation
        {0, 0, 1}};
   v_out = R * v_in;
 end RotationMatrixTest;
+
+function rotateZ "Rotate a vector about the z axis (a vector-valued function)"
+  input Real v[3];
+  input Real a;
+  output Real y[3];
+algorithm
+  y := {cos(a) * v[1] - sin(a) * v[2], sin(a) * v[1] + cos(a) * v[2], v[3]};
+end rotateZ;
+
+model ScalarProductWithCall
+  "A scalar product whose operand is a vector-valued call: the frontend cannot expand it element by element"
+  parameter Real a = 0.5;
+  Real e[3] = {cos(time), sin(time), 0};
+  Real f[3] = {x, 2 * x, 0};
+  Real s;
+  Real x(start = 1, fixed = true);
+equation
+  s = e * rotateZ(f, a);
+  der(x) = -s;
+end ScalarProductWithCall;

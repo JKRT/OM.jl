@@ -181,6 +181,22 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
   #= ----------------------------------------------------------------
      Modelica.Electrical.Analog
      ---------------------------------------------------------------- =#
+  #= One cylinder of the V6 engine (EngineV6_analytic's Utilities.CylinderBase:
+     analytic slider-crank JointRRP, GasForce2) with cylinder 2's crank offset
+     and inclination. Its FixedRotation components carry the record parameter
+     `R_rel_inv = Frames.from_T(transpose(R_rel.T), zeros(3))`, which ends up
+     among the initial equations and has to be expanded there. Reference:
+     OpenModelica 1.27.1 (tolerance 1e-8). =#
+  @testset verbose=true "MultiBody loops" begin
+    @testset "V6 engine cylinder, crank offset 90, inclination 30" begin
+      local sol = OM.simulate("EngineCylinder.CylinderRigFree90", "./Models/MSL/EngineCylinder.mo"; MSL = true,
+                              MSL_Version = "MSL:3.2.3", stopTime = 0.5, abstol = 1e-10, reltol = 1e-8)
+      @test sol.retcode == _SUCCESS
+      @test isapprox(sol(0.5; idxs = :phi), 31.88599149896368; rtol = 1e-5)
+      @test isapprox(sol(0.5; idxs = :flywheel_w), 76.57342671018588; rtol = 1e-5)
+    end
+  end
+
   @testset verbose=true "Electrical" begin
 
     #= ChuaCircuit: nonlinear circuit with inductor, two capacitors.
