@@ -68,4 +68,92 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       y = -x;
     end if;
   end DiscreteCondition;
+
+  model StartAtZeroState "relation on a state that is exactly at its threshold at t0 and moves into the other domain"
+    Real x(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = -1;
+    if x < 0 then
+      y = 1;
+    else
+      y = 2;
+    end if;
+    // y(0) = 2 (literal), y = 1 for t > 0
+  end StartAtZeroState;
+
+  model StartAtZeroClosed "the same with <= and the opposite motion"
+    Real x(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    if x <= 0 then
+      y = 1;
+    else
+      y = 2;
+    end if;
+    // y(0) = 1 (literal), y = 2 for t > 0
+  end StartAtZeroClosed;
+
+  model Complementary "two if-equations on the same zero set with opposite senses"
+    Real x(start = 1, fixed = true);
+    Real y1;
+    Real y2;
+    Real s;
+  equation
+    der(x) = -1;
+    if x > 0 then y1 = 1; else y1 = 0; end if;
+    if x <= 0 then y2 = 1; else y2 = 0; end if;
+    s = y1 + y2;
+    // s = 1 always; y1 -> 0 and y2 -> 1 at t = 1
+  end Complementary;
+
+  model InitFromEquation "relation operand fixed by an initial equation; the start attribute says the opposite"
+    Real x(start = 1, fixed = false);
+    Real y;
+  initial equation
+    x = -1;
+  equation
+    der(x) = 0.5;
+    if x < 0 then
+      y = 1;
+    else
+      y = 2;
+    end if;
+    // y = 1 on [0,2), 2 after t = 2
+  end InitFromEquation;
+
+  model MixedDiscrete "if-equation mixing a discrete condition (changed by a when) and a relation"
+    Real x(start = 0, fixed = true);
+    Boolean b(start = false, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    when x > 0.5 then
+      b = true;
+    end when;
+    if b then
+      y = 1;
+    elseif x > 2 then
+      y = 2;
+    else
+      y = 3;
+    end if;
+    // y = 3 on [0,0.5), 1 after
+  end MixedDiscrete;
+
+  model CompositeBoundary "composite condition exactly at a closed boundary at t0"
+    Real x(start = 0, fixed = true);
+    Real z(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    der(z) = 1;
+    if x >= 0 and z < 10 then
+      y = 1;
+    else
+      y = 2;
+    end if;
+    // y = 1 on [0,10)
+  end CompositeBoundary;
 end EventSemantics;
