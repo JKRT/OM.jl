@@ -70,7 +70,7 @@
       false, Int[], SC.Graphs.SimpleDiGraph(0), [], SC.StructuralTransition[], [],
       String[], String[], SC.Equation[], "mock", NONE(), NONE(), String[],
       SC.ModelicaFunction[], false, SC.RESIDUAL_EQUATION[], String[], SC.AliasEntry[],
-      nothing, SC.INITIAL_ALGORITHM[])
+      nothing, SC.INITIAL_ALGORITHM[], SC.BDAE.ASSERT_EQUATION[])
     local emitted = Expr[]
     OMBackend.CodeGeneration._emitWhenTupleElementAssignMTK!(
       emitted, SC.EXP_CREF(SC.SimCref(:x), SC.TYPE_REAL()), :(rhs), sc)
