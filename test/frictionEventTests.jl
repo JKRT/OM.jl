@@ -25,16 +25,14 @@ _eventTimes(sol) = unique([sol.t[i] for i in 2:length(sol.t) if sol.t[i] == sol.
   @testset "twin relations of the breakaway (peak = 1) flip together" begin
     #= Twins: 100 sin(t); sa > tau0_max and sa > tau0 cross together. OpenModelica:
        breakaways at 0.927295, 4.068888, 7.210481, locks at 2.887004, 6.028597, 9.170189.
-       A breakaway while locked is found on the dense output of the stuck torque, an
-       algebraic variable Rodas5P does not control between its steps. How late depends
-       on where a step ends (146 ms at reltol 1e-3; see "a short excess" below): the
-       tolerances here fit reltol 1e-6 on this model, not a bound. =#
+       While locked, the stuck torque is algebraic and depends on time only: the
+       breakaway is found as accurately as the step control on algebraic unknowns
+       (algebraicStepControl.jl) keeps its dense output. =#
     local sol = _frictionSim("Twins")
     @test sol.retcode == ReturnCode.Success
     local ev = _eventTimes(sol)
-    for (tOmc, tol) in ((0.927295, 5e-3), (2.887004, 1e-4), (4.068888, 1e-2), (6.028597, 1e-4),
-                        (7.210481, 5e-3), (9.170189, 1e-4))
-      @test any(t -> abs(t - tOmc) < tol, ev)
+    for tOmc in (0.927295, 2.887004, 4.068888, 6.028597, 7.210481, 9.170189)
+      @test any(t -> abs(t - tOmc) < 1e-5, ev)
     end
     local modes = [sol(t; idxs = :clutch_mode) for t in (0.5, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 10.0)]
     @test modes == [0.0, 1.0, 1.0, 0.0, 0.0, -1.0, -1.0, 0.0, 1.0, 0.0]
@@ -50,9 +48,8 @@ _eventTimes(sol) = unique([sol.t[i] for i in 2:length(sol.t) if sol.t[i] == sol.
     local sol = _frictionSim("PeakLock")
     @test sol.retcode == ReturnCode.Success
     local ev = _eventTimes(sol)
-    for (tOmc, tol) in ((0.927295, 5e-3), (3.670805, 1e-4), (4.068888, 1e-2), (6.812397, 1e-4),
-                        (7.210481, 5e-3), (9.953990, 1e-4))
-      @test any(t -> abs(t - tOmc) < tol, ev)
+    for tOmc in (0.927295, 3.670805, 4.068888, 6.812397, 7.210481, 9.953990)
+      @test any(t -> abs(t - tOmc) < 1e-5, ev)
     end
     @test [sol(t; idxs = :clutch_mode) for t in (0.5, 1.0, 3.0, 4.0, 5.0, 7.0, 8.0, 10.0)] ==
           [0.0, 1.0, 1.0, 0.0, -1.0, 0.0, 1.0, 0.0]
@@ -62,14 +59,15 @@ _eventTimes(sol) = unique([sol.t[i] for i in 2:length(sol.t) if sol.t[i] == sol.
   end
   @testset "a short excess over the breakaway limit" begin
     #= Narrow: 81 sin(t), above 80 only on (1.4135, 1.7281). OpenModelica breaks away and
-       relocks at 1.41350/1.88578, 4.55509/5.02737, 7.69668/8.16897. OM.jl misses it: the
-       stuck torque is algebraic, and its crossing is looked for on Rodas5P's dense
-       output, which nothing controls while the states are frozen (a separate task). =#
-    local sol = _frictionSim("Narrow")
-    @test sol.retcode == ReturnCode.Success
-    local ev = _eventTimes(sol)
-    for tOmc in (1.41350, 1.88578, 4.55509, 5.02737, 7.69668, 8.16897)
-      @test_broken any(t -> abs(t - tOmc) < 1e-3, ev)
+       relocks at 1.41350/1.88578, 4.55509/5.02737, 7.69668/8.16897. Without step control
+       on the algebraic stuck torque, Rodas5P stepped over the excess. =#
+    for (reltol, tol) in ((1e-6, 1e-5), (1e-3, 2e-2))
+      local sol = _frictionSim("Narrow"; reltol = reltol)
+      @test sol.retcode == ReturnCode.Success
+      local ev = _eventTimes(sol)
+      for tOmc in (1.413499, 1.885781, 4.555092, 5.027374, 7.696685, 8.168967)
+        @test any(t -> abs(t - tOmc) < tol, ev)
+      end
     end
   end
 end
