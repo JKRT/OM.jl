@@ -95,7 +95,7 @@
                                  rtol = 1.0e-2,)
         end
         @test true == begin
-          sols::Vector = runModelMTK("CircuitExamples.Circuit", "./Models/VSS/dynamicCircuit.mo"; timeSpan=(0.0, 20.0), solver = Rodas5())
+          sols::Vector = runModelMTK("CircuitExamples.Circuit", "./Models/VSS/dynamicCircuit.mo"; timeSpan=(0.0, 20.0), solver = Rodas5P())
 
           circuit1_freqOK = testResultRetCodeSuccess(sols,
                                                      solutionIndex = 2,

@@ -86,7 +86,7 @@
     @test true == begin
       #= Stiff system requires implicit solver =#
       OM.translate("StiffSystem", "./Models/ContinuousTests.mo")
-      sol = OM.simulate("StiffSystem"; stopTime = 1.0, solver = Rodas5(autodiff = false))
+      sol = OM.simulate("StiffSystem"; stopTime = 1.0, solver = Rodas5P(autodiff = ADTypes.AutoFiniteDiff()))
       sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
     end
 

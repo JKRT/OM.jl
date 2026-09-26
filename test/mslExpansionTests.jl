@@ -164,7 +164,7 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
         try
           sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.OneWayClutchDisengaged";
                             MSL_Version = "MSL:3.2.3", tspan = (0.0, 1.0),
-                            solver = Rodas5(autodiff = false), reltol = 1e-6, abstol = 1e-9)
+                            solver = Rodas5P(autodiff = ADTypes.AutoFiniteDiff()), reltol = 1e-6, abstol = 1e-9)
           sol.retcode == _SUCCESS
         catch e
           @info "Failed: Rotational.OneWayClutchDisengaged, tight tolerances" exception=(e, catch_backtrace())

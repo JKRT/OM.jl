@@ -109,7 +109,7 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test s4.retcode == ReturnCode.Success && s4(1.2; idxs = :w) ≈ 1.0
     #= a DAE solver: the algebraic variables are solved again after the event =#
     local s5 = OM.simulate("EventSemantics.DAEIfReinit", EVENT_FILE; stopTime = 3.0, reltol = 1e-8, abstol = 1e-10,
-                           solver = OMBackend.DifferentialEquations.DFBDF(autodiff = false))
+                           solver = OMBackend.DifferentialEquations.DFBDF(autodiff = ADTypes.AutoFiniteDiff()))
     @test [s5(1.2; idxs = :y), s5(1.4; idxs = :z), s5(3.0; idxs = :z)] ≈ [0.0, 0.375, 1.125] atol = 1e-6
     #= two whens that re-trigger each other: stopped with an error, as OpenModelica does =#
     local s6 = @test_logs (:error, r"did not settle") match_mode = :any _eventSim("Chatter"; stopTime = 2.0)

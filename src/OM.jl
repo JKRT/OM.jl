@@ -477,7 +477,7 @@ end
 
 """
     simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false,
-             libraries=String[], solver=Rodas5(autodiff=false), mode=OMBackend.DEFAULT_BACKEND_MODE[], ...)
+             libraries=String[], solver=OMBackend.defaultSolver(), mode=OMBackend.DEFAULT_BACKEND_MODE[], ...)
 
 Translate and simulate a file-based Modelica model in one step. Equivalent
 to `translate(modelName, modelFile; ...)` followed by
@@ -489,7 +489,7 @@ to `translate(modelName, modelFile; ...)` followed by
 - `MSL_Version`: MSL version string (default `"MSL:3.2.3"`).
 - `libraries`: cache keys or file/directory paths for user libraries (see
   `loadLibrary` / `loadPackage` / `loadInstalledLibrary`).
-- `solver`: ODE solver (default `Rodas5(autodiff=false)`).
+- `solver`: ODE solver (default `OMBackend.defaultSolver()`: Rodas5P with finite-difference Jacobians).
 - `mode`: backend mode (default `OMBackend.MTK_MODE`).
 - `warnMissingStartValues`: override missing-start-value warnings.
 - `eliminateNonDynamic`: elimination of non-dynamic variables before
@@ -520,7 +520,7 @@ function simulate(modelName::String,
                   MSL = false,
                   MSL_Version = "MSL:3.2.3",
                   libraries::Vector{String} = String[],
-                  solver = Rodas5(autodiff=false),
+                  solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
@@ -552,7 +552,7 @@ Translate and simulate an MSL model by name. Defaults to `MSL=true`.
 # Keyword arguments
 - `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0)
 - `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
-- `solver`: ODE solver (default `Rodas5(autodiff=false)`)
+- `solver`: ODE solver (default `OMBackend.defaultSolver()`: Rodas5P with finite-difference Jacobians)
 - `mode`: backend mode (default `OMBackend.MTK_MODE`)
 - `warnMissingStartValues`: override missing-start-value warnings
 - `eliminateNonDynamic`: elimination of non-dynamic variables before
@@ -592,7 +592,7 @@ function simulate(modelName::String;
                   stopTime = 1.0,
                   MSL = true,
                   MSL_Version = "MSL:3.2.3",
-                  solver = Rodas5(autodiff=false),
+                  solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
@@ -804,7 +804,7 @@ end
 
 """
     resimulate(modelName; startTime=0.0, stopTime=1.0,
-               solver=Rodas5(autodiff=false), parameters=Dict(), kwargs...)
+               solver=OMBackend.defaultSolver(), parameters=Dict(), kwargs...)
 
 Re-run an already-compiled model without rebuilding the MTK problem. The
 model must have been compiled with `translate` (or implicitly by an earlier
@@ -815,7 +815,7 @@ keyword arguments go to the solver. Returns the simulation result.
 When the model is not found, the available compiled model names are printed
 and the underlying error is logged.
 """
-function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = Rodas5(autodiff=false),
+function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = OMBackend.defaultSolver(),
                     mode = OMBackend.DEFAULT_BACKEND_MODE[], parameters::AbstractDict = Dict(), kwargs...)
   try
     OMBackend.resimulateModel(modelName; tspan = (startTime, stopTime), solver = solver, MODE = mode,

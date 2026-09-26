@@ -19,7 +19,7 @@ import OMFrontend
 import OMBackend
 import OM
 
-using DifferentialEquations: ReturnCode, Rodas5
+using DifferentialEquations: ReturnCode, Rodas5P
 import Sundials
 
 #=
@@ -104,7 +104,7 @@ function runModelMTK(model,
                      file;
                      MSL = false,
                      timeSpan = (0.0, 1.0),
-                     solver = Rodas5(), kwargs...)
+                     solver = OMBackend.defaultSolver(), kwargs...)
   @info "Translating : " model
   OM.translate(model, file; MSL = MSL)
   @info "Simulating:"
@@ -449,7 +449,7 @@ Suppresses large solution output.
 """
 function runVSSTest(model::String, file::String;
                     timeSpan = (0.0, 1.0),
-                    solver = Rodas5(),
+                    solver = OMBackend.defaultSolver(),
                     solutionIndex::Int,
                     symbol::Symbol,
                     expectedValue,

@@ -170,7 +170,7 @@ const _HEAVY_SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
        The rest of the family is fastest on the default. =#
     local digitalCases = [
       ("Adder4",      20.0, 0.05,  4.0,  nothing),
-      ("HalfAdder",    1.0, 0.5,   5.0,  OMBackend.DifferentialEquations.Rosenbrock23(autodiff = false)),
+      ("HalfAdder",    1.0, 0.5,   5.0,  OMBackend.DifferentialEquations.Rosenbrock23(autodiff = ADTypes.AutoFiniteDiff())),
       ("NXFER",        1.0, 0.5,   2.0,  nothing),
       ("NRXFER",       1.0, 0.5,   2.0,  nothing),
       ("BUF3S",        1.0, 0.5,   8.0,  nothing),

@@ -33,7 +33,10 @@ end
   @testset "AssertionLevel.warning warns once and goes on" begin
     local (warnings, sol) = _warningsOf("WarningLevel")
     @test sol.retcode == ReturnCode.Success && last(sol[:x]) ≈ 1.0
-    @test count(w -> occursin("Assertion violated at time 0.5", w) && occursin("x beyond 0.5", w), warnings) == 1
+    #= located within the step (to rounding of the interpolation, e.g. 0.4999999999999896), once =#
+    local times = [parse(Float64, m.captures[1]) for w in warnings
+                   for m in (match(r"Assertion violated at time (\S+): x beyond 0\.5", w),) if m !== nothing]
+    @test length(times) == 1 && isapprox(only(times), 0.5; atol = 1e-6)
   end
   @testset "eliminated and algebraic variables" begin
     local err = _simulateOrError("OnAlias")

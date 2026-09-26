@@ -32,7 +32,7 @@ end
   @test true == begin
     sol = OM.simulate("Modelica.Electrical.Analog.Examples.DifferenceAmplifier";
                       MSL = true, MSL_Version = "MSL:3.2.3",
-                      solver = QNDF(autodiff = false), abstol = 1e-2, reltol = 1e-2)
+                      solver = QNDF(autodiff = ADTypes.AutoFiniteDiff()), abstol = 1e-2, reltol = 1e-2)
     testResultRetCodeSuccess(sol;
       expectedValues = (C2_v = 7.1376, C4_v = -7.1376, C5_v = -0.8832,
                         Transistor1_Tr_C_v = 7.1298, Transistor2_Tr_C_v = 7.1298),

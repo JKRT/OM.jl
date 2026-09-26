@@ -157,13 +157,13 @@ PrecompileTools.@compile_workload begin
       nothing
     end
     local prob = DifferentialEquations.ODEProblem(ode!, [1.0], (0.0, 0.1))
-    DifferentialEquations.solve(prob, DifferentialEquations.Rodas5(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.defaultSolver();
                                 abstol = 1e-3, reltol = 1e-3)
 
     local cb = DifferentialEquations.DiscreteCallback(
       (u, t, integrator) -> t == 0.05,
       integrator -> (integrator.u[1] = 0.5 * integrator.u[1]))
-    DifferentialEquations.solve(prob, DifferentialEquations.Rodas5(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.defaultSolver();
                                 callback = cb, tstops = [0.05],
                                 abstol = 1e-3, reltol = 1e-3)
     nothing
@@ -178,7 +178,7 @@ PrecompileTools.@compile_workload begin
     local massMatrix = [1.0 0.0; 0.0 0.0]
     local f = DifferentialEquations.ODEFunction(dae!, mass_matrix = massMatrix)
     local prob = DifferentialEquations.ODEProblem(f, [1.0, 0.0], (0.0, 0.1))
-    DifferentialEquations.solve(prob, DifferentialEquations.FBDF(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.daeFallbackSolver();
                                 abstol = 1e-3, reltol = 1e-3)
     nothing
   end
@@ -200,9 +200,9 @@ PrecompileTools.@compile_workload begin
                                                                  split = false)
     local prob = OMBackend.CodeGeneration.buildDirectRHSProblem(
       reduced, Pair{Any, Any}[], Pair{Any, Any}[], (0.0, 0.1), nothing)
-    DifferentialEquations.solve(prob, DifferentialEquations.Rodas5(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.defaultSolver();
                                 abstol = 1e-3, reltol = 1e-3)
-    DifferentialEquations.solve(prob, DifferentialEquations.FBDF(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.daeFallbackSolver();
                                 abstol = 1e-3, reltol = 1e-3)
     nothing
   end
@@ -227,7 +227,7 @@ PrecompileTools.@compile_workload begin
       local sys = ModelingToolkit.ODESystem([D(x) ~ -x], t; name = :_OMFullWarmupSystem)
       sys = ModelingToolkit.structural_simplify(sys)
       local prob = ModelingToolkit.ODEProblem(sys, [x => 1.0], (0.0, 1.0))
-      DifferentialEquations.solve(prob, DifferentialEquations.Rodas5();
+      DifferentialEquations.solve(prob, OMBackend.defaultSolver();
                                   abstol = 1e-3, reltol = 1e-3)
 
       local dae! = function (du, u, p, t)
