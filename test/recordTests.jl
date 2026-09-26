@@ -120,17 +120,22 @@
   end
 
   #= lowerComplexOperatorRecords reproducer set (test/Models/ComplexLoweringTests.mo).
-     SKIPPED: OMFrontend cannot resolve the top-level operator-record `Complex`
-     for a standalone custom .mo (not in scope); these only ever passed when a
-     prior MSL test left `Complex` in OMFrontend's global scope, so they are
-     order-dependent. The SimCode complex-lowering pass they target is covered
-     by the MSL model test `ShowTransferFunction` (translate+simulate+validate,
-     mslExpansionTests.jl) and by UnsymmetricalLoad. Un-skip if OMFrontend gains
-     Complex-in-scope support for custom files. =#
-  @testset "Lowering: Complex operator-record patterns (skipped — see note)" begin
-    for m in ("DirectAssign", "ConstructorProjection", "ArrayElementAccess",
-              "MatrixVectorMul", "InitialEqAssign")
-      @test_skip OM.translate("ComplexLoweringTests." * m, "./Models/ComplexLoweringTests.mo")
+     `Complex` is a top-level operator record of the MSL, so the file is
+     translated with the MSL loaded (without it, these passed only when an
+     earlier test had loaded the MSL). The models have no states, so their
+     variables cannot be read from the solution; the tests check that the
+     lowering translates and the models simulate. InitialEqAssign's initial
+     equation contradicts its equation at t = 0 (overdetermined): translate
+     only, which is what it reproduces. =#
+  @testset "Lowering: Complex operator-record patterns" begin
+    local file = "./Models/ComplexLoweringTests.mo"
+    for m in ("DirectAssign", "ConstructorProjection", "ArrayElementAccess", "MatrixVectorMul")
+      local sol = OM.simulate("ComplexLoweringTests." * m, file; MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+    end
+    @test begin
+      OM.translate("ComplexLoweringTests.InitialEqAssign", file; MSL = true, MSL_Version = "MSL:3.2.3")
+      true
     end
   end
 
