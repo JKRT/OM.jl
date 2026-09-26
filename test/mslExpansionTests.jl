@@ -40,7 +40,6 @@
    wrong solution. The following testsets need proper signal comparisons
    (against reference/csv/*.csv via validateMSLModel or inline isapprox
    with explicit targets):
-     - Rotational.Friction (currently @test_broken — but when it unbreaks)
      - Electrical.Analog.Examples.ShowVariableResistor
      - Mechanics.Translational.Examples.Oscillator (the MSL one, not the
        OMJL-custom Oscillator that is validated elsewhere)
@@ -89,33 +88,47 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
     end
 
     #= Rotational.Friction: two coupled PartialFriction elements (clutch + brake).
-       The discrete `mode` FSM is updated through the per-model pre-memory path
-       (OMBACKEND_DISCRETE_PRE_MEMORY), so the stuck<->sliding breakaway at
-       w_relfric=0 resolves without Zeno chatter. Matches the OMC 3.2.3 reference:
-       inertia1 brakes to ~0 by t~1, the clutch slides (w_rel~-53 at t=1) then
-       relocks, and the inertias decay together. =#
+       Their discrete equations are clusters the event iteration solves with the
+       algebraic loop they are in (discreteClusters.jl), with relations buffered
+       with a hysteresis. OpenModelica 1.27.1 (tolerance 1e-6): events at
+       0.00678, 0.05934, 0.10929, 0.5, 0.53425, 0.64061, 1.66364 and none after;
+       the stuck torque sa(0.03) = -56.81, sa(1.7) = -66.22, sa(2.0) = 32.55;
+       w_rel ~ 0 while locked. =#
     @testset "Rotational.Friction" begin
-      withenv("OMBACKEND_DISCRETE_PRE_MEMORY" => "true") do
-        local sol = nothing
-        @test true == begin
-          try
-            sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.Friction";
-                              MSL_Version = "MSL:3.2.3", stopTime = 5.0,
-                              overwriteCache = true)
-            sol.retcode == _SUCCESS
-          catch e
-            @info "Failed: Rotational.Friction" exception=(e, catch_backtrace())
-            false
-          end
+      local frictionSim = (; kw...) -> OM.simulate("Modelica.Mechanics.Rotational.Examples.Friction";
+                                                   MSL_Version = "MSL:3.2.3", stopTime = 5.0, kw...)
+      local sol = nothing
+      @test true == begin
+        try
+          sol = frictionSim(; overwriteCache = true)
+          sol.retcode == _SUCCESS
+        catch e
+          @info "Failed: Rotational.Friction" exception=(e, catch_backtrace())
+          false
         end
-        if sol !== nothing && sol.retcode == _SUCCESS
-          #= Sliding window (clutch slips, inertia1 braked to rest). =#
-          @test isapprox(sol(1.0; idxs = :inertia1_w), 0.0; atol = 0.5)
-          @test isapprox(sol(1.0; idxs = :inertia3_w), 53.1; atol = 3.0)
-          @test isapprox(sol(1.0; idxs = :clutch_w_rel), -53.2; atol = 3.0)
-          #= Re-locked long tail: clutch held at w_rel=0, inertia1 at rest. =#
-          @test isapprox(sol(2.0; idxs = :inertia1_w), 0.0; atol = 0.5)
-          @test isapprox(sol(2.0; idxs = :clutch_w_rel), 0.0; atol = 0.5)
+      end
+      if sol !== nothing && sol.retcode == _SUCCESS
+        #= Sliding window (clutch slips, inertia1 braked to rest). =#
+        @test isapprox(sol(1.0; idxs = :inertia1_w), 0.0; atol = 0.5)
+        @test isapprox(sol(1.0; idxs = :inertia3_w), 53.1; atol = 3.0)
+        @test isapprox(sol(1.0; idxs = :clutch_w_rel), -53.2; atol = 3.0)
+        #= Re-locked long tail: clutch held at w_rel=0, inertia1 at rest. =#
+        @test isapprox(sol(2.0; idxs = :inertia1_w), 0.0; atol = 0.5)
+        @test isapprox(sol(2.0; idxs = :clutch_w_rel), 0.0; atol = 0.5)
+        #= The stuck torque: the one of the locked configuration, not the sliding one. =#
+        @test all(isapprox.([sol(t; idxs = :clutch_sa) for t in (0.03, 1.7, 2.0)], [-56.81, -66.22, 32.55]; atol = 0.5))
+      end
+      local tight = frictionSim(; reltol = 1e-6, abstol = 1e-7)
+      @test tight.retcode == _SUCCESS
+      if tight.retcode == _SUCCESS
+        local ev = unique([tight.t[i] for i in 2:length(tight.t) if tight.t[i] == tight.t[i - 1]])
+        for tOmc in (0.00678, 0.05934, 0.10929, 0.5, 0.53425, 0.64061, 1.66364)
+          @test any(t -> abs(t - tOmc) < 1e-5, ev)
+        end
+        @test maximum(ev) < 1.6637
+        @test all(isapprox.([tight(t; idxs = :clutch_sa) for t in (0.03, 1.7, 2.0)], [-56.81, -66.22, 32.55]; atol = 0.01))
+        for (a, b) in ((0.01, 0.05), (0.12, 0.5), (1.67, 5.0))
+          @test maximum(abs(tight(t; idxs = :clutch_w_rel)) for t in range(a, b; length = 200)) < 1e-5
         end
       end
     end
