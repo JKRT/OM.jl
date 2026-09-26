@@ -30,7 +30,7 @@
     ENV["OM_HEAVY_TESTS"] = "1"; include("runtests.jl")
 =#
 
-@info "Heavy MSL Tests: Engine, DCMachines, PID_Controller."
+@info "Heavy MSL Tests: Engine1a, EngineV6, DCMachines, PID_Controller."
 
 const _HEAVY_SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
 
@@ -120,6 +120,28 @@ const _HEAVY_SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
       #= Sanity check that the stuck-at-IC bug is gone: Inertia_w(t=1.0)
          is far from 0 (~10.9 per OMC). =#
       @test !isapprox(sol(1.0; idxs = lookup["Inertia_w"]), 0.0; atol = 1e-3)
+    end
+
+    #= EngineV6_analytic: six cylinders with analytic slider-crank loops and
+       GasForce2 (relations on v_rel < 0 and the piston position). Four states,
+       as in OpenModelica. References: OpenModelica 1.27.1 (tolerance 1e-6);
+       cylinders 1 and 4 start at a dead centre, and OpenModelica's first
+       event is at 1.6e-11 s (cylinder 1 leaving it). =#
+    @testset "MSL EngineV6_analytic" begin
+      local model = "Modelica.Mechanics.MultiBody.Examples.Loops.EngineV6_analytic"
+      local sol = OM.simulate(model; MSL_Version = "MSL:3.2.3", stopTime = 1.01, reltol = 1e-8, abstol = 1e-10)
+      @test sol.retcode == _HEAVY_SUCCESS
+      @test length(OMBackend.ModelingToolkit.unknowns(sol.prob.f.sys)) < 20
+      @test [sol(t; idxs = :load_w) for t in (0.001, 0.02, 0.05, 0.2)] ≈ [10.238482, 15.033995, 23.0972, 61.5478] rtol = 1e-5
+      @test [sol(t; idxs = :engine_cylinder4_gasForce_press) for t in (0.001, 0.02, 0.05)] ≈ [239976.6, 226240.3, 136816] rtol = 1e-5
+      @test isapprox(sol[:load_w][end], 228.246; rtol = 1e-5)
+      #= The gas force events (saved twice) after the start, to 0.25 s. =#
+      local ts = sol.t
+      local saved = unique([ts[i] for i in 2:length(ts) if ts[i] == ts[i - 1] && 1e-6 < ts[i] < 0.25])
+      #= one event can be saved at two times a rounding apart =#
+      local events = [e for (k, e) in enumerate(saved) if k == 1 || e - saved[k - 1] > 1e-8]
+      @test events ≈ [0.0592836577492, 0.0942706542699, 0.121816566098, 0.145305410375, 0.166141362167,
+                      0.185068454564, 0.202537345449, 0.218845513717, 0.234201512878, 0.248758254019] rtol = 1e-6
     end
   end
 
