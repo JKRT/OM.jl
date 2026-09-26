@@ -62,8 +62,24 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     local code = joinpath(mktempdir(), "DiscreteCondition.jl")
     OM.writeModelToFile("EventSemantics.DiscreteCondition", EVENT_FILE, code)
     @test !occursin("0.5 - b ~ 0", read(code, String))
-    #= b(start = true, fixed = true) defined only by a when that never fires:
-       OpenModelica y(0.5) = 0.5; OM.jl loses the start value (a when-equation bug). =#
-    @test_broken _eventSim("DiscreteCondition"; stopTime = 1.0)(0.5; idxs = :y) ≈ 0.5
+    #= b(start = true, fixed = true) defined only by a when that never fires =#
+    @test _eventSim("DiscreteCondition"; stopTime = 1.0)(0.5; idxs = :y) ≈ 0.5
+  end
+  @testset "when-equations: edges of a buffered relation" begin
+    #= x < 0 with x(0) = 0 decreasing: the relation becomes true right after the start =#
+    local s1 = _eventSim("WhenStartAtZero"; stopTime = 1.0)
+    @test [s1(0.0; idxs = :n), s1(0.5; idxs = :n)] == [0.0, 1.0]
+    #= x <= 0 true at the start: no edge, no event =#
+    @test _eventSim("WhenClosedAtZero"; stopTime = 1.0)(1.0; idxs = :n) == 0.0
+    #= only rising edges of y > 0.5, y = sin(time): pi/6 and 13pi/6 =#
+    local s3 = _eventSim("WhenRisingOnly"; stopTime = 10.0)
+    @test [s3(1.0; idxs = :n), s3(10.0; idxs = :n)] == [1.0, 2.0]
+    local s4 = _eventSim("ElsewhenOrder")
+    @test [s4(t; idxs = :m) for t in (0.5, 1.5, 2.5)] == [0.0, 1.0, 2.0]
+    @test _eventSim("WhenOnBoolean"; stopTime = 10.0)(10.0; idxs = :n) == 2.0
+    #= impacts at T0, 2T0, 2.5T0 (T0 = sqrt(2/9.81)); OpenModelica h(1.2) = 0.014557792 =#
+    local s6 = _eventSim("WhenReinitFloor"; stopTime = 1.2)
+    @test s6(1.2; idxs = :bounces) == 3.0
+    @test [s6(1.2; idxs = :h), s6(1.2; idxs = :v)] ≈ [0.014557792, -0.14470184] rtol = 1e-6
   end
 end

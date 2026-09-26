@@ -156,4 +156,70 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     end if;
     // y = 1 on [0,10)
   end CompositeBoundary;
+  model WhenStartAtZero "when x < 0 with x exactly 0 at the start and decreasing: fires right after the start"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = -1;
+    when x < 0 then
+      n = pre(n) + 1;
+    end when;
+  end WhenStartAtZero;
+
+  model WhenClosedAtZero "when x <= 0 is true at the start: no event (edges only), and x leaves"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x <= 0 then
+      n = pre(n) + 1;
+    end when;
+  end WhenClosedAtZero;
+
+  model WhenRisingOnly "when y > 0.5 with y = sin(time): only the rising edges count"
+    Real y(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(y) = cos(time);
+    when y > 0.5 then
+      n = pre(n) + 1;
+    end when;
+  end WhenRisingOnly;
+
+  model ElsewhenOrder "elsewhen: the first true branch at an event"
+    Real x(start = 0, fixed = true);
+    Integer m(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 2 then
+      m = 2;
+    elsewhen x > 1 then
+      m = 1;
+    end when;
+  end ElsewhenOrder;
+
+  model WhenOnBoolean "a when on a Boolean set by a relation"
+    Real y(start = 0, fixed = true);
+    Boolean above;
+    Integer n(start = 0, fixed = true);
+  equation
+    der(y) = cos(time);
+    above = y > 0.5;
+    when above then
+      n = pre(n) + 1;
+    end when;
+  end WhenOnBoolean;
+
+  model WhenReinitFloor "a ball dropped onto a floor; reinit on each impact"
+    Real h(start = 1, fixed = true);
+    Real v(start = 0, fixed = true);
+    Integer bounces(start = 0, fixed = true);
+  equation
+    der(h) = v;
+    der(v) = -9.81;
+    when h < 0 then
+      reinit(v, -0.5 * pre(v));
+      bounces = pre(bounces) + 1;
+    end when;
+  end WhenReinitFloor;
 end EventSemantics;
