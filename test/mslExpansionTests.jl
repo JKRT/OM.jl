@@ -332,8 +332,8 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
           sol = OM.simulate("Modelica.Mechanics.Translational.Examples.SignConvention";
                             MSL_Version = "MSL:3.2.3", stopTime = 1.0)
           sol.retcode == _SUCCESS &&
-            isapprox(sol.u[end][1], 0.5, atol = 1e-4) &&
-            isapprox(sol.u[end][2], 1.0, atol = 1e-4)
+            isapprox(sol[:mass1_s][end], 0.5, atol = 1e-4) &&
+            isapprox(sol[:mass1_v][end], 1.0, atol = 1e-4)
         catch e
           @info "Failed: SignConvention" exception=(e, catch_backtrace())
           false

@@ -239,7 +239,7 @@ PrecompileTools.@compile_workload begin
       local f = DifferentialEquations.ODEFunction(dae!, mass_matrix = massMatrix)
       local massProb = DifferentialEquations.ODEProblem(f, [1.0, 0.0], (0.0, 0.1))
       local daeProb = OMBackend.CodeGeneration.ode_to_dae(massProb)
-      DifferentialEquations.solve(daeProb, DifferentialEquations.DFBDF();
+      DifferentialEquations.solve(daeProb, OMBackend.OrdinaryDiffEqBDF.DFBDF();
                                   abstol = 1e-3, reltol = 1e-3)
     end
   end

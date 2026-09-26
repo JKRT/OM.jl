@@ -62,10 +62,9 @@
       @test begin
         sol = OM.simulate("EventTests.IfEquationDerMulti",
                           "./Models/EventTests.mo"; stopTime=1.0)
-        uEnd = last(sol.u)
         sol.retcode == ReturnCode.Success &&
-          isapprox(uEnd[1], 1.5; atol=0.01) &&
-          isapprox(uEnd[2], 0.0; atol=0.01)
+          isapprox(sol[:x][end], 1.5; atol=0.01) &&
+          isapprox(sol[:y][end], 0.0; atol=0.01)
       end
     end
 
