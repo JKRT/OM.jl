@@ -222,4 +222,147 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       bounces = pre(bounces) + 1;
     end when;
   end WhenReinitFloor;
+  model ReinitMovesIfRelation "a reinit makes an if-equation's relation false at once"
+    Real x(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    when x > 1 then
+      reinit(x, 0);
+    end when;
+    if x > 0.5 then
+      y = 1;
+    else
+      y = 0;
+    end if;
+  end ReinitMovesIfRelation;
+
+  model ReinitTriggersWhen "a reinit makes another when's relation true at the same instant"
+    Real x(start = 0.5, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 1 then
+      reinit(x, 0);
+    end when;
+    when x < 0.1 then
+      n = pre(n) + 1;
+    end when;
+  end ReinitTriggersWhen;
+
+  model ReinitMovesIfIntegrated "the if-equation's value is integrated: a stale branch shows in the state"
+    Real x(start = 0, fixed = true);
+    Real z(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    when x > 1 then
+      reinit(x, 0);
+    end when;
+    y = if x > 0.5 then 1 else 0;
+    der(z) = y;
+  end ReinitMovesIfIntegrated;
+  model ComplementaryWhensB "x < 1 declared before x >= 1 (reinit)"
+    Real x(start = 0, fixed = true);
+    Integer a(start = 0, fixed = true);
+    Integer b(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x < 1 then
+      b = pre(b) + 1;
+    end when;
+    when x >= 1 then
+      reinit(x, 0);
+      a = pre(a) + 1;
+    end when;
+  end ComplementaryWhensB;
+
+  model PreSameInstantB "two whens on the same relation; m written first"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+    Integer m(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 0.5 then
+      m = pre(n);
+    end when;
+    when x > 0.5 then
+      n = pre(n) + 1;
+    end when;
+  end PreSameInstantB;
+
+  model Chatter "two whens that re-trigger each other through reinit: no consistent end"
+    Real x(start = 1, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = -1;
+    when x < 0.5 then
+      reinit(x, 1);
+      n = pre(n) + 1;
+    end when;
+    when x > 0.8 then
+      reinit(x, 0);
+    end when;
+  end Chatter;
+
+  model IfChain "a chain of N if-expressions, each on the previous one's value"
+    parameter Integer N = 25;
+    Real x(start = 0, fixed = true);
+    Real y[N];
+    Real z(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 1 then
+      reinit(x, 0);
+    end when;
+    y[1] = if x > 0.5 then 1 else 0;
+    for i in 2:N loop
+      y[i] = if y[i - 1] > 0.5 then 1 else 0;
+    end for;
+    der(z) = y[N];
+  end IfChain;
+
+  model AssertAfterReinit "w >= 0.5 always holds once the event iteration has settled"
+    Real x(start = 0, fixed = true);
+    Real w;
+  equation
+    der(x) = 1;
+    when x > 1 then
+      reinit(x, 0);
+    end when;
+    w = if x > 0.5 then x else 1;
+    assert(w >= 0.5, "w below 0.5");
+  end AssertAfterReinit;
+
+  model DAEIfReinit "if-equation relation on an algebraic of a nonlinear DAE, moved by a reinit"
+    Real x(start = 0, fixed = true);
+    Real v(start = 0);
+    Real y;
+    Real z(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 1 then
+      reinit(x, 0);
+    end when;
+    v + v ^ 3 = x;
+    y = if v > 0.5 then 1 else 0;
+    der(z) = y;
+  end DAEIfReinit;
+
+  model ChainThroughDiscreteWhen "a when on a relation changes k, a when on change(k) sets m, an if-relation reads m: one event"
+    Real x(start = 0, fixed = true);
+    Integer k(start = 0, fixed = true);
+    Integer m(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    when x > 0.5 then
+      k = pre(k) + 1;
+    end when;
+    when change(k) then
+      m = pre(m) + 1;
+    end when;
+    y = if x > m then 1 else 0;
+  end ChainThroughDiscreteWhen;
+
 end EventSemantics;

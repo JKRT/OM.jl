@@ -82,4 +82,44 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test s6(1.2; idxs = :bounces) == 3.0
     @test [s6(1.2; idxs = :h), s6(1.2; idxs = :v)] ≈ [0.014557792, -0.14470184] rtol = 1e-6
   end
+  @testset "event iteration: an event moves another relation's operand (MLS 8.6)" begin
+    #= reinit(x, 0) at x = 1: the if-equation's x > 0.5 is false at once =#
+    local s1 = _eventSim("ReinitMovesIfRelation")
+    @test [s1(t; idxs = :y) for t in (1.2, 1.7, 2.2)] == [0.0, 1.0, 0.0]
+    #= ... and another when's x < 0.1 true at the same instant =#
+    local s2 = _eventSim("ReinitTriggersWhen"; stopTime = 3.5)
+    @test [s2(t; idxs = :n) for t in (0.4, 0.6, 1.6, 3.4)] == [0.0, 1.0, 2.0, 3.0]
+    #= the if-expression's value integrated: OpenModelica z(1.4) = 0.5, z(3) = 1.5 =#
+    local s3 = _eventSim("ReinitMovesIfIntegrated")
+    @test [s3(1.4; idxs = :z), s3(3.0; idxs = :z)] ≈ [0.5, 1.5] atol = 1e-8
+  end
+  @testset "event iteration: all relations first, then the bodies (OpenModelica's order)" begin
+    #= x < 1 declared before the reinit of x >= 1: it still sees x = 1 first, then 0 =#
+    local s1 = _eventSim("ComplementaryWhensB"; stopTime = 3.5)
+    @test [s1(3.4; idxs = :a), s1(3.4; idxs = :b)] == [3.0, 3.0]
+    #= pre(n) at one instant is the value before it, whatever the order of the whens =#
+    local s2 = _eventSim("PreSameInstantB"; stopTime = 1.0)
+    @test [s2(0.9; idxs = :n), s2(0.9; idxs = :m)] == [1.0, 0.0]
+    #= a chain of 25 if-expressions settles at the event (one sweep per link) =#
+    local s3 = _eventSim("IfChain")
+    @test [s3(1.0; idxs = :z), s3(3.0; idxs = :z)] ≈ [0.5, 1.5] atol = 1e-8
+    @test s3(1.2; idxs = Symbol("y[25]")) ≈ 0.0 atol = 1e-12
+    #= asserts check the state after the iteration =#
+    local s4 = _eventSim("AssertAfterReinit")
+    @test s4.retcode == ReturnCode.Success && s4(1.2; idxs = :w) ≈ 1.0
+    #= a DAE solver: the algebraic variables are solved again after the event =#
+    local s5 = OM.simulate("EventSemantics.DAEIfReinit", EVENT_FILE; stopTime = 3.0, reltol = 1e-8, abstol = 1e-10,
+                           solver = OMBackend.DifferentialEquations.DFBDF(autodiff = false))
+    @test [s5(1.2; idxs = :y), s5(1.4; idxs = :z), s5(3.0; idxs = :z)] ≈ [0.0, 0.375, 1.125] atol = 1e-6
+    #= two whens that re-trigger each other: stopped with an error, as OpenModelica does =#
+    local s6 = @test_logs (:error, r"did not settle") match_mode = :any _eventSim("Chatter"; stopTime = 2.0)
+    @test s6.retcode == ReturnCode.Failure
+    @test s6.t[end] ≈ 0.5 atol = 1e-6
+  end
+  @testset "event iteration: a when on a discrete condition in the same event" begin
+    #= k set at x = 0.5, m by the when on change(k), then x > m false: OpenModelica y 1/0/1, k = m = 1 =#
+    local s1 = _eventSim("ChainThroughDiscreteWhen")
+    @test [s1(t; idxs = :y) for t in (0.3, 0.7, 1.2)] == [1.0, 0.0, 1.0]
+    @test [s1(0.7; idxs = :k), s1(0.7; idxs = :m), s1(3.0; idxs = :m)] == [1.0, 1.0, 1.0]
+  end
 end
