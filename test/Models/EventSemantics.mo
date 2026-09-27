@@ -419,4 +419,30 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     der(x2) = y2;
     // x1 = 0 (the condition is never true) and x2 = 0.5 at t = 1
   end CoincidentTouch;
+  model WhenOnBooleanRead
+    "A when on a Boolean that stays true, read elsewhere (the MSL Timer): two pulses of (2 pi/3)^2/2 in x by t = 9.5"
+    Boolean u;
+    discrete Real entry(start = -1, fixed = true);
+    Real y = if u then time - entry else 0;
+    Real x(start = 0, fixed = true);
+  equation
+    u = sin(time) > 0.5;
+    when u then
+      entry = time;
+    end when;
+    der(x) = y;
+  end WhenOnBooleanRead;
+  model WhenOnBooleanAtStart
+    "A when on a Boolean that is true from the start: no edge at t0, entry stays -1 until 5 pi/3"
+    Boolean u;
+    discrete Real entry(start = -1, fixed = true);
+    Real y = if u then time - entry else 0;
+    Real x(start = 0, fixed = true);
+  equation
+    u = cos(time) > 0.5;
+    when u then
+      entry = time;
+    end when;
+    der(x) = y;
+  end WhenOnBooleanAtStart;
 end EventSemantics;

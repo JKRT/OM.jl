@@ -137,4 +137,39 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s1(t; idxs = :y) for t in (0.3, 0.7, 1.2)] == [1.0, 0.0, 1.0]
     @test [s1(0.7; idxs = :k), s1(0.7; idxs = :m), s1(3.0; idxs = :m)] == [1.0, 1.0, 1.0]
   end
+  @testset "a when on a Boolean that stays true, read elsewhere" begin
+    #= when u then entry = time (the MSL Timer): the when fires once per rising edge
+       and u keeps its value for the equations that read it; each pulse of
+       u = sin(time) > 0.5 adds (2 pi/3)^2/2 to x =#
+    local s = _eventSim("WhenOnBooleanRead"; stopTime = 9.5)
+    @test [s(2.0; idxs = :entry), s(9.0; idxs = :entry)] ≈ [pi / 6, 13pi / 6] atol = 1e-6
+    @test [s(3.0; idxs = :x), s(9.5; idxs = :x)] ≈ [1, 2] .* (2pi / 3)^2 / 2 atol = 1e-6
+    #= u = cos(time) > 0.5 is true from the start: no edge there, so entry stays -1
+       (y = time + 1 until pi/3) until the edge at 5 pi/3 =#
+    local s2 = _eventSim("WhenOnBooleanAtStart"; stopTime = 7.5)
+    @test [s2(0.5; idxs = :entry), s2(6.0; idxs = :entry)] ≈ [-1.0, 5pi / 3] atol = 1e-6
+    @test s2(7.5; idxs = :x) ≈ (pi / 3)^2 / 2 + pi / 3 + (2pi / 3)^2 / 2 atol = 1e-6
+  end
+  @testset "ideal switches (MSL PowerConverters): the discrete-cluster event iteration" begin
+    #= A thyristor fired at alpha = 30 degrees by a timer on a threshold, into R: firing
+       1/600 s into each period; mean and RMS load voltage V/(2 pi) (1 + cos alpha) and
+       V/2 sqrt(1 - alpha/pi + sin(2 alpha)/(2 pi)), V = 110 sqrt(2) (the off-state
+       leakage lowers the mean by 0.01) =#
+    local V = 110 * sqrt(2)
+    local alpha = pi / 6
+    local s1 = OM.simulate("Modelica.Electrical.PowerConverters.Examples.ACDC.Rectifier1Pulse.Thyristor1Pulse_R";
+                           MSL_Version = "MSL:3.2.3", stopTime = 0.1)
+    @test s1.retcode == ReturnCode.Success
+    local off = s1[:idealthyristor_off]
+    local k = findfirst(i -> off[i - 1] == 1.0 && off[i] == 0.0, 2:length(off))
+    @test s1.t[k + 1] ≈ 1 / 600 atol = 1e-6
+    @test s1(0.1; idxs = :meanVoltage_y) ≈ V / (2pi) * (1 + cos(alpha)) atol = 0.02
+    @test s1(0.1; idxs = :rootMeanSquareVoltage_y) ≈ V / 2 * sqrt(1 - alpha / pi + sin(2alpha) / (2pi)) atol = 0.02
+    #= A diode bridge: mean 2 V/pi, RMS V/sqrt(2) =#
+    local s2 = OM.simulate("Modelica.Electrical.PowerConverters.Examples.ACDC.RectifierBridge2Pulse.DiodeBridge2Pulse";
+                           MSL_Version = "MSL:3.2.3", stopTime = 0.1)
+    @test s2.retcode == ReturnCode.Success
+    @test s2(0.1; idxs = :meanVoltage_y) ≈ 2V / pi atol = 0.05
+    @test s2(0.1; idxs = :rootMeanSquareVoltage_y) ≈ V / sqrt(2) atol = 0.05
+  end
 end
