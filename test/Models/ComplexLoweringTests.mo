@@ -21,6 +21,12 @@ Patterns covered:
                            (the Kirchhoff equation `pin_p.i + pin_n.i = Complex(0)` of the
                            QuasiStationary two-pins)
   - ArrayOperatorCallEquation: the same for arrays of Complex
+  - ArrayArgFunctions    : functions with Complex array inputs (a scalar product in a for
+                           loop, an RMS over u[k].re / u[k].im with size(u, 1)), called with a
+                           parameter array and a variable array (flattenRecordParameters)
+  - ArrayRecordOutputs   : a record-array output filled element by element in while/if, assigned
+                           whole, passed on inside a function and in an equation, and an array of
+                           record-valued calls as an argument
 
 This is the test-side companion to the UnsymmetricalLoad fix family.
 */
@@ -133,5 +139,89 @@ package ComplexLoweringTests
     i + v = {Complex(time), Complex(2 * time)};
     der(x) = i[1].re + 2 * i[1].im + 3 * i[2].re + 4 * i[2].im;
   end ArrayOperatorCallEquation;
+
+  function scalarProd "as Complex.'*'.scalarProduct"
+    input Complex a[:];
+    input Complex b[size(a, 1)];
+    output Complex c;
+  algorithm
+    c := Complex(0);
+    for i in 1:size(a, 1) loop
+      c := c + a[i] * b[i];
+    end for;
+  end scalarProd;
+
+  function meanAbs "as QuasiStationary.MultiPhase.Functions.quasiRMS"
+    input Complex u[:];
+    output Real y;
+  protected
+    Integer m = size(u, 1);
+  algorithm
+    y := sum({sqrt(u[k].re ^ 2 + u[k].im ^ 2) for k in 1:m}) / m;
+  end meanAbs;
+
+  model ArrayArgFunctions
+    "Complex arrays passed to functions: y = k*u = (sin(t) - 1) + j cos(t),
+     r = (sin(t) + sqrt(cos(t)^2 + 1))/2, x(1) from both."
+    parameter Complex k[2] = {Complex(1, 0), Complex(0, 1)};
+    Complex u[2];
+    Complex y;
+    Real r;
+    Real x(start = 0, fixed = true);
+  equation
+    u = {Complex(sin(time), 0), Complex(cos(time), 1)};
+    y = scalarProd(k, u);
+    r = meanAbs(u);
+    der(x) = y.re + 2 * y.im + r;
+  end ArrayArgFunctions;
+
+  function rotateAll "each u[k] times exp(j phi); a record-array output filled element by element"
+    input Complex u[:];
+    input Real phi;
+    output Complex v[size(u, 1)];
+  protected
+    Integer i = 1;
+  algorithm
+    while i <= size(u, 1) loop
+      if u[i].re >= 0 then
+        v[i] := Complex(cos(phi) * u[i].re - sin(phi) * u[i].im, sin(phi) * u[i].re + cos(phi) * u[i].im);
+      else
+        v[i] := u[i] * Complex(cos(phi), sin(phi));
+      end if;
+      i := i + 1;
+    end while;
+  end rotateAll;
+
+  function rotatedProd "sum(a[k]^2) * exp(j phi): a record-array output passed on inside a function"
+    input Complex a[:];
+    input Real phi;
+    output Complex c;
+  algorithm
+    c := scalarProd(a, rotateAll(a, phi));
+  end rotatedProd;
+
+  function rotateTwice "whole record-array assignments"
+    input Complex u[:];
+    input Real phi;
+    output Complex y[size(u, 1)];
+  algorithm
+    y := rotateAll(u, phi);
+    y := rotateAll(y, phi);
+  end rotateTwice;
+
+  model ArrayRecordOutputs
+    "p = exp(j t) S, p2 = exp(2 j t) S with S = (-2 - t^2) + j (2 t - 4), q = (-1 - 2 t^2) + j (4 t - 4)."
+    Complex u[2];
+    Complex p;
+    Complex p2;
+    Complex q;
+    Real x(start = 0, fixed = true);
+  equation
+    u = {Complex(1, time), Complex(-1, 2)};
+    p = rotatedProd(u, time);
+    p2 = scalarProd(rotateTwice(u, time), u);
+    q = scalarProd({u[1] * Complex(2, 0), u[2]}, u);
+    der(x) = p.re + 2 * p.im + q.re + q.im + 3 * p2.re;
+  end ArrayRecordOutputs;
 
 end ComplexLoweringTests;

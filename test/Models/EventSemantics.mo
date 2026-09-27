@@ -365,4 +365,58 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     y = if x > m then 1 else 0;
   end ChainThroughDiscreteWhen;
 
+  model CoincidentTimeEvents "pure-time conditions on different parameters with the same value: every event at 0.1 is applied"
+    parameter Real t1 = 0.1;
+    parameter Real t2 = 0.1;
+    parameter Real t3 = 0.1;
+    parameter Real t4 = 0.1;
+    Real y1;
+    Real y2;
+    Real y3;
+    Real y4;
+    Real x1(start = 0, fixed = true);
+    Real x2(start = 0, fixed = true);
+    Real x3(start = 0, fixed = true);
+    Real x4(start = 0, fixed = true);
+  equation
+    if time >= t1 then y1 = 1; else y1 = 0; end if;
+    if time >= t2 then y2 = 1; else y2 = 0; end if;
+    if time >= t3 then y3 = 1; else y3 = 0; end if;
+    if time < t4 then y4 = 1; else y4 = 0; end if;
+    der(x1) = y1;
+    der(x2) = y2;
+    der(x3) = y3;
+    der(x4) = y4;
+    // x1 = x2 = x3 = 0.9 and x4 = 0.1 at t = 1
+  end CoincidentTimeEvents;
+
+  model CoincidentPeriodic "a mod-based condition that jumps at the same time as a step"
+    parameter Real t2 = 0.3;
+    Real y1;
+    Real y2;
+    Real x1(start = 0, fixed = true);
+    Real x2(start = 0, fixed = true);
+  equation
+    if mod(time, 0.3) < 0.1 then y1 = 1; else y1 = 0; end if;
+    if time >= t2 then y2 = 1; else y2 = 0; end if;
+    der(x1) = y1;
+    der(x2) = y2;
+    // x1 = 0.4 (on [0, 0.1), [0.3, 0.4), [0.6, 0.7), [0.9, 1)) and x2 = 0.7 at t = 1
+  end CoincidentPeriodic;
+
+  model CoincidentTouch "an and-condition whose crossing function only touches zero, next to a step at that time"
+    parameter Real t1 = 0.5;
+    parameter Real t2 = 0.5;
+    parameter Real t3 = 0.5;
+    Real y1;
+    Real y2;
+    Real x1(start = 0, fixed = true);
+    Real x2(start = 0, fixed = true);
+  equation
+    if time >= t1 and time < t2 then y1 = 1; else y1 = 0; end if;
+    if time >= t3 then y2 = 1; else y2 = 0; end if;
+    der(x1) = y1;
+    der(x2) = y2;
+    // x1 = 0 (the condition is never true) and x2 = 0.5 at t = 1
+  end CoincidentTouch;
 end EventSemantics;

@@ -20,6 +20,21 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     #= sin(time) > 0.5 on (pi/6, 5pi/6) and (13pi/6, 17pi/6) in [0, 10] =#
     @test isapprox(_eventSim("PeriodicPureTime"; stopTime = 10.0)(10.0; idxs = :x), 4pi / 3; atol = 1e-6)
   end
+  @testset "coincident pure-time events are all applied" begin
+    #= thresholds with the same value (the BooleanSteps of a multi-phase switch, as in
+       the MSL machine examples): each event's affect re-derives the other conditions,
+       which must see the coincident crossings as happened (read just after the event);
+       a mod-based jump coincides with a step, and an and-condition only touches zero =#
+    local expected = (("CoincidentTimeEvents", [:x1, :x2, :x3, :x4], [0.9, 0.9, 0.9, 0.1]),
+                      ("CoincidentPeriodic", [:x1, :x2], [0.4, 0.7]),
+                      ("CoincidentTouch", [:x1, :x2], [0.0, 0.5]))
+    for (model, names, values) in expected
+      for sol in (_eventSim(model; stopTime = 1.0),
+                  OM.simulate("EventSemantics." * model, EVENT_FILE; stopTime = 1.0))
+        @test [sol[n][end] for n in names] ≈ values atol = 1e-6
+      end
+    end
+  end
   @testset "relations in functions and noEvent generate no events" begin
     for model in ("InlinedFunctionRelation", "NoEventCondition")
       local sol = _eventSim(model)

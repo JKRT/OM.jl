@@ -128,7 +128,9 @@
      equation contradicts its equation at t = 0 (overdetermined): translate
      only, which is what it reproduces. The OperatorCall models have a state that
      integrates the fields of Complex equations between an operator call and a
-     constructor (the shape that stopped 59 MSL models in the backend). =#
+     constructor (the shape that stopped 59 MSL models in the backend);
+     ArrayArgFunctions passes Complex arrays to functions (ComplexBlocks Sum,
+     QuasiStationary quasiRMS); ArrayRecordOutputs returns one from a function. =#
   @testset "Lowering: Complex operator-record patterns" begin
     local file = "./Models/ComplexLoweringTests.mo"
     for m in ("DirectAssign", "ConstructorProjection", "ArrayElementAccess", "MatrixVectorMul")
@@ -140,7 +142,9 @@
       true
     end
     for (m, x1) in (("OperatorCallEquation", 0.5 + cos(1.0) - 1 - 2 * sin(1.0)),
-                    ("ArrayOperatorCallEquation", 3.5 + 7 * (cos(1.0) - 1) - 14 * sin(1.0)))
+                    ("ArrayOperatorCallEquation", 3.5 + 7 * (cos(1.0) - 1) - 14 * sin(1.0)),
+                    ("ArrayArgFunctions", 2.02820976),    # the integral of y.re + 2 y.im + r; OpenModelica 2.02820969
+                    ("ArrayRecordOutputs", -8.74339361))  # analytic (OpenModelica 1.27.1 fails in wrapFunctionCalls)
       local sol = OM.simulate("ComplexLoweringTests." * m, file; MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1.0)
       @test sol.retcode == ReturnCode.Success
       @test isapprox(sol[:x][end], x1; atol = 1.0e-4)
