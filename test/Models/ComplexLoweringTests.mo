@@ -224,4 +224,12 @@ package ComplexLoweringTests
     der(x) = p.re + 2 * p.im + q.re + q.im + 3 * p2.re;
   end ArrayRecordOutputs;
 
+  model SymmetricTransformation
+    "The MSL's symmetricTransformationMatrix(5), evaluated at compile time: tM[i, k] = exp(j i (k - 1) 2 pi / 5) / 5."
+    parameter Complex tM[5, 5] = Modelica.Electrical.MultiPhase.Functions.symmetricTransformationMatrix(5);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = tM[2, 2].re + tM[2, 3].im + tM[4, 5].re + tM[3, 4].im;
+  end SymmetricTransformation;
+
 end ComplexLoweringTests;
