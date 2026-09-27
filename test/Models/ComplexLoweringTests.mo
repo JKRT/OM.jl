@@ -1,6 +1,8 @@
 /*
 Reproducer set for OMBackend's Complex operator-record lowering pass
-(lowerComplexOperatorRecords in OMBackend.jl/src/SimulationCode/simCodeUtil.jl).
+(lowerComplexOperatorRecords in OMBackend.jl/src/SimulationCode/simCodeUtil.jl)
+and, for the OperatorCall models, the field-wise expansion of Complex equations
+(expandComplexEquations in OMBackend.jl/src/Backend/Causalize.jl).
 
 Each model isolates one pattern the pass must scalarize cleanly. Without
 the pass extension, SimCodeCheck aborts with cref_resolution errors
@@ -15,6 +17,10 @@ Patterns covered:
   - MatrixVectorMul      : for-loop `y[j] = Complex(sum_re, sum_im)` mirror of
                            SymmetricalComponents in 3 phases
   - InitialEqAssign      : Complex assignment inside an `initial equation` block
+  - OperatorCallEquation : `i + v = Complex(time)`, an operator call against a constructor
+                           (the Kirchhoff equation `pin_p.i + pin_n.i = Complex(0)` of the
+                           QuasiStationary two-pins)
+  - ArrayOperatorCallEquation: the same for arrays of Complex
 
 This is the test-side companion to the UnsymmetricalLoad fix family.
 */
@@ -100,5 +106,32 @@ package ComplexLoweringTests
     c = Complex(sin(time), cos(time));
     der(x) = c.re + c.im;
   end InitialEqAssign;
+
+  model OperatorCallEquation
+    "Pattern F: neither side of the Complex equation is a record reference, so each
+     field is taken from the operator call's result. With v = sin(t) + j cos(t),
+     i = t - v and x(1) = 0.5 + cos(1) - 1 - 2 sin(1); pairing the fields of the two
+     sides the wrong way round gives -1.14264 instead of -1.64264."
+    Complex v;
+    Complex i;
+    Real x(start = 0, fixed = true);
+  equation
+    v = Complex(sin(time), cos(time));
+    i + v = Complex(time);
+    der(x) = i.re + 2 * i.im;
+  end OperatorCallEquation;
+
+  model ArrayOperatorCallEquation
+    "Pattern F for arrays of Complex: the frontend splits the array equation into one
+     Complex equation per element, so this covers the same field-wise expansion per
+     element (not the ARRAY_EQUATION path). x(1) = 3.5 + 7 (cos(1) - 1) - 14 sin(1)."
+    Complex v[2];
+    Complex i[2];
+    Real x(start = 0, fixed = true);
+  equation
+    v = {Complex(sin(time), cos(time)), Complex(2 * sin(time), 3 * cos(time))};
+    i + v = {Complex(time), Complex(2 * time)};
+    der(x) = i[1].re + 2 * i[1].im + 3 * i[2].re + 4 * i[2].im;
+  end ArrayOperatorCallEquation;
 
 end ComplexLoweringTests;
