@@ -473,6 +473,25 @@ const IEQ_MSL_MODELS = [
       @test [sol(0.0; idxs = :x), sol(1.0; idxs = :x)] ≈ [0.6, 0.2207289885] atol = 1e-5
     end
 
+    @testset "IEQ16: a parameter the initialization computes (fixed = false)" begin
+      #= k(fixed = false) is what makes der(x) = 0 at x = 0.5 (so k = y(0)), and k2 = 2*k
+         follows it (the MSL InitSpringConstant's spring.c). Kept at its start 1, the
+         initialization could not hold both. Values from OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ16_FreeParameter", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.0; idxs = :y), sol(1.0; idxs = :x)] ≈ [0.5, 0.9204147203, 0.5559353162] atol = 1e-5
+      @test [sol.ps[:k], sol.ps[:k2]] ≈ [0.9204147203, 1.8408294406] atol = 1e-6
+    end
+
+    @testset "IEQ17: IEQ16 as a pure ODE" begin
+      #= Without an algebraic unknown the problem has no initialization solve: k stayed at its
+         start 1. Values from OpenModelica 1.27.1 (k = 0.8). =#
+      local sol = OM.simulate("InitialEquationTests.IEQ17_FreeParameterODE", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.5; idxs = :x), sol(1.0; idxs = :x)] ≈ [0.5, 0.519478771, 0.5626476075] atol = 1e-5
+      @test [sol.ps[:k], sol.ps[:k2]] ≈ [0.8, 1.6] atol = 1e-8
+    end
+
   end
 
 end

@@ -290,6 +290,15 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s(t; idxs = :fired) for t in (1.9, 2.5, 3.5)] == [0, 0, 1]
     @test s(2.5; idxs = :ts) ≈ 2.0 atol = 1e-8
   end
+  @testset "sample(start, interval)" begin
+    #= Ticks at 0.5, 0.51, ...: n = 1 at 0.505 and 25 at 0.75 (OpenModelica 1.27.1). The start
+       was ignored (ticks from 0.01: 50 at 0.505), and a sample and-ed with a parameter never
+       ticked (the MSL noise blocks with a startTime froze). =#
+    for m in ("SampleFromStart", "SampleWithGuard")
+      local s = _eventSim(m; stopTime = 1.0)
+      @test [s(0.3; idxs = :n), s(0.505; idxs = :n), s(0.75; idxs = :n)] == [0, 1, 25]
+    end
+  end
   @testset "delay(): a step and a sine" begin
     #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
        event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#

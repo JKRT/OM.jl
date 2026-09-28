@@ -713,4 +713,21 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     fire = e and time >= ts + 1;
     fired = pre(fired) or fire;
   end WhenSetsTimerStart;
+
+  model SampleFromStart "sample(0.5, 0.01): the ticks start at 0.5"
+    Integer n(start = 0, fixed = true);
+  equation
+    when sample(0.5, 0.01) then
+      n = pre(n) + 1;
+    end when;
+  end SampleFromStart;
+
+  model SampleWithGuard "a sample and-ed with a Boolean parameter (the MSL noise blocks: generateNoise and sample(startTime, samplePeriod))"
+    parameter Boolean on = true;
+    Integer n(start = 0, fixed = true);
+  equation
+    when on and sample(0.5, 0.01) then
+      n = pre(n) + 1;
+    end when;
+  end SampleWithGuard;
 end EventSemantics;

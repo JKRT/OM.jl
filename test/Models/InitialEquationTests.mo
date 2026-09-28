@@ -314,4 +314,26 @@ package InitialEquationTests
     der(x) = if positive then -x else x;
   end IEQ15_BranchFromInitialStateODE;
 
+  model IEQ16_FreeParameter "A parameter the initialization computes (fixed = false, the MSL InitSpringConstant's spring.c): k such that x starts at rest; k2 = 2*k follows it"
+    parameter Real k(fixed = false, start = 1);
+    parameter Real k2 = 2*k;
+    Real x(start = 0.5, fixed = true);
+    Real y;
+  initial equation
+    der(x) = 0;
+  equation
+    y + 0.1*sin(y) = 1 + 0.2*time;
+    der(x) = y - k2*x;
+  end IEQ16_FreeParameter;
+
+  model IEQ17_FreeParameterODE "IEQ16 as a pure ODE: k(fixed = false) such that der(x) = 0 at x = 0.5"
+    parameter Real k(fixed = false, start = 1);
+    parameter Real k2 = 2*k;
+    Real x(start = 0.5, fixed = true);
+  initial equation
+    der(x) = 0;
+  equation
+    der(x) = 0.8 + 0.2*time - k2*x;
+  end IEQ17_FreeParameterODE;
+
 end InitialEquationTests;
