@@ -243,11 +243,33 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
   @testset "a table's time event runs the event iteration (MSL Digital JK flip-flop)" begin
     #= K rises at t = 22 while the clock is high: the master latch sets at once
        (OpenModelica and the MSL reference: RS2.TD1.x = '1' from 22), not at the next
-       clock edge (25). Open: J rises at 145 with the clock's falling edge; OpenModelica
-       keeps (4, 4) until 150, OM.jl latches J at 145. =#
+       clock edge (25). J rises at 145 with the clock's falling edge: the latches' transport
+       delays (1 ms, delay()) keep (4, 4) until 150, as OpenModelica =#
     local s = OM.simulate("Modelica.Electrical.Digital.Examples.FlipFlop"; MSL_Version = "MSL:3.2.3", stopTime = 150.0)
     @test s.retcode == ReturnCode.Success
     @test [s(23.0; idxs = :FF_RS1_TD1_x), s(23.0; idxs = :FF_RS2_TD1_x)] == [3, 4]
-    @test_broken [s(147.0; idxs = :FF_RS1_TD1_x), s(147.0; idxs = :FF_RS2_TD1_x)] == [4, 4]
+    @test [s(147.0; idxs = :FF_RS1_TD1_x), s(147.0; idxs = :FF_RS2_TD1_x)] == [4, 4]
+  end
+  @testset "an algorithm assigns an enumeration parameter to a connected output" begin
+    #= y := x (the MSL Digital Set source), z = y (a connect): the algorithm defines y
+       (it was dropped as competing with the connect, and y stayed 0, no logic value) =#
+    @test _eventSim("EnumParameterAlgorithm"; stopTime = 1.0)(1.0; idxs = :seen) == 4
+  end
+  @testset "delay(): a step and a sine" begin
+    #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
+       event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#
+    local s = _eventSim("DelayedStepAndSine"; stopTime = 1.0)
+    @test [s(0.45; idxs = :y), s(0.55; idxs = :y)] == [0, 1]
+    @test s(1.0; idxs = :tSwitch) ≈ 0.5 atol = 1e-6
+    @test [s(0.05; idxs = :sd), s(0.6; idxs = :sd)] ≈ [1.0, sin(5.0) + 1] atol = 1e-6
+    #= a delay of a delayed step steps again, 0.2 after the step (it ramped) =#
+    local s2 = _eventSim("DelayChain"; stopTime = 1.0)
+    @test [s2(t; idxs = :z) for t in (0.45, 0.49, 0.51)] == [0, 0, 1]
+    @test s2(1.0; idxs = :tz) ≈ 0.5 atol = 1e-6
+    #= a jump due after the stop time does not extend the run; a BDF solver =#
+    @test OM.simulate("EventSemantics.DelayedStepAndSine", EVENT_FILE; stopTime = 0.4).t[end] == 0.4
+    local s3 = OM.simulate("EventSemantics.DelayedStepAndSine", EVENT_FILE; stopTime = 1.0, reltol = 1e-8, abstol = 1e-10,
+                           solver = OMBackend.OrdinaryDiffEqBDF.FBDF(autodiff = ADTypes.AutoFiniteDiff()))
+    @test s3(1.0; idxs = :tSwitch) ≈ 0.5 atol = 1e-6
   end
 end

@@ -575,4 +575,44 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
   equation
     y = not pre(y) and u > 0.8 or pre(y) and u >= 0.2;
   end InitialPreParameter;
+
+  model DelayedStepAndSine
+    "delay(): a step delayed 0.2 switches a when exactly then; a sine delayed 0.1 is the start value until 0.1"
+    Real x = if time > 0.3 then 1 else 0;
+    Real y = delay(x, 0.2);
+    Real s = sin(10 * time) + 1;
+    Real sd = delay(s, 0.1);
+    discrete Real tSwitch(start = -1, fixed = true);
+  equation
+    when y > 0.5 then
+      tSwitch = time;
+    end when;
+  end DelayedStepAndSine;
+
+  model DelayChain "A delay of a delayed step: the jump arrives as a jump again, 0.2 after the step"
+    Real x = if time > 0.3 then 1 else 0;
+    Real y = delay(x, 0.1);
+    Real z = delay(y, 0.1);
+    discrete Real tz(start = -1, fixed = true);
+  equation
+    when z > 0.5 then
+      tz = time;
+    end when;
+  end DelayChain;
+
+  model EnumParameterAlgorithm
+    "An algorithm assigns an enumeration parameter's value to an output that is connected (the MSL Digital Set source: y := x)"
+    type Logic = enumeration(U, X, Zero, One);
+    parameter Logic x = Logic.One;
+    Logic y;
+    Logic z "Connected to y";
+    discrete Integer seen(start = 0, fixed = true);
+  equation
+    z = y;
+    when time > 0.5 then
+      seen = Integer(z);
+    end when;
+  algorithm
+    y := x;
+  end EnumParameterAlgorithm;
 end EventSemantics;
