@@ -25,6 +25,25 @@
     end
   end
 
+  @testset "if/elseif on package constants in a redeclare function extends" begin
+    #= The frontend drops the branches whose constant condition is false and keeps the first
+       true one's body; that body was appended to a throwaway vector, so the function lost it
+       (the MSL ReferenceAir's specificEntropy returned 0). Values from OpenModelica 1.27.1. =#
+    local sol = OM.simulate("FunctionExtendsConstIf.Test", "./Models/FunctionExtendsConstIf.mo"; startTime = 0.0, stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test [sol(1.0; idxs = :za), sol(1.0; idxs = :zb), sol(1.0; idxs = :zc)] ≈ [4.0, 5.5, 7.0] atol = 1e-6
+  end
+
+  @testset "functions of a protected package in two functions keep apart" begin
+    #= fA and fB each have a protected package Internal with its own g and f. A function's
+       path stopped at the enclosing function (an instantiated root), so both were
+       `Internal.g`, and the first one flattened replaced the other (the MSL Media T_h and T_ps
+       inverted with the same function). Values from OpenModelica 1.27.1. =#
+    local sol = OM.simulate("NestedFunctionNames.Test", "./Models/NestedFunctionNames.mo"; startTime = 0.0, stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test [sol(1.0; idxs = :za), sol(1.0; idxs = :zb)] ≈ [7.5, 12.0] atol = 1e-6
+  end
+
   @testset "If-expressions" begin
     @testset "Ternary if-expression (absolute value)" begin
       # At t=1, x = 1 - 0.5 = 0.5
