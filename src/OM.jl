@@ -529,6 +529,7 @@ function simulate(modelName::String,
                   overwriteCache::Bool = false,
                   kwargs...)
   return withDirectRHS(directRHS) do
+    local rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
     translate(modelName, modelFile;
               MSL = MSL,
               libraries = libraries,
@@ -537,12 +538,32 @@ function simulate(modelName::String,
               warnMissingStartValues = warnMissingStartValues,
               eliminateNonDynamic = eliminateNonDynamic,
               observedFilter = observedFilter)
+    rebuilt = rebuilt && _builtAtTranslate(modelName)
     OMBackend.simulateModel(modelName;
                             MODE = mode, tspan = (startTime, stopTime),
-                            solver = solver, overwriteCache = overwriteCache,
+                            solver = solver, overwriteCache = overwriteCache && !rebuilt,
                             kwargs...)
   end
 end
+
+#= `overwriteCache` asks for a fresh build. In IMTK mode the translate of the
+   same call builds the problem (IMTKGen._buildAndCache), reusing a cached
+   build whose generated code is unchanged: forgetting that build first makes
+   the translate's build fresh, and simulateModel then must not build it a
+   second time (MSL EngineV6_analytic: 70 s and 16 GB of allocations, twice).
+   A translate that throws leaves no cached build to answer for the model.
+   Returns whether the translate is to provide the fresh build. =#
+function _freshBuildAtTranslate!(modelName::String, mode, overwriteCache::Bool)::Bool
+  (overwriteCache && mode == OMBackend.IMTK_MODE) || return false
+  OMBackend.IMTKGen.forgetBuild(OMBackend.canonicalName(modelName))
+  return true
+end
+
+#= Whether the translate cached a build. The structural / sub-model /
+   flat-model path (and a failed build) caches none: simulateModel's forced
+   rebuild then evaluates the module again, as before. =#
+_builtAtTranslate(modelName::String)::Bool =
+  haskey(OMBackend.IMTKGen.BUILT, OMBackend.canonicalName(modelName))
 
 """
     simulate(modelName; MSL_Version="MSL:3.2.3", startTime=0.0, stopTime=1.0, ...)
@@ -603,17 +624,20 @@ function simulate(modelName::String;
   return withDirectRHS(directRHS) do
     internalName = OMBackend.canonicalName(modelName)
     alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
+    local rebuilt = false
     if (!alreadyCompiled || overwriteCache) && MSL
+      rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
       translate(modelName;
                 MSL_Version = MSL_Version,
                 mode = mode,
                 warnMissingStartValues = warnMissingStartValues,
                 eliminateNonDynamic = eliminateNonDynamic,
                 observedFilter = observedFilter)
+      rebuilt = rebuilt && _builtAtTranslate(modelName)
     end
     OMBackend.simulateModel(modelName;
                             MODE = mode, tspan = (startTime, stopTime),
-                            solver = solver, overwriteCache = overwriteCache,
+                            solver = solver, overwriteCache = overwriteCache && !rebuilt,
                             kwargs...)
   end
 end
