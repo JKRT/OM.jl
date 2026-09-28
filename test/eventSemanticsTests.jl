@@ -270,6 +270,16 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
        value made it hold at the first step as well) =#
     @test _eventSim("ChangeAfterInitialization"; stopTime = 1.0)(1.0; idxs = :count) == 1
   end
+  @testset "a table's ramps after its time events" begin
+    #= A periodic table's runtime reads pre(nextTimeEventScaled) < nextTimeEventScaled as an
+       event being iterated and holds the segment's left value; between events pre(x) = x. It was
+       the value before the last event, so a ramp after the first event stayed flat (the MSL
+       conveyors). One that holds its last point was right, and stays right (OpenModelica) =#
+    local s = OM.simulate("EventSemantics.TableRampsAfterEvents", EVENT_FILE; MSL = true, MSL_Version = "MSL:3.2.3",
+                          stopTime = 14.0, reltol = 1e-8, abstol = 1e-10)
+    @test [s(4.5; idxs = :z1), s(7.0; idxs = :z1), s(14.0; idxs = :z1)] ≈ [3.875, 4.0, 7.5] atol = 1e-4
+    @test [s(2.5; idxs = :z2), s(4.5; idxs = :z2), s(14.0; idxs = :z2)] ≈ [1.9375, 3.0, 7.75] atol = 1e-4
+  end
   @testset "delay(): a step and a sine" begin
     #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
        event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#

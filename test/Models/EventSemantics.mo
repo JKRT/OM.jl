@@ -687,4 +687,16 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       count = pre(count) + 1;
     end when;
   end ChangeAfterInitialization;
+
+  model TableRampsAfterEvents "CombiTimeTable ramps after their first time event (the MSL AIMC_Conveyor duty cycle): z1(4.5) = 3.875, z1(14) = 7.5; z2(4.5) = 3, z2(14) = 7.75"
+    Modelica.Blocks.Sources.CombiTimeTable periodic(table = [0, 0; 1, 1; 4, 1; 5, 0; 10, 0],
+      extrapolation = Modelica.Blocks.Types.Extrapolation.Periodic);
+    Modelica.Blocks.Sources.CombiTimeTable held(table = [0, 0; 1, 1; 2, 1; 3, 0.5],
+      extrapolation = Modelica.Blocks.Types.Extrapolation.HoldLastPoint);
+    Real z1(start = 0, fixed = true);
+    Real z2(start = 0, fixed = true);
+  equation
+    der(z1) = periodic.y[1];
+    der(z2) = held.y[1];
+  end TableRampsAfterEvents;
 end EventSemantics;
