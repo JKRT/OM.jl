@@ -454,6 +454,25 @@ const IEQ_MSL_MODELS = [
       @test [sol(0.0; idxs = :s), sol(1.0; idxs = :y)] ≈ [0.1, -1.1] atol = 1e-8
     end
 
+    @testset "IEQ14: a parameter an initial equation computes from the initial state" begin
+      #= positive(fixed = false) = k*x > 0 (the MSL JointSSP's positiveBranch). Kept at its
+         default false, the initial equation was a residual row no unknown satisfies: d
+         started on the other branch (-0.47) and x left its fixed start. Values from
+         OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ14_BranchFromInitialState", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.0; idxs = :d)] ≈ [0.6, 0.7330835739] atol = 1e-6
+      @test [sol(1.0; idxs = :x), sol(1.0; idxs = :d)] ≈ [0.5242376381, 0.7811615459] atol = 1e-5
+    end
+
+    @testset "IEQ15: IEQ14 as a pure ODE (no initialization solve)" begin
+      #= positive = x > 0 assigned at the initial state; kept at its default false, x grew
+         (0.6*e at 1 s). Values from OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ15_BranchFromInitialStateODE", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(1.0; idxs = :x)] ≈ [0.6, 0.2207289885] atol = 1e-5
+    end
+
   end
 
 end

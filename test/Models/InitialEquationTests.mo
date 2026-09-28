@@ -292,4 +292,26 @@ package InitialEquationTests
     der(s) = 1;
   end IEQ13_NegatedAliasFixedStart;
 
+  model IEQ14_BranchFromInitialState "A parameter an initial equation computes from the initial state (the MSL JointSSP's positiveBranch): positive = true, d + 0.1*sin(d) starts at +0.8"
+    parameter Boolean positive(fixed = false);
+    Real x(start = 0.6, fixed = true);
+    Real k;
+    Real d;
+  initial equation
+    positive = k*x > 0;
+  equation
+    k = sqrt(1 - x*x);
+    d + 0.1*sin(d) = if positive then k else -k;
+    der(x) = -0.1*d;
+  end IEQ14_BranchFromInitialState;
+
+  model IEQ15_BranchFromInitialStateODE "IEQ14 as a pure ODE (no initialization solve): positive = true, x decays"
+    parameter Boolean positive(fixed = false);
+    Real x(start = 0.6, fixed = true);
+  initial equation
+    positive = x > 0;
+  equation
+    der(x) = if positive then -x else x;
+  end IEQ15_BranchFromInitialStateODE;
+
 end InitialEquationTests;
