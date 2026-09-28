@@ -445,4 +445,134 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     end when;
     der(x) = y;
   end WhenOnBooleanAtStart;
+
+  model RelationAliasOrientation
+    "Two relations with an alias each, one alias sharing the relation's lhs (a connect's orientation): both make events at their crossings"
+    Boolean y1, b1, y2, b2;
+    discrete Real t1(start = -1, fixed = true);
+    discrete Real t2(start = -1, fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    y1 = x > 0.5;
+    y1 = b1;
+    y2 = x > 1.5;
+    b2 = y2;
+    when b1 then
+      t1 = time;
+    end when;
+    when b2 then
+      t2 = time;
+    end when;
+  end RelationAliasOrientation;
+
+  model IfMixedTargets
+    "An if-equation whose branches define different variables (an ideal switch as in the MSL switches with arc): 1 V into R and the switch, closed until 0.5"
+    parameter Real R = 2;
+    Real v "Switch voltage";
+    Real i "Current";
+    Boolean open = time > 0.5;
+    discrete Real iAtOpen(start = -1, fixed = true);
+  equation
+    v + R * i = 1;
+    if open then
+      i = 0;
+    else
+      v = 0;
+    end if;
+    when open then
+      iAtOpen = pre(i);
+    end when;
+  end IfMixedTargets;
+
+  model KeptConstantUnknown
+    "Unknowns bound to a parameter through each other, one of them read in a when body"
+    parameter Real R = 2;
+    Real y;
+    Real u;
+    discrete Real z(start = 0, fixed = true);
+  equation
+    y = R;
+    u = y;
+    when time > 0.5 then
+      z = u;
+    end when;
+  end KeptConstantUnknown;
+
+  model PulseSampleHold
+    "A Boolean pulse restarted by sample (as the MSL BooleanPulse) drives a sample-and-hold and a counter"
+    parameter Real period = 0.2;
+    parameter Real width = 0.05;
+    discrete Real T0(start = 0, fixed = true);
+    Boolean pulse;
+    discrete Real held(start = -1, fixed = true);
+    Integer count(start = 0, fixed = true);
+  equation
+    when sample(0, period) then
+      T0 = time;
+    end when;
+    pulse = time >= T0 and time < T0 + width;
+    when pulse then
+      held = time;
+      count = pre(count) + 1;
+    end when;
+  end PulseSampleHold;
+
+  model InitialPreStep
+    "A step active from the start through its initial equation only (as the MSL StateGraph InitialStep), left at 0.5"
+    Boolean active;
+    Boolean localActive;
+    Boolean newActive;
+    Boolean leave = time > 0.5;
+    discrete Real tLeft(start = -1, fixed = true);
+  initial equation
+    pre(newActive) = pre(localActive);
+    active = true;
+  equation
+    active = localActive;
+    localActive = pre(newActive);
+    newActive = localActive and not leave;
+    when not active then
+      tLeft = time;
+    end when;
+  end InitialPreStep;
+
+  model WhenReadsAlgebraic
+    "A when body reads an algebraic variable that is solved explicitly (eliminated from the unknowns)"
+    Real w = 2 * time;
+    Real w2 = w + 1;
+    discrete Real z(start = 0, fixed = true);
+  equation
+    when time > 0.5 then
+      z = w2;
+    end when;
+  end WhenReadsAlgebraic;
+
+  model WhenReadsAfterRelationWhen
+    "A when on a relation sets k; a when on k reads y = k*x in the same event: y with the new k"
+    Real x(start = 0, fixed = true);
+    Integer k(start = 1, fixed = true);
+    Real y;
+    discrete Real yAt(start = -1, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 0.5 then
+      k = 2;
+    end when;
+    y = k * x;
+    when k > 1 then
+      yAt = y;
+    end when;
+  end WhenReadsAfterRelationWhen;
+
+  model InitialPreParameter
+    "pre(y) fixed to a parameter by an initial equation (the MSL Hysteresis): u starts inside the band"
+    parameter Boolean pre_y_start = true;
+    Real u = 0.5 - time;
+    Boolean y;
+  initial equation
+    pre(y) = pre_y_start;
+  equation
+    y = not pre(y) and u > 0.8 or pre(y) and u >= 0.2;
+  end InitialPreParameter;
 end EventSemantics;

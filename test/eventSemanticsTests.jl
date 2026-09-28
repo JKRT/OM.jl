@@ -150,6 +150,50 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s2(0.5; idxs = :entry), s2(6.0; idxs = :entry)] ≈ [-1.0, 5pi / 3] atol = 1e-6
     @test s2(7.5; idxs = :x) ≈ (pi / 3)^2 / 2 + pi / 3 + (2pi / 3)^2 / 2 atol = 1e-6
   end
+  @testset "a relation with an alias, in either orientation" begin
+    #= y1 = x > 0.5 next to y1 = b1 (a connect's orientation), y2 = x > 1.5 next to
+       b2 = y2: both relations make events, and the whens on the aliases fire at the
+       crossings (the relation sharing its lhs with an alias was left in the
+       continuous equations: t1 at the end of the next step) =#
+    local s = _eventSim("RelationAliasOrientation"; stopTime = 2.5)
+    @test [s(2.5; idxs = :t1), s(2.5; idxs = :t2)] ≈ [0.5, 1.5] atol = 1e-6
+  end
+  @testset "an if-equation whose branches define different variables" begin
+    #= if open then i = 0 else v = 0 (an ideal switch), v + R i = 1, R = 2; open is a
+       binding (Boolean open = time > 0.5): a binding with a relation makes events as an
+       equation does (it made none: the switch never opened), and pre(i) in the when
+       is i before the event =#
+    local s = _eventSim("IfMixedTargets"; stopTime = 1.0)
+    @test [s(0.25; idxs = :v), s(0.25; idxs = :i), s(0.75; idxs = :v), s(0.75; idxs = :i)] ≈ [0, 0.5, 1, 0] atol = 1e-6
+    @test s(1.0; idxs = :iAtOpen) ≈ 0.5 atol = 1e-6
+  end
+  @testset "a when body reads variables solved outside the state vector" begin
+    #= u = y and y = R: u is bound to the parameter and kept for the when; w2 = 2 time + 1
+       is solved explicitly (both were missing from the state vector the when reads) =#
+    @test _eventSim("KeptConstantUnknown"; stopTime = 1.0)(1.0; idxs = :z) ≈ 2 atol = 1e-6
+    @test _eventSim("WhenReadsAlgebraic"; stopTime = 1.0)(1.0; idxs = :z) ≈ 2 atol = 1e-6
+    #= a when on a relation sets k, a when on k reads y = k x in the same event: y is
+       solved with the new k first (OpenModelica yAt = 1) =#
+    @test _eventSim("WhenReadsAfterRelationWhen"; stopTime = 1.0)(1.0; idxs = :yAt) ≈ 1 atol = 1e-6
+  end
+  @testset "a Boolean pulse restarted by sample drives a sample-and-hold" begin
+    #= pulses at 0.2, 0.4, 0.6, 0.8 (the one at the start is no edge); a variable named
+       count (Base.count in the generated module) =#
+    local s = _eventSim("PulseSampleHold"; stopTime = 0.95)
+    @test [s(0.95; idxs = :count), s(0.95; idxs = :held)] ≈ [4, 0.8] atol = 1e-6
+  end
+  @testset "pre() at the start from the initial equations" begin
+    #= active = true (initial equation), active = localActive, localActive =
+       pre(newActive): the step is active from the start, as the MSL StateGraph
+       InitialStep (newActive's start alone left it inactive), and left at 0.5 =#
+    local s = _eventSim("InitialPreStep"; stopTime = 1.0)
+    @test [s(0.0; idxs = :active), s(0.25; idxs = :active), s(0.75; idxs = :active)] == [1, 1, 0]
+    @test s(1.0; idxs = :tLeft) ≈ 0.5 atol = 1e-6
+    #= pre(y) = pre_y_start (a parameter, true) with u inside the hysteresis band:
+       y true until u < 0.2 =#
+    local s2 = _eventSim("InitialPreParameter"; stopTime = 0.6)
+    @test [s2(t; idxs = :y) for t in (0.0, 0.1, 0.5)] == [1, 1, 0]
+  end
   @testset "ideal switches (MSL PowerConverters): the discrete-cluster event iteration" begin
     #= A thyristor fired at alpha = 30 degrees by a timer on a threshold, into R: firing
        1/600 s into each period; mean and RMS load voltage V/(2 pi) (1 + cos alpha) and
@@ -171,5 +215,29 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test s2.retcode == ReturnCode.Success
     @test s2(0.1; idxs = :meanVoltage_y) ≈ 2V / pi atol = 0.05
     @test s2(0.1; idxs = :rootMeanSquareVoltage_y) ≈ V / sqrt(2) atol = 0.05
+    #= A thyristor bridge fired at alpha = 30 degrees (its two firing signals reach the
+       thyristors through connects of opposite orientation): mean V/pi (1 + cos alpha) =#
+    local s3 = OM.simulate("Modelica.Electrical.PowerConverters.Examples.ACDC.RectifierBridge2Pulse.ThyristorBridge2Pulse_R";
+                           MSL_Version = "MSL:3.2.3", stopTime = 0.1)
+    @test s3.retcode == ReturnCode.Success
+    @test s3(0.1; idxs = :meanVoltage_y) ≈ V / pi * (1 + cos(alpha)) atol = 0.05
+    #= A three-phase (six-pulse) thyristor bridge: commutations whose algebraic
+       re-solve ends near singular; mean 3 sqrt(3)/pi V cos alpha =#
+    local s4 = OM.simulate("Modelica.Electrical.PowerConverters.Examples.ACDC.RectifierBridge2mPulse.ThyristorBridge2mPulse_R";
+                           MSL_Version = "MSL:3.2.3", stopTime = 0.1)
+    @test s4.retcode == ReturnCode.Success
+    @test s4(0.1; idxs = :meanVoltage_y) ≈ 3sqrt(3) / pi * V * cos(alpha) atol = 0.05
+  end
+  @testset "after an event that switches, the step size starts again" begin
+    #= An ideal switch opens onto an inductor at 0.5: its current falls to V Goff at once;
+       a step sized before the event crossed that transient, interpolating -4.5 A at
+       0.545 (SwitchWithArc). The switched-capacitor filter's charge transfers
+       likewise (CauerLowPassSC, values from OpenModelica 1.27.1) =#
+    local s1 = OM.simulate("Modelica.Electrical.Analog.Examples.SwitchWithArc"; MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+    @test s1.retcode == ReturnCode.Success
+    @test s1(0.545; idxs = :inductor1_i) ≈ 5.0e-4 atol = 1.0e-5
+    local s2 = OM.simulate("Modelica.Electrical.Analog.Examples.CauerLowPassSC"; MSL_Version = "MSL:3.2.3", stopTime = 2.0)
+    @test s2.retcode == ReturnCode.Success
+    @test [s2(1.5; idxs = :C1_v), s2(2.0; idxs = :C3_v)] ≈ [-0.30282, -0.17201] atol = 1.0e-4
   end
 end
