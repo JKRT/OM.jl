@@ -97,6 +97,14 @@ const ALG_INIT_FILE = "./Models/AlgInitTest.mo"
     end
   end
 
+  @testset "WhenInitialFunctionCall" begin
+    #= The early initial algorithm runs in the model's module, where the function's name was
+       unbound: UndefVarError, swallowed, y stayed 0. =#
+    local sol = OM.simulate("AlgInitTest.WhenInitialFunctionCall", ALG_INIT_FILE; startTime = 0.0, stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test [sol(0.0; idxs = :y), sol(1.0; idxs = :y)] == [10.0, 10.0]
+  end
+
   @testset "AssertPositive" begin
     @test true == begin
       sol = OM.simulate("AlgInitTest.AssertPositive", ALG_INIT_FILE;

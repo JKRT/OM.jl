@@ -172,4 +172,16 @@ package AlgInitTest
     der(x) = 0;
   end AssertPositive;
 
+
+  model WhenInitialFunctionCall
+    "when initial() in an algorithm assigns a discrete from a Modelica function
+       (the MSL WriteRealMatrixToFile: success1 := writeRealMatrix(...)).
+       recursiveSum(4) = 10"
+    parameter Integer n = 4;
+    discrete Real y;
+  algorithm
+    when initial() then
+      y := recursiveSum(n);
+    end when;
+  end WhenInitialFunctionCall;
 end AlgInitTest;
