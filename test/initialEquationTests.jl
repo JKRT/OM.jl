@@ -424,6 +424,19 @@ const IEQ_MSL_MODELS = [
       @test [sol(0.01; idxs = :vc), sol(0.03; idxs = :vc)] ≈ [9.0479625, 7.4067552] atol = 1e-4
     end
 
+    @testset "IEQ11: an ideal diode that starts in the wrong mode" begin
+      #= IEQ10 with s(start = 0): off is initialized conducting, and the algebraic solve has
+         s = -8e5 against Ron = 1e-5. Its Jacobian is badly scaled, not singular; pinv's rank
+         cutoff dropped the direction that corrects s, the solve crept above its tolerance,
+         and a later phase moved vc to 2 (the MSL diode rectifiers' capacitors and their
+         means' x = 0, y = 0). Values from OpenModelica 1.27.1, as IEQ10's. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ11_DiodeStartsInWrongMode",
+                              "./Models/InitialEquationTests.mo"; stopTime = 0.03)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :vc), sol(0.0; idxs = :s), sol(0.0; idxs = :off)] ≈ [10.0, -8.0, 1.0] atol = 1e-6
+      @test [sol(0.01; idxs = :vc), sol(0.03; idxs = :vc)] ≈ [9.0479625, 7.4067552] atol = 1e-4
+    end
+
   end
 
 end
