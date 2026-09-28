@@ -615,4 +615,76 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
   algorithm
     y := x;
   end EnumParameterAlgorithm;
+
+  model ArcSwitchOpening "off from a time relation (SwitchWithArc's CloserWithArc on a BooleanPulse): opens at 0.5 into 50 V, R = 1, L = 0.1"
+    parameter Real V0 = 30;
+    parameter Real dVdt = 1e4;
+    parameter Real Vmax = 60;
+    parameter Real Ron = 1e-5;
+    parameter Real Goff = 1e-5;
+    Boolean control;
+    Boolean off(start = true, fixed = true);
+    Boolean quenched(start = true, fixed = true);
+    discrete Real tSwitch(start = -1e60, fixed = true);
+    Real i(start = 0, fixed = true);
+    Real v;
+  equation
+    control = time < 0.5;
+    off = not control;
+    when edge(off) then
+      tSwitch = time;
+    end when;
+    quenched = off and (abs(i) <= abs(v)*Goff or pre(quenched));
+    if off then
+      if quenched then
+        i = Goff*v;
+      else
+        v = min(Vmax, V0 + dVdt*(time - tSwitch))*sign(i);
+      end if;
+    else
+      v = Ron*i;
+    end if;
+    50 = v + 1*i + 0.1*der(i);
+  end ArcSwitchOpening;
+
+  model ArcSwitchControlled "off from a relation on a sine (ControlledSwitchWithArc's ControlledCloserWithArc): closes at 1/12, opens at 5/12"
+    parameter Real V0 = 30;
+    parameter Real dVdt = 1e4;
+    parameter Real Vmax = 60;
+    parameter Real Ron = 1e-5;
+    parameter Real Goff = 1e-5;
+    Real vc;
+    Boolean off(start = true, fixed = true);
+    Boolean quenched(start = true, fixed = true);
+    discrete Real tSwitch(start = -1e60, fixed = true);
+    Real i(start = 0, fixed = true);
+    Real v;
+  equation
+    vc = sin(2*3.141592653589793*time);
+    off = vc < 0.5;
+    when edge(off) then
+      tSwitch = time;
+    end when;
+    quenched = off and (abs(i) <= abs(v)*Goff or pre(quenched));
+    if off then
+      if quenched then
+        i = Goff*v;
+      else
+        v = min(Vmax, V0 + dVdt*(time - tSwitch))*sign(i);
+      end if;
+    else
+      v = Ron*i;
+    end if;
+    50 = v + 1*i + 0.1*der(i);
+  end ArcSwitchControlled;
+
+  model ChangeAfterInitialization "when change(n): pre(n) at the first event is n's initialized value 1, not its start 0; one change, at 0.5"
+    Integer n(start = 0);
+    Integer count(start = 0, fixed = true);
+  equation
+    n = if time < 0.5 then 1 else 2;
+    when change(n) then
+      count = pre(count) + 1;
+    end when;
+  end ChangeAfterInitialization;
 end EventSemantics;

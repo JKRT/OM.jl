@@ -255,6 +255,21 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
        (it was dropped as competing with the connect, and y stayed 0, no logic value) =#
     @test _eventSim("EnumParameterAlgorithm"; stopTime = 1.0)(1.0; idxs = :seen) == 4
   end
+  @testset "when edge(b): pre(b) is the initialized value, then follows b" begin
+    #= The MSL switch with arc: `when edge(off) then tSwitch = time`, off(start = true)
+       initialized false; the arc voltage ramps from tSwitch (OpenModelica). The edge memory
+       held the start value (the when never fired), and missed an edge after a change that
+       fired nothing (the controlled switch closes at 1/12, opens at 5/12) =#
+    local s = _eventSim("ArcSwitchOpening"; stopTime = 0.6)
+    @test s(0.6; idxs = :tSwitch) ≈ 0.5 atol = 1e-6
+    @test [s(0.50125; idxs = :i), s(0.50125; idxs = :v), s(0.502; idxs = :i)] ≈ [49.2162, 42.5, 48.8766] atol = 1e-3
+    local s2 = _eventSim("ArcSwitchControlled"; stopTime = 0.6)
+    @test s2(0.6; idxs = :tSwitch) ≈ 5 / 12 atol = 1e-6
+    @test [s2(0.418; idxs = :i), s2(0.41975; idxs = :i)] ≈ [47.7537, 46.8890] atol = 1e-3
+    #= n(start = 0) is initialized 1: change(n) holds only at 0.5 (the memory from the start
+       value made it hold at the first step as well) =#
+    @test _eventSim("ChangeAfterInitialization"; stopTime = 1.0)(1.0; idxs = :count) == 1
+  end
   @testset "delay(): a step and a sine" begin
     #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
        event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#

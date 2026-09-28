@@ -240,4 +240,22 @@ package InitialEquationTests
     der(x) = y;
   end IAL4_InitAlgStateInIfCondition;
 
+  model IEQ10_StartKeptBesideDiscreteInit "the capacitor keeps vc(start = 10), not fixed, beside an initialized discrete: an ideal diode (MSL IdealSemiconductor equations) that blocks at t0 (MSL Rectifier6pulse's cDC1.v)"
+    parameter Real Ron = 1e-5;
+    parameter Real Goff = 1e-5;
+    parameter Real R = 100;
+    parameter Real C = 1e-3;
+    Boolean off(start = true);
+    Real s(start = -1);
+    Real vs, vd, i;
+    Real vc(start = 10);
+  equation
+    vs = 5*sin(2*3.141592653589793*50*time) + 2;
+    off = s < 0;
+    vd = s*(if off then 1 else Ron);
+    i = s*(if off then Goff else 1);
+    vs = vd + vc;
+    C*der(vc) = i - vc/R;
+  end IEQ10_StartKeptBesideDiscreteInit;
+
 end InitialEquationTests;
