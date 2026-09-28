@@ -437,6 +437,23 @@ const IEQ_MSL_MODELS = [
       @test [sol(0.01; idxs = :vc), sol(0.03; idxs = :vc)] ≈ [9.0479625, 7.4067552] atol = 1e-4
     end
 
+    @testset "IEQ12: a fixed start on an alias of a state" begin
+      #= x(start = 0.1, fixed = true) = s(start = 0), s the state. Merging the alias's
+         attributes field by field kept s's free start 0 with x's fixed = true; a fixed start
+         goes with its fixed (the MSL RollingWheelSet's x of its prismatic joint's s).
+         Values from OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ12_AliasFixedStart", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :s), sol(1.0; idxs = :x)] ≈ [0.1, 1.1] atol = 1e-8
+    end
+
+    @testset "IEQ13: a fixed start on a negated alias of a state" begin
+      #= IEQ12 with y = -s: the alias's start flips sign, its fixed does not. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ13_NegatedAliasFixedStart", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :s), sol(1.0; idxs = :y)] ≈ [0.1, -1.1] atol = 1e-8
+    end
+
   end
 
 end

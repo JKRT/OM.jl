@@ -276,4 +276,20 @@ package InitialEquationTests
     C*der(vc) = i - vc/R;
   end IEQ11_DiodeStartsInWrongMode;
 
+  model IEQ12_AliasFixedStart "x(start = 0.1, fixed = true) is an alias of the state s(start = 0): s starts at 0.1 (the MSL RollingWheelSet's x of its prismatic joint's s)"
+    Real s(start = 0, stateSelect = StateSelect.prefer);
+    Real x(start = 0.1, fixed = true);
+  equation
+    x = s;
+    der(s) = 1;
+  end IEQ12_AliasFixedStart;
+
+  model IEQ13_NegatedAliasFixedStart "IEQ12 with a negated alias: y(start = -0.1, fixed = true) = -s, s starts at 0.1"
+    Real s(start = 0, stateSelect = StateSelect.prefer);
+    Real y(start = -0.1, fixed = true);
+  equation
+    y = -s;
+    der(s) = 1;
+  end IEQ13_NegatedAliasFixedStart;
+
 end InitialEquationTests;
