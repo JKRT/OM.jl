@@ -240,4 +240,14 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test s2.retcode == ReturnCode.Success
     @test [s2(1.5; idxs = :C1_v), s2(2.0; idxs = :C3_v)] ≈ [-0.30282, -0.17201] atol = 1.0e-4
   end
+  @testset "a table's time event runs the event iteration (MSL Digital JK flip-flop)" begin
+    #= K rises at t = 22 while the clock is high: the master latch sets at once
+       (OpenModelica and the MSL reference: RS2.TD1.x = '1' from 22), not at the next
+       clock edge (25). Open: J rises at 145 with the clock's falling edge; OpenModelica
+       keeps (4, 4) until 150, OM.jl latches J at 145. =#
+    local s = OM.simulate("Modelica.Electrical.Digital.Examples.FlipFlop"; MSL_Version = "MSL:3.2.3", stopTime = 150.0)
+    @test s.retcode == ReturnCode.Success
+    @test [s(23.0; idxs = :FF_RS1_TD1_x), s(23.0; idxs = :FF_RS2_TD1_x)] == [3, 4]
+    @test_broken [s(147.0; idxs = :FF_RS1_TD1_x), s(147.0; idxs = :FF_RS2_TD1_x)] == [4, 4]
+  end
 end
