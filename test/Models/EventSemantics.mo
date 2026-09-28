@@ -699,4 +699,18 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     der(z1) = periodic.y[1];
     der(z2) = held.y[1];
   end TableRampsAfterEvents;
+
+  model WhenSetsTimerStart "StateGraph's Transition: when enableFire then t_start = time; fire = enableFire and time >= t_start + waitTime; the step's active from pre() and fire: fire first at 3, not at 2 with ts's old value"
+    Boolean e;
+    discrete Real ts(start = 0, fixed = true);
+    Boolean fire;
+    Boolean fired(start = false, fixed = true);
+  equation
+    e = time >= 2 or time < -1;
+    when e then
+      ts = time;
+    end when;
+    fire = e and time >= ts + 1;
+    fired = pre(fired) or fire;
+  end WhenSetsTimerStart;
 end EventSemantics;

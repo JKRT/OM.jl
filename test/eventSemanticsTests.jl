@@ -280,6 +280,16 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s(4.5; idxs = :z1), s(7.0; idxs = :z1), s(14.0; idxs = :z1)] ≈ [3.875, 4.0, 7.5] atol = 1e-4
     @test [s(2.5; idxs = :z2), s(4.5; idxs = :z2), s(14.0; idxs = :z2)] ≈ [1.9375, 3.0, 7.75] atol = 1e-4
   end
+  @testset "a when's discrete read by a relation in the same event" begin
+    #= when e then ts = time; fire = e and time >= ts + 1; fired = pre(fired) or fire. At e's
+       event ts becomes 2, and fire, in the same iteration of the event, reads the new ts:
+       false, first true at 3. The clusters ran before the discrete whens, so fire read
+       ts = 0 and fired latched at 2 (the MSL StateGraph transition fired at once instead of
+       after its waitTime). Values from OpenModelica 1.27.1. =#
+    local s = _eventSim("WhenSetsTimerStart"; stopTime = 4.0)
+    @test [s(t; idxs = :fired) for t in (1.9, 2.5, 3.5)] == [0, 0, 1]
+    @test s(2.5; idxs = :ts) ≈ 2.0 atol = 1e-8
+  end
   @testset "delay(): a step and a sine" begin
     #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
        event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#
