@@ -511,4 +511,31 @@ package RecordFunctionTest
     der(x) = secondOfMadePair(time);
   end FieldOfRecordCall;
 
+  function makePairIf "a record-valued if-expression assigned to a record output (MSL MixtureGasNasa setState_pTX)"
+    input Real x;
+    input Boolean first;
+    output PairRecord r;
+  protected
+    Real z;
+  algorithm
+    z := x;
+    r := if first then PairRecord(a = z, b = 2*z) else PairRecord(a = -z, b = 1);
+  end makePairIf;
+
+  function secondOfPairIf
+    input Real x;
+    output Real b;
+  protected
+    Real z;
+  algorithm
+    z := x;
+    b := secondOf(makePairIf(z, z < 0.5));
+  end secondOfPairIf;
+
+  model RecordIfAssignment "der(x) = makePairIf(time, time < 0.5).b: 2 time, then 1: x(1) = 0.75"
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = secondOfPairIf(time);
+  end RecordIfAssignment;
+
 end RecordFunctionTest;

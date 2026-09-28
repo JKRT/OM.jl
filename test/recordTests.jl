@@ -290,6 +290,17 @@
     end
   end
 
+  @testset "Record-valued if-expression assigned to a record" begin
+    #= r := if first then PairRecord(...) else PairRecord(...) went to an unused local, and the
+       flattened fields r_a, r_b stayed 0 (the MSL MixtureGasNasa setState_pTX returned a zero
+       state). der(x) = 2 time until 0.5, then 1 (the else branch), so x(1) = 0.75: within 1e-2,
+       as the switch is inside a function (no event), and 0 (the bug) or 0.25 (no else) are far. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.RecordIfAssignment", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 0.75, atol = 1e-2, rtol = 0.0)
+    end
+  end
+
   @testset "Protected array sized by an input" begin
     #= Real w[size(x, 1)] was declared a scalar 0.0, and w[i] := ... failed (setindex! on a
        Float64; the MSL Media massToMoleFractions). der(x) = 1.5 (1 + 2 + 3) = 9. =#
