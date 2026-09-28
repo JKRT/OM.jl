@@ -299,6 +299,14 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
       @test [s(0.3; idxs = :n), s(0.505; idxs = :n), s(0.75; idxs = :n)] == [0, 1, 25]
     end
   end
+  @testset "two tables indexed alike are not one equation" begin
+    #= yAnd = andT[b, a], yXor = xorT[b, a] with 4x4 constant tables: printed abbreviated
+       (`{<4×4 table>}[b, a]`) the two right-hand sides were the same string, and
+       eliminateRHSEquivalentEquations made yXor an alias of yAnd (the MSL Digital
+       HalfAdder's XOR gate took its AND gate's output). OpenModelica 1.27.1. =#
+    local s = _eventSim("TwoTablesSameIndices"; stopTime = 1.0)
+    @test [s(t; idxs = v) for t in (0.1, 0.3, 0.7) for v in (:yAnd, :yXor)] == [3, 1, 3, 4, 4, 3]
+  end
   @testset "delay(): a step and a sine" begin
     #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
        event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#

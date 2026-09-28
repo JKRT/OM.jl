@@ -730,4 +730,16 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       n = pre(n) + 1;
     end when;
   end SampleWithGuard;
+
+  model TwoTablesSameIndices "two lookups with the same indices into different constant tables of more than 12 entries (the Digital HalfAdder's XOR and AND gates) are not equivalent"
+    constant Integer andT[4, 4] = [1, 1, 3, 1; 1, 2, 3, 2; 3, 3, 3, 3; 1, 2, 3, 4];
+    constant Integer xorT[4, 4] = [1, 1, 1, 1; 1, 2, 2, 2; 1, 2, 3, 4; 1, 2, 4, 3];
+    Integer b = if time < 0.5 then 3 else 4;
+    Integer a = if time < 0.25 then 1 else 4;
+    Integer yAnd;
+    Integer yXor;
+  equation
+    yAnd = andT[b, a];
+    yXor = xorT[b, a];
+  end TwoTablesSameIndices;
 end EventSemantics;
