@@ -427,4 +427,88 @@ package RecordFunctionTest
     der(y) = r.v[1];
   end MatrixRecordFuncAccess1D;
 
+  record PairRecord
+    Real a;
+    Real b;
+  end PairRecord;
+
+  function makePair
+    input Real x;
+    output PairRecord r;
+  protected
+    Real y;
+  algorithm
+    y := x;
+    r.a := y;
+    r.b := 2*y;
+  end makePair;
+
+  function sumWithPair
+    input Real y;
+    input PairRecord r;
+    output Real s;
+  algorithm
+    s := y + r.a + r.b;
+  end sumWithPair;
+
+  function sumOfMadePair "a record-valued call as a record argument (the MSL ReferenceAir's rho_props_pT(p, T, airBaseProp_pT(p, T)))"
+    input Real x;
+    output Real s;
+  protected
+    Real z;
+  algorithm
+    z := x;
+    s := sumWithPair(1.0, makePair(z));
+  end sumOfMadePair;
+
+  model RecordArgFromCall "der(x) = sumOfMadePair(time) = 1 + 3 time: x(1) = 2.5"
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = sumOfMadePair(time);
+  end RecordArgFromCall;
+
+  function scaledSum "a protected array sized by an input (MSL Media massToMoleFractions' invMMX[size(X, 1)])"
+    input Real x[:];
+    input Real k;
+    output Real s;
+  protected
+    Real w[size(x, 1)];
+  algorithm
+    for i in 1:size(x, 1) loop
+      w[i] := k*x[i];
+    end for;
+    s := sum(w);
+  end scaledSum;
+
+  model ProtectedArrayFromInputSize "der(x) = scaledSum({1, 2, 3}, 1.5) = 9: x(1) = 9"
+    Real x(start = 0, fixed = true);
+    Real v[3] = {1, 2, 3};
+  equation
+    der(x) = scaledSum(v, 1.5);
+  end ProtectedArrayFromInputSize;
+
+  function secondOf
+    input PairRecord r;
+    output Real b;
+  algorithm
+    b := r.b;
+    annotation(Inline = true);
+  end secondOf;
+
+  function secondOfMadePair "a field of a record-valued call, from inlining (MSL Media temperature(setState_psX(...)))"
+    input Real x;
+    output Real b;
+  protected
+    Real z;
+  algorithm
+    z := x;
+    b := secondOf(makePair(z));
+  end secondOfMadePair;
+
+  model FieldOfRecordCall "der(x) = makePair(time).b = 2 time: x(1) = 1"
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = secondOfMadePair(time);
+  end FieldOfRecordCall;
+
 end RecordFunctionTest;

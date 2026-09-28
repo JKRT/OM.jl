@@ -269,6 +269,36 @@
     end
   end
 
+  @testset "Record-valued call as a record argument in a function" begin
+    #= sumOfMadePair calls sumWithPair(1.0, makePair(z)): a record input takes its fields,
+       and a call returning a record returns them as a tuple, which is splatted (it went in
+       as one argument: BoundsError; the MSL ReferenceAir's rho_props_pT(p, T,
+       airBaseProp_pT(p, T))). der(x) = 1 + 3 time, so x(1) = 2.5. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.RecordArgFromCall", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 2.5)
+    end
+  end
+
+  @testset "Field of a record-valued call in a function" begin
+    #= secondOf(makePair(z)) inlines to makePair(z).b: the field of a tuple, by position
+       (`.b` on the tuple: FieldError; the MSL Media's temperature(setState_psX(...))).
+       der(x) = 2 time, so x(1) = 1. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.FieldOfRecordCall", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 1.0)
+    end
+  end
+
+  @testset "Protected array sized by an input" begin
+    #= Real w[size(x, 1)] was declared a scalar 0.0, and w[i] := ... failed (setindex! on a
+       Float64; the MSL Media massToMoleFractions). der(x) = 1.5 (1 + 2 + 3) = 9. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.ProtectedArrayFromInputSize", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 9.0)
+    end
+  end
+
   @testset "Record Pass-Through in Component Equations" begin
     #= Test 1D array field pass-through: R_out.w = R_in.w inside a component.
        R_in.w = {1,2,3}, R_out = R_in, so R_out.w[2] = 2.0.
