@@ -11,23 +11,16 @@
   `Modelica.Constants.pi`, so MSL 3.2.3 is loaded (MSL 4.0.0 removed
   `Modelica.SIunits`).
 
-  Current status (measured 2026-04-12):
-    * `OM.flatten` succeeds for all four systems -- the NFOCConnectionGraph
-      machinery in the frontend is live.
-    * `OM.translate` succeeds for all four systems with `directRHS = false`.
-    * `OM.simulate` succeeds for System1 (static topology) and System3
-      (breaker at t=10, stopTime=20). The original SIGILL crash was caused
-      by four bugs in the Complex record handling pipeline. Callback index
-      mismatches (hardcoded x[N] after MTK reordering) were fixed in both
-      the discrete and continuous-elseif paths of codeGen.jl.
-    * System3 breaker event fires correctly: T2_open transitions at t=10,
-      triggering T2_closed=false, T2_B_act=0. However, the overconstrained
-      connection graph is NOT re-analyzed at runtime, so the reference
-      frequency (omegaRef) is not correctly reassigned after the topology
-      split. Full DOCC support requires StructuralChangeRecompilation or
-      the orphaned reconfiguration.jl path.
-    * System4 simulate requires the TransmissionLineVariableBranch model
-      (conditional Connections.branch), which is not yet supported.
+  Current status (2026-09-29):
+    * `OM.flatten` and `OM.translate` succeed for all four systems.
+    * System1 and System3 simulate and match omc. System3's branches are
+      unconditional, so it is the static comparison case: G1 stays the only
+      root after T2 opens at t = 10.
+    * DOCCDesugared.mo writes System4's OCC resolution out by hand in
+      standard Modelica (an if-equation on T2.closed); it matches omc and is
+      the reference for what System4 should give.
+    * System4 (conditional Connections.branch) is broken: the runtime
+      reconfiguration path throws at t = 1e-6.
 
   To run this file by itself from the `test/` directory:
       julia> include("testUtils.jl")
@@ -35,7 +28,15 @@
 =#
 
 const DOCC_MODEL_FILE = "./DOCC/Models/DynamicOverconstrainedConnectors.mo"
+const DOCC_DESUGARED_FILE = "./DOCC/Models/DOCCDesugared.mo"
 const DOCC_MSL_VERSION = "MSL:3.2.3"
+
+"Simulate a DOCC model to t = 50 with MSL 3.2.3."
+_doccSim(model::String, file::String; directRHS::Bool = true) =
+  OM.simulate(model, file; MSL = true, MSL_Version = DOCC_MSL_VERSION, directRHS = directRHS, stopTime = 50.0)
+
+"The values of the variables `names` (unknown or observed) of `sol` at `t`."
+_doccAt(sol, t::Float64, names::Symbol...)::Vector{Float64} = [Float64(sol(t; idxs = n)) for n in names]
 
 #= Translate tests use directRHS=false to exercise the split MTKParameters path
    needed by structural callbacks (StructuralChangeRecompilation). Simulate
@@ -216,9 +217,9 @@ const DOCC_SYSTEMS = [
     end
 
     @testset "Generated code dump" begin
-      local dumpPath = "/tmp/DOCC_System1_generated.jl"
+      local dumpPath = joinpath(mktempdir(), "DOCC_System1_generated.jl")
       @test begin
-        OMBackend.writeModelToFile("DynamicOverconstrainedConnectors__System1", dumpPath)
+        OMBackend.writeModelToFile("DynamicOverconstrainedConnectors_System1", dumpPath)
         isfile(dumpPath)
       end
       @info "DOCC System1 generated code dumped to $dumpPath"
@@ -264,26 +265,20 @@ const DOCC_SYSTEMS = [
       "DOCCMinimal.M11_BooleanReturnFunc",
     ]
 
-    #= Expected final-state values for models with differential states.
-       Key = model name, value = list of (stateIndex, expectedValue) pairs.
-       Verified against omc (MSL 3.2.3) and analytical solutions.
+    #= Expected values at t = 1 by variable name (analytical; omc agrees).
        M0: der(x)=y, der(y)=-x, x(0)=0, y(0)=1 => x(1)=sin(1), y(1)=cos(1)
-       M1: der(theta)=1, theta(0)=0 => theta(1)=1.0
-       M7: same ODE as M1 for theta
-       M10: der(x)=1, x(0)=0 => x(1)=1.0 (intFunc returns Integer)
-       M11: der(x)=1, x(0)=0 => x(1)=1.0 (boolFunc returns Boolean) =#
-    local stateExpected = Dict(
-      "DOCCMinimal.M0_PureODE"       => [(1, sin(1.0)), (2, cos(1.0))],
-      "DOCCMinimal.M1_FromPolar"     => [(1, 1.0)],
-      "DOCCMinimal.M7_FromPolarConj" => [(1, 1.0)],
-      "DOCCMinimal.M9_LoadEquation"  => [(1, sin(1.0)), (2, cos(1.0))],
-      "DOCCMinimal.M10_IntegerReturnFunc" => [(1, 1.0)],
-      "DOCCMinimal.M11_BooleanReturnFunc" => [(1, 1.0)],
+       M1, M7: der(theta)=1, theta(0)=0 => theta(1)=1.0
+       M9: v = (cos(t), sin(t)), v*conj(i) = 1 => i = v; purely algebraic, so the
+           default reltol 1e-3 bounds it (1e-4 relative off at t = 1)
+       M10, M11: der(x)=1, x(0)=0 => x(1)=1.0 (functions returning Integer, Boolean) =#
+    local expectedAt1 = Dict(
+      "DOCCMinimal.M0_PureODE"       => [(:x, sin(1.0), 1e-4), (:y, cos(1.0), 1e-4)],
+      "DOCCMinimal.M1_FromPolar"     => [(:theta, 1.0, 1e-4)],
+      "DOCCMinimal.M7_FromPolarConj" => [(:theta, 1.0, 1e-4)],
+      "DOCCMinimal.M9_LoadEquation"  => [(:i_re, cos(1.0), 1e-3), (:i_im, sin(1.0), 1e-3)],
+      "DOCCMinimal.M10_IntegerReturnFunc" => [(:x, 1.0, 1e-4)],
+      "DOCCMinimal.M11_BooleanReturnFunc" => [(:x, 1.0, 1e-4)],
     )
-
-    #= M9 values were previously broken due to flattenRecordCallSites bug
-       (Complex function impls returning zeros). Now fixed. =#
-    local brokenExpected = Dict{String, Vector{Tuple{Int,Float64}}}()
 
     #= Simulate uses directRHS=true (default). The non-DirectRHS path
        (directRHS=false) hits an MTK initialization bug in calculate_A_b.
@@ -304,17 +299,8 @@ const DOCC_SYSTEMS = [
         @test sol !== nothing
         if sol !== nothing
           @test sol.retcode == ReturnCode.Success
-          #= Value validation for models with differential states =#
-          if haskey(stateExpected, modelName)
-            for (idx, expected) in stateExpected[modelName]
-              @test isapprox(last(sol.u)[idx], expected; rtol = 1e-4)
-            end
-          end
-          #= Broken value checks: correct omc values that OM.jl gets wrong =#
-          if haskey(brokenExpected, modelName)
-            for (idx, expected) in brokenExpected[modelName]
-              @test_broken isapprox(last(sol.u)[idx], expected; rtol = 1e-4)
-            end
+          for (name, expected, rtol) in get(expectedAt1, modelName, ())
+            @test isapprox(sol(1.0; idxs = name), expected; rtol = rtol)
           end
         end
       end
@@ -322,94 +308,49 @@ const DOCC_SYSTEMS = [
   end
 
   @testset "End-to-end simulate" begin
-    #= System1 (static topology, no reconfiguration).
-       Complex function impls, initial equations, and discrete callback
-       indices are now correct (flattenRecordCallSites fix +
-       isParametricOnlyEquation discrete fix + MTK-aware discrete callback
-       index lookup fix in codeGen.jl).
-
-       Value validation against omc (MSL 3.2.3) at stopTime=50:
-         G1_omega = G2_omega = 1.005 (steady-state after L2 load step at t=1)
-         G1_theta ~ 0.0, G2_theta ~ 0.02
-
-       Unknown ordering (from MTK structural_simplify):
-         [1] L1_port_i_im, [2] L1_port_i_re, [3] ifEq_tmp37,
-         [4] L2_port_i_re, [5] L2_port_i_im, [6] T_port_b_i_re,
-         [7] T_port_b_i_im, [8] T_close, [9] T_open, [10] T_closed,
-         [11] T_B_act, [12] G2_theta, [13] G2_omega, [14] G1_omegaˍt,
-         [15] G1_theta, [16] G1_omega, [17] G2_omegaˍt =#
+    #= Values from omc 1.27.1 (MSL 3.2.3), by name. The load L2 steps from 1 to 0.8 at t = 1; T2 opens at t = 10. =#
     @testset "System1 simulate" begin
-      local sol = nothing
-      try
-        sol = OM.simulate("DynamicOverconstrainedConnectors.System1", DOCC_MODEL_FILE;
-                          MSL = true,
-                          MSL_Version = DOCC_MSL_VERSION,
-                          directRHS = true,
-                          stopTime = 50.0)
-      catch e
-        e isa InterruptException && rethrow()
-        @warn "System1 simulate failed" exception=(e, catch_backtrace())
-      end
-      @test sol !== nothing
-      if sol !== nothing
-        @test sol.retcode == ReturnCode.Success
-        #= omc reference: G1_omega = G2_omega = 1.005 at t=50 =#
-        local u_final = last(sol.u)
-        @test isapprox(u_final[13], 1.005; rtol = 1e-4)  # G2_omega
-        @test isapprox(u_final[16], 1.005; rtol = 1e-4)  # G1_omega
-        @test isapprox(u_final[12], 0.02; rtol = 1e-2)   # G2_theta
-        @test isapprox(u_final[15], 0.0; atol = 1e-4)    # G1_theta
-      end
+      local sol = _doccSim("DynamicOverconstrainedConnectors.System1", DOCC_MODEL_FILE)
+      @test sol.retcode == ReturnCode.Success
+      @test _doccAt(sol, 50.0, :G1_omega, :G2_omega, :G1_theta) ≈ [1.005, 1.005, 0.0] atol = 1e-4
+      @test _doccAt(sol, 50.0, :G2_theta)[1] ≈ 0.02 rtol = 1e-2
     end
 
-    #= System3 (breaker transition at t=10, static OCC branches).
-       TransmissionLine uses unconditional Connections.branch, so the OCC
-       graph is never reconfigured at runtime. After T2 opens at t=10
-       (B_act=0), G2 is electrically isolated but the reference frequency
-       still propagates through the static branch. G2_omega drifts to
-       ~1.01 (droop response) and oscillates indefinitely instead of
-       settling. This is the EXPECTED limitation of static OCC.
-       Full DOCC (System4) is needed for correct post-breaker behavior. =#
+    #= System3: TransmissionLine's Connections.branch is unconditional, so G1 stays the only
+       root after T2 opens: G2's angle drifts at (1.01 - 1.0) * omega_n. =#
     @testset "System3 simulate (static OCC)" begin
-      local sol = nothing
-      try
-        sol = OM.simulate("DynamicOverconstrainedConnectors.System3", DOCC_MODEL_FILE;
-                          MSL = true,
-                          MSL_Version = DOCC_MSL_VERSION,
-                          directRHS = true,
-                          stopTime = 50.0)
-      catch e
-        e isa InterruptException && rethrow()
-        @warn "System3 simulate failed" exception=(e, catch_backtrace())
-      end
-      @test sol !== nothing
-      if sol !== nothing
-        @test sol.retcode == ReturnCode.Success
+      local sol = _doccSim("DynamicOverconstrainedConnectors.System3", DOCC_MODEL_FILE)
+      @test sol.retcode == ReturnCode.Success
+      @test _doccAt(sol, 20.0, :T2_closed, :G1_omega, :G2_omega, :G2_port_omegaRef) ≈ [0.0, 1.0, 1.01, 1.0] atol = 1e-4
+      @test _doccAt(sol, 50.0, :G2_theta)[1] ≈ 124.105058 rtol = 1e-5
+    end
+
+    #= DOCCDesugared: System3 and System4 with the OCC resolution written out by hand in
+       standard Modelica, the reference for the DOCC semantics (omc cannot run System4).
+       System4D: after T2 opens, G2 is the root of its island (G2.port.omegaRef =
+       G2.omega) and its angle stays at 0.020014. System4E is the explicit form. =#
+    @testset "Hand-desugared DOCC ($m)" for m in ("System3D", "System4D", "System4E")
+      local sol = _doccSim("DOCCDesugared." * m, DOCC_DESUGARED_FILE)
+      @test sol.retcode == ReturnCode.Success
+      if m == "System3D"
+        @test _doccAt(sol, 50.0, :G2_theta)[1] ≈ 124.105058 rtol = 1e-5
+      else
+        @test _doccAt(sol, 20.0, :G1_omega, :G2_omega, :T2_port_a_omegaRef, :G2_port_omegaRef) ≈
+              [1.0, 1.01, 1.0, 1.01] atol = 1e-4
+        @test _doccAt(sol, 50.0, :G2_theta)[1] ≈ 0.020014 atol = 1e-4
       end
     end
 
-    #= System4 (dynamic OCC with TransmissionLineVariableBranch).
-       Conditional Connections.branch inside if-closed requires runtime OCC
-       graph reconfiguration when the breaker opens at t=10. After
-       reconfiguration, G2 becomes its own root (port.omegaRef = omega) and
-       settles to a constant frequency determined by droop response. =#
+    #= System4: TransmissionLineVariableBranch's `if closed then Connections.branch(...)`.
+       It should give System4D's values; it throws at t = 1e-6 (the structural callback's
+       condition `!T2_closed` on a Float64). =#
     @testset "System4 simulate (dynamic OCC)" begin
-      local sol = nothing
-      try
-        sol = OM.simulate("DynamicOverconstrainedConnectors.System4", DOCC_MODEL_FILE;
-                          MSL = true,
-                          MSL_Version = DOCC_MSL_VERSION,
-                          directRHS = false,
-                          stopTime = 50.0)
-      catch e
-        e isa InterruptException && rethrow()
-        @warn "System4 simulate failed" exception=(e, catch_backtrace())
-      end
-      @test sol !== nothing
-      if sol !== nothing
-        #= For recompilation models, solve returns a Vector of solutions =#
-        local finalSol = sol isa Vector ? last(sol) : sol
-        @test finalSol.retcode == ReturnCode.Success
+      @test_broken begin
+        local sol = _doccSim("DynamicOverconstrainedConnectors.System4", DOCC_MODEL_FILE; directRHS = false)
+        sol = sol isa Vector ? last(sol) : sol
+        sol.retcode == ReturnCode.Success &&
+          isapprox(_doccAt(sol, 20.0, :G2_omega, :G2_port_omegaRef), [1.01, 1.01]; atol = 1e-4) &&
+          isapprox(_doccAt(sol, 50.0, :G2_theta)[1], 0.020014; atol = 1e-4)
       end
     end
   end
