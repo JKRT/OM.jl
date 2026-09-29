@@ -12,15 +12,16 @@
   `Modelica.SIunits`).
 
   Current status (2026-09-29):
-    * `OM.flatten` and `OM.translate` succeed for all four systems.
-    * System1 and System3 simulate and match omc. System3's branches are
-      unconditional, so it is the static comparison case: G1 stays the only
-      root after T2 opens at t = 10.
-    * DOCCDesugared.mo writes System4's OCC resolution out by hand in
-      standard Modelica (an if-equation on T2.closed); it matches omc and is
-      the reference for what System4 should give.
-    * System4 (conditional Connections.branch) is broken: the runtime
-      reconfiguration path throws at t = 1e-6.
+    * All five systems flatten, translate and simulate, and match omc.
+    * System3's branches are unconditional: the static comparison case (G1
+      stays the only root after T2 opens at t = 10).
+    * System4 and System5 (conditional Connections.branch): the frontend
+      resolves the OCC graph for every breaker state and emits one
+      if-equation over the states (NFOCConnectionGraph.resolveModes); the
+      breaker's when switches the roots at run time. System5 re-closes the
+      breaker at t = 30.
+    * DOCCDesugared.mo writes these if-equations out by hand in standard
+      Modelica; omc runs them (it rejects System4) and gives the reference.
 
   To run this file by itself from the `test/` directory:
       julia> include("testUtils.jl")
@@ -38,80 +39,24 @@ _doccSim(model::String, file::String; directRHS::Bool = true) =
 "The values of the variables `names` (unknown or observed) of `sol` at `t`."
 _doccAt(sol, t::Float64, names::Symbol...)::Vector{Float64} = [Float64(sol(t; idxs = n)) for n in names]
 
-#= Translate tests use directRHS=false to exercise the split MTKParameters path
-   needed by structural callbacks (StructuralChangeRecompilation). Simulate
-   tests use the default DirectRHS path (directRHS=true) which works for
-   static-topology models (System1, minimals). =#
-const DOCC_DIRECT_RHS = false
-
-const DOCC_SYSTEMS = [
-  "DynamicOverconstrainedConnectors.System1",
-  "DynamicOverconstrainedConnectors.System2",
-  "DynamicOverconstrainedConnectors.System3",
-  "DynamicOverconstrainedConnectors.System4",
-]
+const DOCC_SYSTEMS = ["DynamicOverconstrainedConnectors.System$i" for i in 1:5]
 
 @testset "DOCC (Dynamically Overconstrained Connectors)" begin
 
   @testset "Frontend flatten" begin
-    #= All four System models should flatten through the overconstrained
-       connection graph machinery. The tuple returned by OM.flatten is
-       (FlatModel, FunctionCache). =#
     for systemName in DOCC_SYSTEMS
-      @test true == begin
-        result = OM.flatten(systemName, DOCC_MODEL_FILE;
-                            MSL = true,
-                            MSL_Version = DOCC_MSL_VERSION)
-        result isa Tuple && length(result) == 2
-      end
+      local (flat, _) = OM.flatten(systemName, DOCC_MODEL_FILE; MSL = true, MSL_Version = DOCC_MSL_VERSION)
+      local eqs = map(OMFrontend.Frontend.toString, flat.equations)
+      #= The conditional branch (System4, System5) becomes one if-equation over T2.closed:
+         the branch's equation while closed, G2's root equation while open. =#
+      @test any(e -> occursin("if T2.closed then", e) && occursin("T2.port_a.omegaRef = T2.port_b.omegaRef", e) &&
+                     occursin("G2.port.omegaRef = G2.omega", e), eqs) == (systemName[end] in ('4', '5'))
     end
   end
 
   @testset "Backend translate" begin
-    #= System1 is the static baseline: two generators, one line, fixed
-       branches, no reconfiguration. =#
-    @test true == begin
-      OM.translate("DynamicOverconstrainedConnectors.System1", DOCC_MODEL_FILE;
-                   MSL = true,
-                   MSL_Version = DOCC_MSL_VERSION,
-                   directRHS = DOCC_DIRECT_RHS)
-      true
-    end
-
-    #= System2 adds parallel lines and a series line. Still static branches.
-       Exercises more of the overconstrained graph (multiple branches,
-       redundant paths). =#
-    @test true == begin
-      OM.translate("DynamicOverconstrainedConnectors.System2", DOCC_MODEL_FILE;
-                   MSL = true,
-                   MSL_Version = DOCC_MSL_VERSION,
-                   directRHS = DOCC_DIRECT_RHS)
-      true
-    end
-
-    #= System3 introduces a breaker on T2 that trips at t = 10. This is the
-       first model that genuinely needs DOCC-driven reconfiguration: the
-       graph topology changes at a known event. Backend translate completes;
-       the actual reconfiguration path is exercised at simulate time. =#
-    @test true == begin
-      OM.translate("DynamicOverconstrainedConnectors.System3", DOCC_MODEL_FILE;
-                   MSL = true,
-                   MSL_Version = DOCC_MSL_VERSION,
-                   directRHS = DOCC_DIRECT_RHS)
-      true
-    end
-
-    #= System4 uses TransmissionLineVariableBranch — the fully dynamic case
-       where the branch edge itself becomes conditional. The variant with
-       `connect(port_b_int, port_b, closed)` is commented out in the source
-       because Modelica 3.4 does not accept it syntactically, so this
-       currently exercises the non-variable-branch fallback path. =#
-    @test true == begin
-      OM.translate("DynamicOverconstrainedConnectors.System4", DOCC_MODEL_FILE;
-                   MSL = true,
-                   MSL_Version = DOCC_MSL_VERSION,
-                   directRHS = DOCC_DIRECT_RHS)
-      true
+    for systemName in DOCC_SYSTEMS
+      @test (OM.translate(systemName, DOCC_MODEL_FILE; MSL = true, MSL_Version = DOCC_MSL_VERSION); true)
     end
   end
 
@@ -280,10 +225,6 @@ const DOCC_SYSTEMS = [
       "DOCCMinimal.M11_BooleanReturnFunc" => [(:x, 1.0, 1e-4)],
     )
 
-    #= Simulate uses directRHS=true (default). The non-DirectRHS path
-       (directRHS=false) hits an MTK initialization bug in calculate_A_b.
-       DirectRHS works for static-topology models. System3/4 (structural
-       transitions) will need directRHS=false for the recompilation path. =#
     for modelName in minimalModels
       @testset "$modelName" begin
         local sol = nothing
@@ -342,16 +283,26 @@ const DOCC_SYSTEMS = [
     end
 
     #= System4: TransmissionLineVariableBranch's `if closed then Connections.branch(...)`.
-       It should give System4D's values; it throws at t = 1e-6 (the structural callback's
-       condition `!T2_closed` on a Float64). =#
+       The frontend resolves the OCC graph for both breaker states and emits System4D's
+       if-equation; when T2 opens, G2 becomes the root of its island. =#
     @testset "System4 simulate (dynamic OCC)" begin
-      @test_broken begin
-        local sol = _doccSim("DynamicOverconstrainedConnectors.System4", DOCC_MODEL_FILE; directRHS = false)
-        sol = sol isa Vector ? last(sol) : sol
-        sol.retcode == ReturnCode.Success &&
-          isapprox(_doccAt(sol, 20.0, :G2_omega, :G2_port_omegaRef), [1.01, 1.01]; atol = 1e-4) &&
-          isapprox(_doccAt(sol, 50.0, :G2_theta)[1], 0.020014; atol = 1e-4)
-      end
+      local sol = _doccSim("DynamicOverconstrainedConnectors.System4", DOCC_MODEL_FILE)
+      @test sol.retcode == ReturnCode.Success
+      @test _doccAt(sol, 9.99, :G2_theta, :G2_port_omegaRef) ≈ [0.020013, 1.005] atol = 1e-4
+      @test _doccAt(sol, 20.0, :T2_closed, :G1_omega, :G2_omega, :T2_port_a_omegaRef, :G2_port_omegaRef) ≈
+            [0.0, 1.0, 1.01, 1.0, 1.01] atol = 1e-4
+      @test _doccAt(sol, 50.0, :G2_theta)[1] ≈ 0.020014 atol = 1e-4
+    end
+
+    #= System5: System4 whose breaker closes again at t = 30: G1 is the only root again and
+       the generators resynchronize (omc on DOCCDesugared.System5D). =#
+    @testset "System5 simulate (breaker re-closes)" for (m, file) in
+        (("DynamicOverconstrainedConnectors.System5", DOCC_MODEL_FILE), ("DOCCDesugared.System5D", DOCC_DESUGARED_FILE))
+      local sol = _doccSim(m, file)
+      @test sol.retcode == ReturnCode.Success
+      @test _doccAt(sol, 30.5, :G1_omega, :G2_omega, :G2_port_omegaRef) ≈ [1.007590, 1.002417, 1.007590] atol = 1e-4
+      @test _doccAt(sol, 30.5, :G2_theta)[1] ≈ 0.082256 atol = 1e-4
+      @test _doccAt(sol, 50.0, :G1_omega, :G2_omega, :G2_theta, :T2_port_a_omegaRef) ≈ [1.005, 1.005, 0.020001, 1.005] atol = 1e-4
     end
   end
 

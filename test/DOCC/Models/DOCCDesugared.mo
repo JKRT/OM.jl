@@ -107,4 +107,9 @@ package DOCCDesugared
     T2.port_b.omegaRef = if T2.closed then T2.port_a.omegaRef else G2.omega;
   annotation(experiment(StopTime = 50, Interval = 0.02));
   end System4E;
+
+  model System5D "System4D whose breaker closes again at t = 30: G1 the only root again"
+    extends System4D(T2(close = time >= 30));
+  annotation(experiment(StopTime = 50, Interval = 0.02));
+  end System5D;
 end DOCCDesugared;
