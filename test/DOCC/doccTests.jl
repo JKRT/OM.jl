@@ -79,8 +79,11 @@ const DOCC_SYSTEMS = ["DynamicOverconstrainedConnectors.System$i" for i in 1:5]
        and the actual call site is the suspected SIGILL root cause. =#
 
     local CG = OMBackend.CodeGeneration
-    local impls = CG.MODELICA_FUNCTION_IMPLS
-    local wrappers = CG.MODELICA_FUNCTION_WRAPPERS
+    #= The registries hold every model's functions built in this process; the
+       probes below are for the Complex functions of the DOCC models only. =#
+    local isDOCCFunction(name) = occursin("Complex", string(name))
+    local impls = filter(p -> isDOCCFunction(p.first), CG.MODELICA_FUNCTION_IMPLS)
+    local wrappers = filter(p -> isDOCCFunction(p.first), CG.MODELICA_FUNCTION_WRAPPERS)
     local elemCache = CG.ELEM_FUNC_CACHE
 
     @testset "Registered functions" begin
@@ -295,7 +298,8 @@ const DOCC_SYSTEMS = ["DynamicOverconstrainedConnectors.System$i" for i in 1:5]
     end
 
     #= System5: System4 whose breaker closes again at t = 30: G1 is the only root again and
-       the generators resynchronize (omc on DOCCDesugared.System5D). =#
+       the generators resynchronize (omc on DOCCDesugared.System5D). The roots depend on the
+       breakers at that instant only, not on the modes before. =#
     @testset "System5 simulate (breaker re-closes)" for (m, file) in
         (("DynamicOverconstrainedConnectors.System5", DOCC_MODEL_FILE), ("DOCCDesugared.System5D", DOCC_DESUGARED_FILE))
       local sol = _doccSim(m, file)
