@@ -244,6 +244,19 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s2(0.0; idxs = :cDC1_v), s2(0.0; idxs = Symbol("supplyL_inductor[2]_i")), s2(0.05; idxs = :cDC1_v)] ≈
           [116.9545202, -116.9545202, 111.4614178] atol = 1e-3
   end
+  @testset "Spice3: constant function outputs and events of a short run" begin
+    #= The MOSFET's capacitances are 0 for every voltage with the default parameters:
+       partially evaluated to 0 (OpenModelica's evalFunc), `icBS = cBS*(der(B.v) -
+       der(Sinternal))` loses its derivatives (0/0 at the start before). The run lasts
+       1e-7 s; the event hysteresis follows the time span (it was 1e-7 absolute, and the
+       V_pulse sources never switched). OpenModelica 1.27.1. =#
+    local s = OM.simulate("Modelica.Electrical.Spice3.Examples.Spice3BenchmarkMosfetCharacterization";
+                          MSL_Version = "MSL:3.2.3", stopTime = 1e-7)
+    @test s.retcode == ReturnCode.Success
+    @test [s(2.0e-8; idxs = :M1_D_i), s(5.0e-8; idxs = :M1_D_i), s(9.0e-8; idxs = :M1_D_i)] ≈
+          [6.000001387e-5, 0.0007350000139, 0.0007350000139] atol = 1e-8
+    @test s(5.0e-8; idxs = :VGS_p_v) ≈ 5.0 atol = 1e-6
+  end
   @testset "after an event that switches, the step size starts again" begin
     #= An ideal switch opens onto an inductor at 0.5: its current falls to V Goff at once;
        a step sized before the event crossed that transient, interpolating -4.5 A at
