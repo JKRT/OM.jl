@@ -774,6 +774,16 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     annotation(experiment(StopTime = 3));
   end IfInitialBranch;
 
+  model IfInitialOr "initial() in a condition with a relation on time or on a state, and negated: true only during the initialization"
+    Real x(start = 0, fixed = true);
+    Real y = if initial() or time > 1.5 then 1 else 0;
+    Real v = if initial() or x > 2.5 then 1 else 0;
+    Real w = if not initial() then x else -1;
+  equation
+    der(x) = 1;
+    annotation(experiment(StopTime = 3));
+  end IfInitialOr;
+
   model ElseIfExpression "an if-expression's elseif makes an event as its if does (MLS 8.5; MSL FluxTubes' H_lim = if H < -Hsat then -Hsat elseif H > Hsat then Hsat else H)"
     Real x(start = -1.5, fixed = true);
     Real y;

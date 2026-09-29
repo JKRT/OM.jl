@@ -350,6 +350,9 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     #= y = 10 only during the initialization, then y = x = t: z = t^2/2 (OpenModelica 1.27.1: z(2) = 2.000004) =#
     local s = _eventSim("IfInitialBranch")
     @test [s(0.5; idxs = :y), s(2.0; idxs = :y), s(2.0; idxs = :z)] ≈ [0.5, 2.0, 2.0] atol = 1e-6
+    local s1 = _eventSim("IfInitialOr")
+    @test [s1(0.5; idxs = :y), s1(2.0; idxs = :y), s1(0.5; idxs = :v), s1(2.75; idxs = :v), s1(0.5; idxs = :w)] ≈
+          [0.0, 1.0, 0.0, 1.0, 0.5] atol = 1e-6
     #= y = x clipped to [-1, 1], x = t - 1.5: both conditions make events, at 0.5 and 2.5 (OpenModelica) =#
     local s2 = _eventSim("ElseIfExpression")
     @test [s2(0.25; idxs = :y), s2(1.5; idxs = :y), s2(2.75; idxs = :y), s2(1.0; idxs = :z), s2(3.0; idxs = :z)] ≈
