@@ -46,7 +46,7 @@ end
 
 @testset "Frozen state constraint (kinematic)" begin
 
-  # `eliminateFrozenStates` (simCodeUtil.jl) detects `0 = state - literal`
+  # `eliminateFrozenStates` (SimulationCode/frozenStates.jl) detects `0 = state - literal`
   # patterns where the state has STATE varKind, substitutes state -> literal
   # and der(state) -> 0 everywhere, and iterates until no more frozen states
   # are exposed (since substituting der(phi)=0 may freeze the velocity w too).
@@ -81,7 +81,7 @@ end
 
 @testset "Alias zero-wrapped connect" begin
 
-  # detectAlias (simCodeUtil.jl) peels a trailing `- 0` / `+ 0` residual
+  # detectAlias (SimulationCode/aliasElimination.jl) peels a trailing `- 0` / `+ 0` residual
   # wrapper and accepts UMINUS-wrapped operands, so connect-style flux
   # balance equations `A + B = 0` lowering to `(A + B) - 0.0 = 0` are
   # recognised as aliases. Without the peel, the Magnetic.FundamentalWave
