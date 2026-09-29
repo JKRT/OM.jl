@@ -228,6 +228,22 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test s4.retcode == ReturnCode.Success
     @test s4(0.1; idxs = :meanVoltage_y) ≈ 3sqrt(3) / pi * V * cos(alpha) atol = 0.05
   end
+  @testset "ideal switches start at their start values (MLS 8.6, as OpenModelica)" begin
+    #= The initial algorithm set an ideal diode's `off = s < 0` at s = 0 (conducting) before
+       the continuous solve. With the fixed inductor current HBridge_RL's init failed and
+       freed it (340 kA); the MultiPhase Rectifier, whose line currents and capacitor voltages
+       are fixed, reached another fixpoint of the mixed system (every diode conducting,
+       5.8e6 V). Now the members start at off = true and the mixed system is iterated.
+       OpenModelica 1.27.1 (the PWM switching instants differ by ~1e-6 s). =#
+    local s1 = OM.simulate("Modelica.Electrical.PowerConverters.Examples.DCDC.HBridge.HBridge_RL";
+                           MSL_Version = "MSL:3.2.3", stopTime = 0.1)
+    @test s1.retcode == ReturnCode.Success
+    @test [s1(t; idxs = :inductor_i) for t in (0.0, 0.02, 0.1)] ≈ [0.0, 0.1521193698, 0.1759204428] atol = 1e-4
+    local s2 = OM.simulate("Modelica.Electrical.MultiPhase.Examples.Rectifier"; MSL_Version = "MSL:3.2.3", stopTime = 0.1)
+    @test s2.retcode == ReturnCode.Success
+    @test [s2(0.0; idxs = :cDC1_v), s2(0.0; idxs = Symbol("supplyL_inductor[2]_i")), s2(0.05; idxs = :cDC1_v)] ≈
+          [116.9545202, -116.9545202, 111.4614178] atol = 1e-3
+  end
   @testset "after an event that switches, the step size starts again" begin
     #= An ideal switch opens onto an inductor at 0.5: its current falls to V Goff at once;
        a step sized before the event crossed that transient, interpolating -4.5 A at
