@@ -537,6 +537,15 @@ const IEQ_MSL_MODELS = [
       @test [ode(0.0; idxs = :x), ode(1.0; idxs = :x)] ≈ [1.25, 1.091970315] atol = 1e-6
     end
 
+    @testset "IEQ24: a guess of 0 that makes the entry residual non-finite" begin
+      #= G = 0.3/(7e-6 (1 + x)), x = exp(-t) =#
+      local sol = OM.simulate("InitialEquationTests.IEQ24_ReciprocalWithoutStart", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      #= at t = 0 the init solve's absolute tolerance on a row of size 1e-5 (5e-6 relative) =#
+      @test sol(0.0; idxs = :G) ≈ 0.3 / 1.4e-5 rtol = 1e-4
+      @test sol(1.0; idxs = :G) ≈ 0.3 / (7e-6 * (1 + exp(-1))) rtol = 1e-6
+    end
+
   end
 
 end

@@ -407,4 +407,12 @@ package InitialEquationTests
     der(x) = 1 - x;
   end IEQ23_SteadyStateOnObservedODE;
 
+  model IEQ24_ReciprocalWithoutStart "a variable defined through its reciprocal, without a start value (MSL QS FluxTubes GeneralLeakage: 0.3/G_m = 7e-6): its guess 0 made the entry residual non-finite"
+    Real G;
+    Real x(start = 1, fixed = true);
+  equation
+    0.3 / G = 7e-6 * (1 + x);
+    der(x) = -x;
+  end IEQ24_ReciprocalWithoutStart;
+
 end InitialEquationTests;
