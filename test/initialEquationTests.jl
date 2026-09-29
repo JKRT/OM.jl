@@ -492,6 +492,26 @@ const IEQ_MSL_MODELS = [
       @test [sol.ps[:k], sol.ps[:k2]] ≈ [0.8, 1.6] atol = 1e-8
     end
 
+    @testset "IEQ18/19: relations settled at initialization" begin
+      #= f = if v < 0 then 10 else 1 with der(x) = 0: the relation's value at the solved
+         initial state selects the branch (MLS 8.6), then x is solved again. Solved with the
+         relation's compiled value (false: v from start values), x started at 1 (the MSL
+         EngineV6_analytic's steady-state filter settled on the wrong gas-force branch).
+         OpenModelica 1.27.1. =#
+      local s18 = OM.simulate("InitialEquationTests.IEQ18_SteadyStateAfterRelation", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test s18.retcode == ReturnCode.Success
+      @test [s18(0.0; idxs = :x), s18(0.5; idxs = :x), s18(1.0; idxs = :x)] ≈ [10.0, 10.0, 10.0] atol = 1e-6
+      #= The relation reads the steady-state variable itself: x = 1 flips it, x = 2 settles. =#
+      local s19 = OM.simulate("InitialEquationTests.IEQ19_SteadyStateSelectsBranch", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test s19.retcode == ReturnCode.Success
+      @test [s19(0.0; idxs = :x), s19(1.0; idxs = :x)] ≈ [2.0, 2.0] atol = 1e-6
+      #= No consistent branch (x = 2 selects 1, x = 1 selects 2): a cycle keeps the first
+         solution, x = 2, instead of failing. =#
+      local s20 = OM.simulate("InitialEquationTests.IEQ20_RelationsDoNotSettle", "./Models/InitialEquationTests.mo"; stopTime = 0.1)
+      @test s20.retcode == ReturnCode.Success
+      @test s20(0.0; idxs = :x) ≈ 2.0 atol = 1e-6
+    end
+
   end
 
 end

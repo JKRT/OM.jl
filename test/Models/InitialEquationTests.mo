@@ -336,4 +336,43 @@ package InitialEquationTests
     der(x) = 0.8 + 0.2*time - k2*x;
   end IEQ17_FreeParameterODE;
 
+  model IEQ18_SteadyStateAfterRelation "The MSL EngineV6_analytic's filter behind the gas force: der(x) = 0 downstream of an if-expression on a relation of the state, x starts at f = 10"
+    parameter Real w0 = 2;
+    parameter Real T = 0.5;
+    Real phi(start = 0, fixed = true);
+    Real w "set only by the initialization";
+    Real v;
+    Real f;
+    Real x;
+  initial equation
+    der(w) = 0;
+    der(x) = 0;
+  equation
+    der(w) = w0 - w;
+    der(phi) = w;
+    v = -w*sin(phi + 1);
+    f = if v < 0 then 10 else 1;
+    T*der(x) = f - x;
+  end IEQ18_SteadyStateAfterRelation;
+
+  model IEQ19_SteadyStateSelectsBranch "The relation reads the steady-state variable itself: x = 2"
+    Real f;
+    Real x;
+  initial equation
+    der(x) = 0;
+  equation
+    f = if x > 0.5 then 2 else 1;
+    der(x) = f - x;
+  end IEQ19_SteadyStateSelectsBranch;
+
+  model IEQ20_RelationsDoNotSettle "No consistent branch: x = 2 flips the relation to 1, x = 1 flips it back; the initialization keeps its first solution"
+    Real f;
+    Real x;
+  initial equation
+    der(x) = 0;
+  equation
+    f = if x > 1.5 then 1 else 2;
+    der(x) = f - x;
+  end IEQ20_RelationsDoNotSettle;
+
 end InitialEquationTests;
