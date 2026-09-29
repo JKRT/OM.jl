@@ -758,4 +758,43 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     y = pre(ySample);
     der(k) = 0;
   end SampleTriggerHold;
+
+  model IfInitialBranch "an if-equation on initial() holds its first branch only during the initialization (MSL LimIntegrator, ElastoBacklash, FluxTubes' Tellinen hysteresis)"
+    Real x(start = 0, fixed = true);
+    Real y;
+    Real z(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    if initial() then
+      y = 10;
+    else
+      y = x;
+    end if;
+    der(z) = y;
+    annotation(experiment(StopTime = 3));
+  end IfInitialBranch;
+
+  model ElseIfExpression "an if-expression's elseif makes an event as its if does (MLS 8.5; MSL FluxTubes' H_lim = if H < -Hsat then -Hsat elseif H > Hsat then Hsat else H)"
+    Real x(start = -1.5, fixed = true);
+    Real y;
+    Real z(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    y = if x < -1 then -1 elseif x > 1 then 1 else x;
+    der(z) = y;
+    annotation(experiment(StopTime = 3));
+  end ElseIfExpression;
+
+  model DerOfExpression "der of an expression through an explicitly defined variable (MSL FluxTubes: der(hystR - mu0*Hstat)), and a relation on a derivative (asc = der(Hstat) > 0)"
+    Real x(start = 1, fixed = true);
+    Real w;
+    Real q(start = 0, fixed = true);
+    Boolean rising;
+  equation
+    der(x) = cos(time);
+    w = x^2 + 3*x;
+    der(q) = der(w - 2*x);
+    rising = der(x) > 0;
+    annotation(experiment(StopTime = 3));
+  end DerOfExpression;
 end EventSemantics;

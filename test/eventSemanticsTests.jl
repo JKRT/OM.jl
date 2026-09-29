@@ -346,6 +346,21 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s(t; idxs = :ySample) for t in (0.0, 0.05, 0.2, 0.4, 0.9)] ≈ [1.0, 1.0, 1.1, 1.35, 1.85] atol = 1e-9
     @test s(0.5; idxs = :k) ≈ 2.0
   end
+  @testset "initial() in an if-equation, an if-expression's elseif, der of an expression" begin
+    #= y = 10 only during the initialization, then y = x = t: z = t^2/2 (OpenModelica 1.27.1: z(2) = 2.000004) =#
+    local s = _eventSim("IfInitialBranch")
+    @test [s(0.5; idxs = :y), s(2.0; idxs = :y), s(2.0; idxs = :z)] ≈ [0.5, 2.0, 2.0] atol = 1e-6
+    #= y = x clipped to [-1, 1], x = t - 1.5: both conditions make events, at 0.5 and 2.5 (OpenModelica) =#
+    local s2 = _eventSim("ElseIfExpression")
+    @test [s2(0.25; idxs = :y), s2(1.5; idxs = :y), s2(2.75; idxs = :y), s2(1.0; idxs = :z), s2(3.0; idxs = :z)] ≈
+          [-1.0, 0.0, 1.0, -0.875, 0.0] atol = 1e-6
+    @test any(t -> abs(t - 0.5) < 1e-8, s2.t) && any(t -> abs(t - 2.5) < 1e-8, s2.t)
+    #= x = 1 + sin(t), der(q) = der(x^2 + 3x - 2x): q = x^2 + x - 2; rising = cos(t) > 0 =#
+    local s3 = _eventSim("DerOfExpression")
+    local qOf(t) = (x = 1 + sin(t); x^2 + x - 2)
+    @test [s3(1.0; idxs = :q), s3(2.0; idxs = :q)] ≈ [qOf(1.0), qOf(2.0)] atol = 1e-6
+    @test [s3(1.0; idxs = :rising), s3(2.0; idxs = :rising)] == [1, 0]
+  end
   @testset "delay(): a step and a sine" begin
     #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
        event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#
