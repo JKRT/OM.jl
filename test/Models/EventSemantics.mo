@@ -589,6 +589,13 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     end when;
   end DelayedStepAndSine;
 
+  model DelayAfterBuildSpan
+    "delay(): a jump due after the cached build's span (0, 1) still gets its time event; a discrete integer() of the delayed value changes only there (MSL Digital FullAdder's gates)"
+    Real x = if time > 1.5 then 1 else 0;
+    Integer k = integer(delay(x, 0.2));
+    annotation(experiment(StopTime = 3));
+  end DelayAfterBuildSpan;
+
   model DelayChain "A delay of a delayed step: the jump arrives as a jump again, 0.2 after the step"
     Real x = if time > 0.3 then 1 else 0;
     Real y = delay(x, 0.1);

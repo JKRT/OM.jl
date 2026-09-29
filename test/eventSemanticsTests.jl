@@ -375,6 +375,9 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     local s2 = _eventSim("DelayChain"; stopTime = 1.0)
     @test [s2(t; idxs = :z) for t in (0.45, 0.49, 0.51)] == [0, 0, 1]
     @test s2(1.0; idxs = :tz) ≈ 0.5 atol = 1e-6
+    #= a jump due after the cached build's span (0, 1): its time event at 1.7 =#
+    local s4 = _eventSim("DelayAfterBuildSpan"; stopTime = 3.0)
+    @test [s4(1.6; idxs = :k), s4(1.8; idxs = :k), s4(3.0; idxs = :k)] == [0, 1, 1]
     #= a jump due after the stop time does not extend the run; a BDF solver =#
     @test OM.simulate("EventSemantics.DelayedStepAndSine", EVENT_FILE; stopTime = 0.4).t[end] == 0.4
     local s3 = OM.simulate("EventSemantics.DelayedStepAndSine", EVENT_FILE; stopTime = 1.0, reltol = 1e-8, abstol = 1e-10,
