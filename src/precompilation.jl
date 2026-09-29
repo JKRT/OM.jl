@@ -44,14 +44,23 @@ end
    the ones that no longer resolve instead of failing the whole precompile. =#
 let hintsFile = joinpath(@__DIR__, "precompile_statements.jl")
   include_dependency(hintsFile)
+  local total = 0
+  local stale = 0
+  local notCompiled = 0
   for hint in Meta.parseall(read(hintsFile, String); filename = hintsFile).args
     hint isa Expr || continue
+    total += 1
     try
-      Core.eval(@__MODULE__, hint)
+      #= precompile(...) returns false for a signature that no longer compiles. =#
+      Core.eval(@__MODULE__, hint) === false && (notCompiled += 1)
     catch err
+      stale += 1
       @debug "Skipping stale precompile hint" hint exception = err
     end
   end
+  #= One line, so a stale hints file is noticed (efficiency review 2026-09-29). =#
+  (stale + notCompiled) > 0 &&
+    @info "OM precompile hints: $stale of $total no longer resolve, $notCompiled do not compile; regenerate precompile_statements.jl"
 end
 
 PrecompileTools.@compile_workload begin
