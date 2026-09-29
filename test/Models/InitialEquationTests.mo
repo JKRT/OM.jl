@@ -375,4 +375,36 @@ package InitialEquationTests
     der(x) = f - x;
   end IEQ20_RelationsDoNotSettle;
 
+  model IEQ21_SteadyStateOnAlgebraic "der(z) = 0 on an algebraic z (the MSL AIMC_Initialize's der(aimc.idq_sr) = zeros(2)): with the explicit time term, der(x) = -0.5 and x starts at 1.5"
+    Real x;
+    Real z;
+  initial equation
+    der(z) = 0;
+  equation
+    z + 0.1*sin(z) = x + 0.5*time;
+    der(x) = 1 - x;
+  end IEQ21_SteadyStateOnAlgebraic;
+
+  model IEQ22_SteadyStateOnObserved "der(w) = 0 on an observed w (the MSL FundamentalWave AIMC_Initialize's der(airGap.V_msr.re) = 0), with an algebraic z that follows x: der(w) = der(x)*(2 + 0.1/(1 + 0.1*cos(z))) + 0.5 = 0; x's start is only a guess"
+    Real x(start = 0.3);
+    Real w;
+    Real z;
+  initial equation
+    der(w) = 0;
+  equation
+    w = 2*x + 0.5*time + 0.1*z;
+    z + 0.1*sin(z) = x;
+    der(x) = 1 - x;
+  end IEQ22_SteadyStateOnObserved;
+
+  model IEQ23_SteadyStateOnObservedODE "der(w) = 0 on an observed w of a pure ODE: der(w) = 2*der(x) + 0.5 = 0, x starts at 1.25"
+    Real x;
+    Real w;
+  initial equation
+    der(w) = 0;
+  equation
+    w = 2*x + 0.5*time;
+    der(x) = 1 - x;
+  end IEQ23_SteadyStateOnObservedODE;
+
 end InitialEquationTests;

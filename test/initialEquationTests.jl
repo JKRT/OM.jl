@@ -512,6 +512,31 @@ const IEQ_MSL_MODELS = [
       @test s20(0.0; idxs = :x) ≈ 2.0 atol = 1e-6
     end
 
+    @testset "IEQ21: der(z) = 0 on an algebraic unknown" begin
+      #= z + 0.1*sin(z) = x + 0.5*time keeps z algebraic; der(z) = 0 then asks der(x) = -0.5,
+         x(0) = 1.5 (with the explicit time term). The init solve's derivative targets need a
+         differential state and dropped the row: x started at 0 (the MSL AIMC_Initialize's
+         steady-state stator currents). OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ21_SteadyStateOnAlgebraic", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.0; idxs = :z), sol(1.0; idxs = :x)] ≈ [1.5, 1.401430809, 1.183939645] atol = 1e-6
+    end
+
+    @testset "IEQ22: der(w) = 0 on an observed variable" begin
+      #= w = 2*x + 0.5*time + 0.1*z is eliminated; the backend substitutes it into der(w),
+         which crashed code generation (der of an expression). der(w) = 0 reads der(z) of the
+         algebraic z + 0.1*sin(z) = x too, and x's start 0.3 is only a guess (the MSL
+         FundamentalWave AIMC_Initialize's steady state on the observed air-gap potentials).
+         OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ22_SteadyStateOnObserved", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.0; idxs = :z), sol(1.0; idxs = :x)] ≈ [1.238543548, 1.147374708, 1.087755726] atol = 1e-6
+      #= The same on a pure ODE: its initialization used to take the start values only. =#
+      local ode = OM.simulate("InitialEquationTests.IEQ23_SteadyStateOnObservedODE", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test ode.retcode == ReturnCode.Success
+      @test [ode(0.0; idxs = :x), ode(1.0; idxs = :x)] ≈ [1.25, 1.091970315] atol = 1e-6
+    end
+
   end
 
 end

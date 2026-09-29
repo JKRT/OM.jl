@@ -307,6 +307,16 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     local s = _eventSim("TwoTablesSameIndices"; stopTime = 1.0)
     @test [s(t; idxs = v) for t in (0.1, 0.3, 0.7) for v in (:yAnd, :yXor)] == [3, 1, 3, 4, 4, 3]
   end
+  @testset "a when on a sample-defined Boolean or initial()" begin
+    #= when {trig, initial()} with trig = sample(0.1, 0.25), the MSL ZeroOrderHold: the
+       runtime arm was dropped (only a `time >= pre(x)` trigger kept it), and trig itself
+       is false between ticks, so ySample held its start value. With an initial algorithm
+       next to it (the MSL SignalPWM's sawtooth) the when's initial body was dropped too.
+       The PowerConverters choppers and inverters. OpenModelica 1.27.1. =#
+    local s = _eventSim("SampleTriggerHold"; stopTime = 1.0)
+    @test [s(t; idxs = :ySample) for t in (0.0, 0.05, 0.2, 0.4, 0.9)] ≈ [1.0, 1.0, 1.1, 1.35, 1.85] atol = 1e-9
+    @test s(0.5; idxs = :k) ≈ 2.0
+  end
   @testset "delay(): a step and a sine" begin
     #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
        event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#

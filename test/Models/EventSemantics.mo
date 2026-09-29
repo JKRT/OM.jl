@@ -742,4 +742,20 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     yAnd = andT[b, a];
     yXor = xorT[b, a];
   end TwoTablesSameIndices;
+
+  model SampleTriggerHold "when {trig, initial()} on a Boolean trig = sample(0.1, 0.25) (the MSL ZeroOrderHold's sampleTrigger), next to an initial algorithm (the MSL SignalPWM's sawtooth)"
+    Real u = 1 + time;
+    Boolean trig = sample(0.1, 0.25);
+    Real ySample(start = 0, fixed = true);
+    Real y;
+    Real k;
+  initial algorithm
+    k := 2;
+  equation
+    when {trig, initial()} then
+      ySample = u;
+    end when;
+    y = pre(ySample);
+    der(k) = 0;
+  end SampleTriggerHold;
 end EventSemantics;
