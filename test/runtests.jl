@@ -103,12 +103,10 @@ OMBackend.warnMissingStartValues(false)
   else
     @info "Skipping heavy MSL tests (set OM_HEAVY_TESTS=1 to enable)."
   end
-  #= DOCC tests deactivated — run manually from test/ with include("DOCC/doccTests.jl")
   @info "Testing DOCC (Dynamically Overconstrained Connectors)..."
   @testset "DOCC Tests:" begin
     include("DOCC/doccTests.jl")
   end
-  =#
 end #= End OM tests =#
 
 if get(ENV, "AGENTIC_MODELICA", "") != ""

@@ -60,122 +60,13 @@ const DOCC_SYSTEMS = ["DynamicOverconstrainedConnectors.System$i" for i in 1:5]
     end
   end
 
-  @testset "Function wrapper diagnostics" begin
-    #= After translate (done in the testset above), the function wrappers and
-       implementations are registered in global dicts. Test each individually
-       to isolate which (if any) causes the SIGILL during simulate.
-
-       The flat model uses these Complex-valued Modelica functions:
-         - Complex.'constructor'.fromReal'  (2 Real -> Complex)
-         - Modelica.ComplexMath.fromPolar   (2 Real -> Complex)
-         - Modelica.ComplexMath.conj        (1 Complex -> Complex)
-         - Modelica.ComplexMath.real         (1 Complex -> Real)
-         - ComplexPerUnit.'*'.multiply      (2 Complex -> Complex)
-         - ComplexPerUnit.'+'               (2 Complex -> Complex)
-         - ComplexPerUnit.'-'.subtract      (2 Complex -> Complex)
-
-       After record expansion the Complex args may become scalar pairs (re, im),
-       changing the effective arity. An arity mismatch between the wrapper RGF
-       and the actual call site is the suspected SIGILL root cause. =#
-
-    local CG = OMBackend.CodeGeneration
-    #= The registries hold every model's functions built in this process; the
-       probes below are for the Complex functions of the DOCC models only. =#
-    local isDOCCFunction(name) = occursin("Complex", string(name))
-    local impls = filter(p -> isDOCCFunction(p.first), CG.MODELICA_FUNCTION_IMPLS)
-    local wrappers = filter(p -> isDOCCFunction(p.first), CG.MODELICA_FUNCTION_WRAPPERS)
-    local elemCache = CG.ELEM_FUNC_CACHE
-
-    @testset "Registered functions" begin
-      @test !isempty(impls)
-      @test !isempty(wrappers)
-      @info "DOCC registered IMPLS:" collect(keys(impls))
-      @info "DOCC registered WRAPPERS:" collect(keys(wrappers))
-      @info "DOCC registered ELEM_FUNC_CACHE:" collect(keys(elemCache))
+  @testset "Generated code dump" begin
+    local dumpPath = joinpath(mktempdir(), "DOCC_System1_generated.jl")
+    @test begin
+      OMBackend.writeModelToFile("DynamicOverconstrainedConnectors_System1", dumpPath)
+      isfile(dumpPath)
     end
-
-    @testset "Impl arity probing" begin
-      #= Call each impl with 1..6 numeric args to discover effective arity.
-         Impls are plain anonymous functions, so wrong arity throws MethodError
-         (safe, no SIGILL). =#
-      for (name, impl) in impls
-        local foundArity = -1
-        local testArgs = [1.0, 0.5, 1.0, 0.5, 1.0, 0.5]
-        for n in 0:6
-          try
-            args = n == 0 ? () : Tuple(testArgs[1:n])
-            Base.invokelatest(impl, args...)
-            foundArity = n
-            break
-          catch e
-            e isa InterruptException && rethrow()
-          end
-        end
-        @info "Impl arity" name foundArity
-        @test foundArity >= 0
-      end
-    end
-
-    @testset "Wrapper arity vs impl arity" begin
-      #= Compare the wrapper RGF nArgs (from Modelica-level signature) against
-         the impl arity (from DAE-level after record expansion). A mismatch
-         means the wrapper was built with the wrong arg count and will SIGILL
-         when called. We cannot safely call wrappers with wrong arg counts
-         (RGF uses @inbounds on the arg tuple, so OOB = SIGILL, uncatchable).
-         Instead we call each wrapper with exactly the impl arity. If the
-         wrapper nArgs matches, the numeric dispatch path works. If not, the
-         wrapper either ignores extra args (nArgs < implArity) and fails at
-         the impl call, or SIGILLs (nArgs > implArity). =#
-      local implArities = Dict{Symbol, Int}()
-      local testArgs = [1.0, 0.5, 1.0, 0.5, 1.0, 0.5]
-      for (name, impl) in impls
-        for n in 0:6
-          try
-            args = n == 0 ? () : Tuple(testArgs[1:n])
-            Base.invokelatest(impl, args...)
-            implArities[name] = n
-            break
-          catch e
-            e isa InterruptException && rethrow()
-          end
-        end
-      end
-      for (name, wrapper) in wrappers
-        n = get(implArities, name, -1)
-        if n < 0
-          @warn "No impl arity found for wrapper" name
-          @test false
-          continue
-        end
-        #= Print BEFORE calling so SIGILL leaves a trail =#
-        @info "About to call wrapper" name implArity=n
-        flush(stdout); flush(stderr)
-        local ok = false
-        try
-          args = n == 0 ? () : Tuple(testArgs[1:n])
-          Base.invokelatest(wrapper, args...)
-          ok = true
-        catch e
-          e isa InterruptException && rethrow()
-          @warn "Wrapper call with impl arity failed (arity mismatch?)" name implArity=n exception=e
-        end
-        @info "Wrapper dispatch OK" name implArity=n ok
-        @test ok
-      end
-    end
-
-    @testset "Generated code dump" begin
-      local dumpPath = joinpath(mktempdir(), "DOCC_System1_generated.jl")
-      @test begin
-        OMBackend.writeModelToFile("DynamicOverconstrainedConnectors_System1", dumpPath)
-        isfile(dumpPath)
-      end
-      @info "DOCC System1 generated code dumped to $dumpPath"
-    end
-
-    #= getMTKProblem diagnostic removed: it reused the translate cache
-       (directRHS=false) which hits an MTK initialization bug. The
-       end-to-end simulate tests (directRHS=true) now cover this path. =#
+    @info "DOCC System1 generated code dumped to $dumpPath"
   end
 
   @testset "Minimal model simulate" begin
