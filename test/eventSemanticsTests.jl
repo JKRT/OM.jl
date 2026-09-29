@@ -364,6 +364,14 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s3(1.0; idxs = :q), s3(2.0; idxs = :q)] ≈ [qOf(1.0), qOf(2.0)] atol = 1e-6
     @test [s3(1.0; idxs = :rising), s3(2.0; idxs = :rising)] == [1, 0]
   end
+  @testset "a Boolean that holds its own pre()" begin
+    #= y = (s or pre(y)) and not r, s and r from whens: set at 0.3, held after s falls at
+       0.7, reset at 0.8. Lifted to a when on the change of pre(y), it never fired
+       (OpenModelica 1.27.1). =#
+    local s = _eventSim("SelfLatch"; stopTime = 1.0)
+    @test [s(t; idxs = :y) for t in (0.2, 0.35, 0.5, 0.75, 0.9)] == [0, 1, 1, 1, 0]
+    @test s(0.9; idxs = :n) == 1
+  end
   @testset "delay(): a step and a sine" begin
     #= x steps at 0.3; y = delay(x, 0.2) steps at 0.5, where a when on it fires (a time
        event); sd = delay(sin(10 t) + 1, 0.1) is the start value 1 until 0.1 (OpenModelica) =#

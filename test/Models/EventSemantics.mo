@@ -814,4 +814,22 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     rising = der(x) > 0;
     annotation(experiment(StopTime = 3));
   end DerOfExpression;
+
+  model SelfLatch "a Boolean that holds its own pre(), set and reset by whens (y = (s or pre(y)) and not r): no relation in the equation, the pre() read closes the loop"
+    Boolean s(start = false, fixed = true);
+    Boolean r(start = false, fixed = true);
+    Boolean y(start = false, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    when sample(0.3, 0.4) then
+      s = not pre(s);
+    end when;
+    when time > 0.8 then
+      r = true;
+    end when;
+    y = (s or pre(y)) and not r;
+    when y then
+      n = pre(n) + 1;
+    end when;
+  end SelfLatch;
 end EventSemantics;
