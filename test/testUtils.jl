@@ -429,6 +429,10 @@ function validateMSLModel(sol, refFile::String;
     end
   end
 
+  #= No signal compared is no validation (as OMLibraryTesting's validate_against_reference). =#
+  if !isempty(signal_names) && skipped == length(signal_names)
+    return (false, "None of the $(length(signal_names)) reference signals is in the solution")
+  end
   if isempty(failures)
     msg = "All $(length(signal_names) - skipped) signals validated"
     if skipped > 0

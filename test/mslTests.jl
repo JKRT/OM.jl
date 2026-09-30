@@ -934,3 +934,83 @@ end
      kinematic loop takes 4-7 min to translate+simulate. =#
 
 end
+
+#= Models whose generated code failed to build (an UndefVarError or MethodError
+   the error policy no longer swallows, 2026-09-30) or never translated. =#
+@testset verbose=true "MSL generated-code regressions" begin
+  #= At the experiments' tolerance, 1e-6, as the references were made. =#
+  function simulateMSL(model, stopTime)
+    try
+      local sol = OM.simulate(model; MSL_Version = "MSL:3.2.3", stopTime = stopTime,
+                              reltol = 1e-6, abstol = 1e-8)
+      sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success && return sol
+      @info "Simulating $model returned $(sol.retcode)"
+    catch e
+      @info "Failed to simulate $model" exception=(e, catch_backtrace())
+    end
+    return nothing
+  end
+
+  @testset "InitSpringConstant: a free parameter referred to by name" begin
+    sol = simulateMSL("Modelica.Mechanics.MultiBody.Examples.Elementary.InitSpringConstant", 1.01)
+    @test sol !== nothing
+    sol === nothing || @test begin
+      passed, details = validateMSLModel(sol,
+        "Mechanics_MultiBody_Examples_Elementary_InitSpringConstant"; stopTime = 1.01)
+      passed || @warn "InitSpringConstant validation failed" details
+      passed
+    end
+  end
+
+  @testset "MultiPhaseTwoLevel_R: an algorithm assigning a scalarized array element" begin
+    sol = simulateMSL("Modelica.Electrical.PowerConverters.Examples.DCAC.MultiPhaseTwoLevel.MultiPhaseTwoLevel_R", 0.1)
+    @test sol !== nothing
+    sol === nothing || @test begin
+      passed, details = validateMSLModel(sol,
+        "Electrical_PowerConverters_Examples_DCAC_MultiPhaseTwoLevel_MultiPhaseTwoLevel_R"; stopTime = 0.1)
+      passed || @warn "MultiPhaseTwoLevel_R validation failed" details
+      passed
+    end
+  end
+
+  @testset "GenerateRandomNumbers: an external C function of a parameter" begin
+    #= final parameter Integer id = initializeImpureRandom(globalSeed): the C
+       function seeds the generator and returns the constant local seed. (The
+       random outputs are not in the solution yet: no validation here.) =#
+    sol = simulateMSL("Modelica.Math.Random.Examples.GenerateRandomNumbers", 2.0)
+    @test sol !== nothing
+    sol === nothing || @test sol.ps[resolveMTKVariable(sol, :id)] == 715827883
+  end
+
+  @testset "RealNetwork1: a run-time subscript into a scalarized array" begin
+    sol = simulateMSL("Modelica.Blocks.Examples.RealNetwork1", 10.0)
+    @test sol !== nothing
+    if sol !== nothing
+      @test begin
+        passed, details = validateMSLModel(sol,
+          "Blocks_Examples_RealNetwork1"; stopTime = 10.0)
+        passed || @warn "RealNetwork1 validation failed" details
+        passed
+      end
+      #= The reference has the switch's inputs only: its output is
+         expr[firstTrueIndex(u)] with expr = {4, 6}, else y_default = 2. =#
+      local value(name, t) = sol(t; idxs = resolveMTKVariable(sol, Symbol(name)))
+      for t in (0.3, 1.0, 1.7, 3.1, 5.9)
+        local expected = value("multiSwitch_u[1]", t) > 0.5 ? 4.0 :
+                         value("multiSwitch_u[2]", t) > 0.5 ? 6.0 : 2.0
+        @test value("multiSwitch_y", t) == expected
+      end
+    end
+  end
+
+  @testset "SeriesBode: a Complex if-expression argument" begin
+    sol = simulateMSL("Modelica.Electrical.QuasiStationary.SinglePhase.Examples.SeriesBode", 1.0)
+    @test sol !== nothing
+    sol === nothing || @test begin
+      passed, details = validateMSLModel(sol,
+        "Electrical_QuasiStationary_SinglePhase_Examples_SeriesBode"; stopTime = 1.0)
+      passed || @warn "SeriesBode validation failed" details
+      passed
+    end
+  end
+end
