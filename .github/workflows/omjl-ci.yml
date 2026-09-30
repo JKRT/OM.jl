@@ -126,4 +126,5 @@ jobs:
         working-directory: OM.jl/test
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
-        run: julia --color=yes --project=.. -e 'include("runtests.jl")'
+        # With threads: OMFrontend's parallel path, as users run it (package tests: ci/test-package.jl).
+        run: julia --color=yes --project=.. --threads=auto -e 'include("runtests.jl")'
