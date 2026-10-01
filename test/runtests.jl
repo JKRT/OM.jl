@@ -59,6 +59,7 @@ OMBackend.warnMissingStartValues(false)
   @info "Testing procedural/algorithmic Modelica..."
   @testset "Procedural Modelica:" begin
     include("proceduralTests.jl")
+    include("expressionTests.jl")
   end
   @info "Testing external builtin functions..."
   @testset "External Builtin Functions:" begin

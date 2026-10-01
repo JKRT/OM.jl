@@ -194,7 +194,8 @@
     local expected = ("Single" => (:y => [2.0, 1.21306, 0.73576],),
                       "Multi" => (:a => [2.0, 1.60653, 1.36788], :y => [4.0, 2.58094, -1.87109]),
                       "GuardedStart" => (:z => [5.0, 5.0, 1.0],),
-                      "ForLoop" => (Symbol("v[2]") => [2.0, 1.21306, 0.73576], Symbol("v[3]") => [3.0, 1.81959, 1.10364]),
+                      "ForLoop" => (Symbol("v[2]") => [2.0, 1.21306, 0.73576], Symbol("v[3]") => [3.0, 1.81959, 1.10364],
+                                    :s => [6.0, 3.63919, 2.20728]),
                       "Mixed" => (:k => [1.0, 1.0, 2.0], :y => [1.0, 0.60653, 0.73576]))
     for (model, values) in expected
       local sol = OM.simulate("AlgorithmRealTargets." * model, file; stopTime = 1.0)

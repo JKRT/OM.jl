@@ -415,4 +415,164 @@ package InitialEquationTests
     der(x) = -x;
   end IEQ24_ReciprocalWithoutStart;
 
+
+  function pair
+    input Real u;
+    output Real a;
+    output Real b;
+  algorithm
+    a := 2 * u;
+    b := 3 * u;
+  end pair;
+
+  model IEQ25_TupleParameters "two fixed=false parameters from one tuple initial equation"
+    parameter Real a(fixed = false);
+    parameter Real b(fixed = false);
+    Real x(start = 0, fixed = true);
+  initial equation
+    (a, b) = pair(1.5);
+  equation
+    der(x) = a + 10 * b;
+  end IEQ25_TupleParameters;
+
+  model IEQ26_ParameterFromTime "t0 = time (MSL Blocks.Math.Mean): computed for start time 0"
+    parameter Real t0(fixed = false, start = 0.6);
+    Real x(start = 0, fixed = true);
+    discrete Integer n(start = 0, fixed = true);
+  initial equation
+    t0 = time;
+  equation
+    der(x) = 1;
+    when sample(t0 + 0.25, 0.25) then
+      n = pre(n) + 1;
+    end when;
+  end IEQ26_ParameterFromTime;
+
+  model IEQ27_ParameterFromInitialAlgorithm "fixed=false parameters assigned in an initial algorithm (MSL Fluid sensors' ind)"
+    parameter Integer n = 3;
+    parameter Integer ind(fixed = false);
+    parameter Real k(fixed = false);
+    Real x(start = 0, fixed = true);
+  initial algorithm
+    ind := 0;
+    for i in 1:n loop
+      if i == 2 then
+        ind := i;
+      end if;
+    end for;
+    k := 10 * ind;
+  equation
+    der(x) = k;
+  end IEQ27_ParameterFromInitialAlgorithm;
+
+  model IEQ28_FixedAlgebraic "an algebraic variable with a fixed start determines the state's start"
+    Real x(start = 0);
+    Real v(start = 3, fixed = true);
+  equation
+    der(x) = -x;
+    v = x + 1;
+  end IEQ28_FixedAlgebraic;
+
+  model IEQ29_SteadyPureODE "a pure ODE starting in steady state: its initial equations need the init solve"
+    Real x(start = 0);
+    Real y(start = 0);
+  initial equation
+    der(x) = 0;
+    y = 2 * x;
+  equation
+    der(x) = 1 - x;
+    der(y) = x - y;
+  end IEQ29_SteadyPureODE;
+  model IEQ30_ScaledInit "an initial equation with an expression on the left, in a pure ODE (OpenModelica: x(0) = 2)"
+    Real x(start = 0);
+  initial equation
+    2 * x = 4;
+  equation
+    der(x) = -x;
+  end IEQ30_ScaledInit;
+
+  model IEQ31_DerInOneSection "one initial algorithm reads der(): refused (OpenModelica: a = 5, b = 1)"
+    Real x(start = 1, fixed = true);
+    discrete Real a(start = 0, fixed = false);
+    discrete Real b(start = 0, fixed = false);
+  initial algorithm
+    a := 5;
+  initial algorithm
+    b := if der(x) < 0 then 1 else 2;
+  equation
+    der(x) = -x;
+    when time > 10 then
+      a = pre(a);
+      b = pre(b);
+    end when;
+  end IEQ31_DerInOneSection;
+
+  model IEQ32_InitialAlgorithmReadsTime "an initial algorithm reading time: the same count from 0 and 0.1"
+    parameter Real period = 1;
+    discrete Integer count(start = 0, fixed = false);
+    Real x(start = 0, fixed = true);
+  initial algorithm
+    count := integer(time / period);
+  equation
+    der(x) = 1 + count;
+    when time > 10 then
+      count = pre(count);
+    end when;
+  end IEQ32_InitialAlgorithmReadsTime;
+
+  model IEQ33_TimeOfStart "an initial algorithm storing time: refused from another start time"
+    discrete Real t1(start = 0, fixed = false);
+    Real x(start = 0, fixed = true);
+  initial algorithm
+    t1 := time;
+  equation
+    der(x) = 1;
+    when time > 10 then
+      t1 = pre(t1);
+    end when;
+  end IEQ33_TimeOfStart;
+
+  model IEQ34_CoupledParameters "two fixed=false parameters from two initial equations (solved by the initialization)"
+    parameter Real p(fixed = false);
+    parameter Real q(fixed = false);
+    Real x(start = 0, fixed = true);
+  initial equation
+    p + q = 3;
+    p - q = 1;
+  equation
+    der(x) = p;
+  end IEQ34_CoupledParameters;
+  model IEQ35_RecordArgInInitialEquation "a fixed=false parameter from a function of a record of variables (MSL JointRRP's e_im)"
+    record R
+      Real a;
+      Real b[2];
+    end R;
+    function f
+      input R r;
+      output Real y;
+    algorithm
+      y := r.a + 10 * r.b[2];
+    end f;
+    R r;
+    parameter Real p(fixed = false);
+    Real x(start = 0, fixed = true);
+  initial equation
+    p = f(r);
+  equation
+    r.a = 1 + time;
+    r.b = {2, 3} * (1 + time);
+    der(x) = p;
+  end IEQ35_RecordArgInInitialEquation;
+  model IEQ36_ParameterStartInInitialAlgorithm "an initial algorithm reads x, whose start is a parameter (OpenModelica: a = 4)"
+    parameter Real x0 = 3;
+    Real x(start = x0, fixed = true);
+    discrete Real a(start = 0, fixed = false);
+  initial algorithm
+    a := x + 1;
+  equation
+    der(x) = 0;
+    when time > 10 then
+      a = pre(a);
+    end when;
+  end IEQ36_ParameterStartInInitialAlgorithm;
 end InitialEquationTests;

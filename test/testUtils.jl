@@ -401,6 +401,14 @@ function validateMSLModel(sol, refFile::String;
       end
       abs_err = abs(actual - expected)
       threshold = atol + reltol * abs(expected)
+      #= An event instant: the reference has a row per value there (both limits,
+         and a pulse of zero width: 0.015 in MultiPhaseTwoLevel_R). The actual
+         value matching any of them is the same instant. =#
+      if abs_err > threshold
+        local tol = 1e-9 * max(1.0, abs(t))
+        local rows = searchsortedfirst(ref_time, t - tol):searchsortedlast(ref_time, t + tol)
+        length(rows) > 1 && any(k -> abs(actual - ref_values[k]) <= atol + reltol * abs(ref_values[k]), rows) && continue
+      end
       if abs_err > threshold && knot_eps > 0.0
         expected_lo = interpolateRef(ref_time, ref_values, t - knot_eps)
         expected_hi = interpolateRef(ref_time, ref_values, t + knot_eps)

@@ -981,4 +981,238 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
   equation
     y = r.a + 10 * r.b + 100 * q;
   end RecordTupleInWhenAlgorithm;
+
+  model VectorOfRelations "when {c1, c2}: fires at each element's rising edge"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when {x > 0.3, x > 0.6} then
+      n = pre(n) + 1;
+    end when;
+  end VectorOfRelations;
+
+  model VectorOfBooleans "when {b1, b2} on Booleans (MSL MathInteger.TriggeredAdd): b2 rises while b1 is true"
+    Real x(start = 0, fixed = true);
+    Boolean b1 = x > 0.25;
+    Boolean b2 = x > 0.75;
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when {b1, b2} then
+      n = pre(n) + 10;
+    end when;
+  end VectorOfBooleans;
+  model AndOfRelations "when x > 0.3 and y > 0.5: one firing, at 0.3"
+    Real x(start = 0, fixed = true);
+    Real y(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+    discrete Real tf(start = -1, fixed = true);
+  equation
+    der(x) = 1;
+    der(y) = 2;
+    when x > 0.3 and y > 0.5 then
+      n = pre(n) + 1;
+      tf = time;
+    end when;
+  end AndOfRelations;
+
+  model OrOutside "when x < 0.2 or x > 0.6: true at the start (no firing), fires at 0.6"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+    discrete Real tf(start = -1, fixed = true);
+  equation
+    der(x) = 1;
+    when x < 0.2 or x > 0.6 then
+      n = pre(n) + 1;
+      tf = time;
+    end when;
+  end OrOutside;
+
+  model Window "when x > 0.4 and x < 0.7, x up then down: fires at 0.4 and 1.3"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+    discrete Real tf(start = -1, fixed = true);
+  equation
+    der(x) = if time < 1 then 1 else -1;
+    when x > 0.4 and x < 0.7 then
+      n = pre(n) + 1;
+      tf = time;
+    end when;
+  end Window;
+
+  model InitialElsewhen "when initial() then .. elsewhen: the initial arm at the initialization"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when initial() then
+      n = 5;
+    elsewhen x > 0.5 then
+      n = pre(n) + 10;
+    end when;
+  end InitialElsewhen;
+
+  model SampleNegativeStart "sample(-0.15, 0.25) ticks at 0.1, 0.35, 0.6, 0.85"
+    Integer n(start = 0, fixed = true);
+    discrete Real tf(start = -1, fixed = true);
+  equation
+    when sample(-0.15, 0.25) then
+      n = pre(n) + 1;
+      tf = time;
+    end when;
+  end SampleNegativeStart;
+
+  model SampleOr "sample() under or (refused)"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when sample(0, 0.25) or x > 0.6 then
+      n = pre(n) + 1;
+    end when;
+  end SampleOr;
+
+  model TerminalOr "terminal() with another trigger (refused)"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when terminal() or x > 0.5 then
+      n = pre(n) + 1;
+    end when;
+  end TerminalOr;
+  model VectorRelReal "D18: vector of relations assigning a discrete Real"
+    Real x(start = 0, fixed = true);
+    discrete Real tf(start = -1, fixed = true);
+    discrete Real xs(start = -1, fixed = true);
+  equation
+    der(x) = 1;
+    when {x > 0.3, x > 0.6} then
+      tf = time;
+      xs = 2 * x;
+    end when;
+  end VectorRelReal;
+  model VectorNot "D18: {u, not u} (MSL Logical.TriggeredTrapezoid's {initial(), u, not u})"
+    Real x(start = 0, fixed = true);
+    Boolean u = x > 0.3 and x < 0.6;
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when {u, not u} then
+      n = pre(n) + 1;
+    end when;
+  end VectorNot;
+  model VectorNotInitial "D18: {initial(), u, not u}, as TriggeredTrapezoid"
+    Real x(start = 0, fixed = true);
+    Boolean u = x > 0.3 and x < 0.6;
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when {initial(), u, not u} then
+      n = pre(n) + 1;
+    end when;
+  end VectorNotInitial;
+  model VectorMixed "D18: a relation and a Boolean set by another when"
+    Real x(start = 0, fixed = true);
+    Boolean b(start = false, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 0.7 then
+      b = true;
+    end when;
+    when {x > 0.3, b} then
+      n = pre(n) + 1;
+    end when;
+  end VectorMixed;
+  model AndOfRelationsInVector "D18+D19: a compound element in a vector"
+    Real x(start = 0, fixed = true);
+    Real y(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    der(y) = 2;
+    when {x > 0.3 and y > 0.5, x > 0.8} then
+      n = pre(n) + 1;
+    end when;
+  end AndOfRelationsInVector;
+  model ElsewhenCompoundOnly "D19: the only compound condition is an elsewhen arm"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+    discrete Real tf(start = -1, fixed = true);
+  equation
+    der(x) = 1;
+    when initial() then
+      n = 0;
+      tf = -1;
+    elsewhen x < 0.2 or x > 0.6 then
+      n = pre(n) + 1;
+      tf = time;
+    end when;
+  end ElsewhenCompoundOnly;
+  model SampleNegativeRounding "D23: sample(-0.9, 0.3) ticks at 0, 0.3, 0.6, 0.9"
+    Integer n(start = 0, fixed = true);
+    discrete Real tf(start = -1, fixed = true);
+  equation
+    when sample(-0.9, 0.3) then
+      n = pre(n) + 1;
+      tf = time;
+    end when;
+  end SampleNegativeRounding;
+  model StartTimeSample "sample(0, 0.25) simulated from 0.1: ticks at 0.25, 0.5, 0.75"
+    Integer n(start = 0, fixed = true);
+    discrete Real tf(start = -1, fixed = true);
+  equation
+    when sample(0, 0.25) then
+      n = pre(n) + 1;
+      tf = time;
+    end when;
+  end StartTimeSample;
+  model AlgVectorOfRelations "D18 in an algorithm: when {x > 0.3, x > 0.6}"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+  algorithm
+    when {x > 0.3, x > 0.6} then
+      n := pre(n) + 1;
+    end when;
+  end AlgVectorOfRelations;
+  model AlgVectorNot "D18 in an algorithm: when {u, not u}"
+    Real x(start = 0, fixed = true);
+    Boolean u = x > 0.3 and x < 0.6;
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+  algorithm
+    when {u, not u} then
+      n := pre(n) + 1;
+    end when;
+  end AlgVectorNot;
+  model PreIncrement "when initial() then n = pre(n) + 1: n(0) = 1"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when initial() then
+      n = pre(n) + 1;
+    end when;
+  end PreIncrement;
+  model PreIncrementOr "when {initial(), x > 0.5} then n = pre(n) + 1: 1, then 2 at 0.5"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when {initial(), x > 0.5} then
+      n = pre(n) + 1;
+    end when;
+  end PreIncrementOr;
+  model SampleAtStopTime "sample(0, 0.25) over [0, 1]: ticks 0, 0.25, 0.5, 0.75, 1 (OpenModelica: n = 5 at the end)"
+    Integer n(start = 0, fixed = true);
+  equation
+    when sample(0, 0.25) then
+      n = pre(n) + 1;
+    end when;
+  end SampleAtStopTime;
 end EventSemantics;

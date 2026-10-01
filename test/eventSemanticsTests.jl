@@ -447,4 +447,61 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
       @test s(0.55; idxs = :q) ≈ 1.5
     end
   end
+  @testset "a vector of triggers" begin
+    #= The array condition was never folded: a MethodError, or always true (the body
+       after every step: n = 200). Each element's rising edge fires it; OpenModelica:
+       n(1) = 2 and 20. =#
+    @test [_eventSim("VectorOfRelations"; stopTime = 1.0)(t; idxs = :n) for t in (0.5, 0.9)] ≈ [1, 2]
+    @test [_eventSim("VectorOfBooleans"; stopTime = 1.0)(t; idxs = :n) for t in (0.5, 0.9)] ≈ [10, 20]
+  end
+  @testset "compound and initial when-conditions, sample phases" begin
+    #= A combination of relations had one crossing, e1 - e2: never (0.3), at
+       0.2062 (0.6), at 0.4397 and 1.5 (0.4, 1.3). Each relation is a Boolean now. =#
+    @test _eventSim("AndOfRelations"; stopTime = 1.0)(1.0; idxs = :tf) ≈ 0.3 atol = 1e-6
+    local orOutside = _eventSim("OrOutside"; stopTime = 1.0)
+    @test [orOutside(1.0; idxs = :n), orOutside(1.0; idxs = :tf)] ≈ [1, 0.6] atol = 1e-6
+    local window = _eventSim("Window"; stopTime = 2.0)
+    @test [window(1.0; idxs = :tf), window(2.0; idxs = :n), window(2.0; idxs = :tf)] ≈ [0.4, 2, 1.3] atol = 1e-6
+    #= The frontend reversed when/elsewhen chains: the initial arm was lost
+       (OpenModelica: n(0) = 5, n(1) = 15). =#
+    local initialElsewhen = _eventSim("InitialElsewhen"; stopTime = 1.0)
+    @test [initialElsewhen(0.0; idxs = :n), initialElsewhen(1.0; idxs = :n)] ≈ [5, 15]
+    #= A negative start ticked from 0 (0.25, 0.5, 0.75). =#
+    local negativeStart = _eventSim("SampleNegativeStart"; stopTime = 1.0)
+    @test [negativeStart(t; idxs = :n) for t in (0.2, 0.9)] ≈ [1, 4]
+    @test negativeStart(0.2; idxs = :tf) ≈ 0.1 atol = 1e-9
+    #= sample() read false under or, terminal() undefined: refused. =#
+    @test_throws OMBackend.UnsupportedLowering _eventSim("SampleOr"; stopTime = 1.0)
+    @test_throws OMBackend.UnsupportedLowering _eventSim("TerminalOr"; stopTime = 1.0)
+  end
+  @testset "vectors of triggers, initial() bodies, sample starts (B3 review)" begin
+    local at(sol, v) = [sol(t; idxs = v) for t in (0.1, 0.45, 0.7, 0.95)]
+    #= A vector on relations went to the discrete clusters, which wrote a Real
+       target as 0/1 (tf = 0, 1; xs = 1). OpenModelica: tf = 0.3, 0.6; xs = 0.6, 1.2. =#
+    local relReal = _eventSim("VectorRelReal"; stopTime = 1.0)
+    @test at(relReal, :tf) ≈ [-1, 0.3, 0.6, 0.6] atol = 1e-6
+    @test at(relReal, :xs) ≈ [-1, 0.6, 1.2, 1.2] atol = 1e-6
+    #= edge(not u), a mixed vector and a compound element never fired. =#
+    @test at(_eventSim("VectorNot"; stopTime = 1.0), :n) ≈ [0, 1, 2, 2]
+    @test at(_eventSim("VectorNotInitial"; stopTime = 1.0), :n) ≈ [1, 2, 3, 3]
+    @test at(_eventSim("VectorMixed"; stopTime = 1.0), :n) ≈ [0, 1, 1, 2]
+    @test at(_eventSim("AndOfRelationsInVector"; stopTime = 1.0), :n) ≈ [0, 1, 1, 2]
+    #= The only compound condition in an elsewhen arm was left alone. =#
+    @test at(_eventSim("ElsewhenCompoundOnly"; stopTime = 1.0), :tf) ≈ [-1, -1, 0.6, 0.6] atol = 1e-6
+    #= Vectors in algorithm sections were OR-folded (one edge of the OR). =#
+    @test at(_eventSim("AlgVectorOfRelations"; stopTime = 1.0), :n) ≈ [0, 1, 2, 2]
+    @test at(_eventSim("AlgVectorNot"; stopTime = 1.0), :n) ≈ [0, 1, 2, 2]
+    #= A when initial() body ran twice, pre(n) read after the first (n(0) = 2). =#
+    @test _eventSim("PreIncrement"; stopTime = 1.0)(0.5; idxs = :n) == 1
+    @test [_eventSim("PreIncrementOr"; stopTime = 1.0)(t; idxs = :n) for t in (0.4, 0.9)] ≈ [1, 2]
+    #= sample(-0.9, 0.3): the first tick rounded to -1.1e-16, a negative phase
+       (an ArgumentError). MLS: 0, 0.3, 0.6, 0.9 (OpenModelica fires none). =#
+    @test _eventSim("SampleNegativeRounding"; stopTime = 1.0)(0.95; idxs = :n) ≈ 4
+    #= Ticks count from the start time (sample(0, 0.25) from 0.1 ticked at 0.1,
+       0.35): refused. =#
+    @test_throws OMBackend.UnsupportedLowering OM.simulate("EventSemantics.StartTimeSample", EVENT_FILE;
+                                                           startTime = 0.1, stopTime = 1.0)
+    #= The tick at the stop time (PeriodicCallback skips the final time). =#
+    @test last(_eventSim("SampleAtStopTime"; stopTime = 1.0)[:n]) == 5
+  end
 end

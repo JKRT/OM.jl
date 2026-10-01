@@ -83,4 +83,35 @@ end
     err = _simulateOrError("CallFailsLater")
     @test err isa ErrorException && occursin("flag is false in CallFailsLater", err.msg)
   end
+  @testset "asserts that were not checked" begin
+    #= In a branch of an if-equation (left out with a warning; OpenModelica
+       stops at 0.6, 0.8). An if-equation of asserts only also ended the
+       lowering of every if-equation after it (y stayed undetermined). =#
+    local err = _simulateOrError("InIfBranch")
+    @test err isa ModelicaAssertionError && isapprox(err.time, 0.6; atol = 1e-6)
+    err = _simulateOrError("AssertOnlyIf")
+    @test err isa ModelicaAssertionError && isapprox(err.time, 0.8; atol = 1e-6)
+    @test [_simulateOrError("AssertOnlyIf"; stopTime = 0.7)(t; idxs = :y) for t in (0.1, 0.5)] == [1, 2]
+    #= Under the elseif's guard (x < 0.2 false), and a nested if's. =#
+    err = _simulateOrError("InElseifBranch")
+    @test err isa ModelicaAssertionError && isapprox(err.time, 0.4; atol = 1e-6)
+    err = _simulateOrError("InNestedIf")
+    @test err isa ModelicaAssertionError && isapprox(err.time, 0.7; atol = 1e-6)
+    #= The relations are crossings, evaluated where the condition reaches them:
+       sqrt(x) under x > 0 threw a DomainError (OpenModelica: no violation). A
+       relation an event flips at a step end is no violation within the step. =#
+    @test _simulateOrError("HoistedSqrtAssert"; stopTime = 3.0).retcode == ReturnCode.Success
+    @test _simulateOrError("AssertAfterReinit").retcode == ReturnCode.Success
+    @test _simulateOrError("AssertAfterDiscrete").retcode == ReturnCode.Success
+    #= A record argument in the condition: the record was read whole, a name the
+       simulation does not keep, and the assert was not checked. =#
+    err = _simulateOrError("RecordArgument")
+    @test err isa ModelicaAssertionError && isapprox(err.time, 0.7; atol = 1e-6)
+    #= Folded with the call on constants: its result was used, the assert dropped. =#
+    err = _simulateOrError("ConstantCall")
+    @test err isa ErrorException && occursin("u must be positive", err.msg)
+    #= In a when initial() equation: it only warned. =#
+    err = _simulateOrError("InInitialWhen")
+    @test err isa ModelicaAssertionError && err.time == 0.0
+  end
 end

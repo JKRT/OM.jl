@@ -59,4 +59,12 @@
     @test isapprox(sol(0.5; idxs = lookup["w"]),   sol(0.5; idxs = lookup["w_rel"]);   atol = 1e-6)
   end
 
+  @testset "FoldedSum: variables folded before the output-only elimination" begin
+    #= The output-only elimination replaced the eliminated pairs the explicit fold
+       had recorded: total and v[1] (= x) had no observed equation. =#
+    local sol = OM.simulate("AliasObservePreservationMWE.FoldedSum", "Models/AliasObservePreservationMWE.mo"; stopTime = 1.0)
+    @test [sol(t; idxs = :total) for t in (0.0, 1.0)] ≈ [6.0, 6 * exp(-1.0)] atol = 1e-5
+    @test sol(1.0; idxs = Symbol("v[1]")) ≈ exp(-1.0) atol = 1e-5
+  end
+
 end

@@ -137,4 +137,144 @@ package AssertTests "assert in equation sections, algorithms and functions"
     der(v) = 1;
     check("CallFailsLater", {v, 1 - v}, v < 0.5);
   end CallFailsLater;
+
+  model InIfBranch "an assert in a branch of a time-varying if-equation"
+    Real x(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    if x > 0.3 then
+      y = 1;
+      assert(x < 0.6, "x reached 0.6 in the branch");
+    else
+      y = 0;
+    end if;
+  end InIfBranch;
+
+  model AssertOnlyIf "an if-equation of asserts only, then another if-equation"
+    Real x(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    if x > 0.5 then
+      assert(x < 0.8, "x reached 0.8");
+    end if;
+    if x > 0.2 then
+      y = 2;
+    else
+      y = 1;
+    end if;
+  end AssertOnlyIf;
+
+  record Line
+    Real a;
+    Real b;
+  end Line;
+
+  function lineAt
+    input Line l;
+    input Real x;
+    output Real y;
+  algorithm
+    y := l.a * x + l.b;
+  end lineAt;
+
+  model RecordArgument "a record argument in an assert's condition"
+    parameter Line l(a = 1, b = -0.7);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    assert(lineAt(l, x) < 0, "lineAt(l, x) became positive");
+  end RecordArgument;
+
+  function positiveTwice "an assert, then a value"
+    input Real u;
+    output Real y;
+  algorithm
+    assert(u > 0, "u must be positive");
+    y := 2 * u;
+  end positiveTwice;
+
+  model ConstantCall "a call on constants whose assert fails"
+    Real x(start = 0, fixed = true);
+    Real z = positiveTwice(-1.0) + x;
+  equation
+    der(x) = 1;
+  end ConstantCall;
+
+  model InInitialWhen "an error-level assert in a when initial() equation"
+    parameter Real p = -1;
+    Real x(start = 0, fixed = true);
+    discrete Real y(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when initial() then
+      y = 2 * p;
+      assert(y > 0, "y must be positive at the start");
+    end when;
+  end InInitialWhen;
+  model InElseifBranch "asserts in an elseif and an else branch (OpenModelica: stops at 0.4)"
+    Real x(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    if x < 0.2 then
+      y = 0;
+    elseif x < 0.5 then
+      y = 1;
+      assert(x < 0.4, "elseif branch: x reached 0.4");
+    else
+      y = 2;
+      assert(false, "else branch reached");
+    end if;
+  end InElseifBranch;
+  model InNestedIf "an assert in a nested if-equation (OpenModelica: stops at 0.7)"
+    Real x(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 1;
+    if x > 0.2 then
+      if x > 0.5 then
+        y = 2;
+        assert(x < 0.7, "nested: x reached 0.7");
+      else
+        y = 1;
+      end if;
+    else
+      y = 0;
+    end if;
+  end InNestedIf;
+  model HoistedSqrtAssert "assert crossings: a guarded relation operand outside its domain"
+    Real x(start = 1, fixed = true);
+    Real y;
+  equation
+    der(x) = -1;
+    if x > 0 then
+      assert(sqrt(x) < 2, "x too large");
+      y = x;
+    else
+      y = 0;
+    end if;
+  end HoistedSqrtAssert;
+  model AssertAfterReinit "a relation flipped by an event at the step end, not within the step"
+    Real x(start = 0, fixed = true);
+    Real y(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    der(y) = 0;
+    when x > 0.5 then
+      reinit(y, 10);
+    end when;
+    assert(y < 5 or x > 0.45, "y raised before x reached 0.45");
+  end AssertAfterReinit;
+  model AssertAfterDiscrete "the same with a discrete Integer set at the event"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 0.5 then
+      n = 1;
+    end when;
+    assert(n < 0.5 or x > 0.45, "n set before x reached 0.45");
+  end AssertAfterDiscrete;
 end AssertTests;

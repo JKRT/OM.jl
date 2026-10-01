@@ -545,6 +545,55 @@ const IEQ_MSL_MODELS = [
       @test sol(0.0; idxs = :G) ≈ 0.3 / 1.4e-5 rtol = 1e-4
       @test sol(1.0; idxs = :G) ≈ 0.3 / (7e-6 * (1 + exp(-1))) rtol = 1e-6
     end
+    @testset "IEQ25-36: fixed=false parameters and initial equations that were lost" begin
+      local file = "./Models/InitialEquationTests.mo"
+      #= A tuple initial equation failed in the frontend (simplifyTupleElement typed
+         for statements only). OpenModelica: a = 3, b = 4.5, x(1) = 48. =#
+      local s25 = OM.simulate("InitialEquationTests.IEQ25_TupleParameters", file; stopTime = 1.0)
+      @test s25(1.0; idxs = :x) ≈ 48.0 rtol = 1e-6
+      #= t0 = time could not be evaluated at the build and t0 kept its start (0.6)
+         for any start time: computed for 0, another start time is refused. =#
+      local s26 = OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file; stopTime = 1.0)
+      @test s26(0.9; idxs = :n) == 3   # samples at 0.25, 0.5, 0.75
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file;
+                                                             startTime = 0.1, stopTime = 1.0)
+      #= Parameter targets of the initial algorithm were never set (k stayed 0).
+         OpenModelica: k = 20, x(1) = 20. =#
+      local s27 = OM.simulate("InitialEquationTests.IEQ27_ParameterFromInitialAlgorithm", file; stopTime = 1.0)
+      @test s27(1.0; idxs = :x) ≈ 20.0 rtol = 1e-6
+      #= The explicit fold removed v and its fixed start (x(0) = 0, v(0) = 1).
+         OpenModelica: x(0) = 2, v(0) = 3. =#
+      local s28 = OM.simulate("InitialEquationTests.IEQ28_FixedAlgebraic", file; stopTime = 1.0)
+      @test [s28(0.0; idxs = :x), s28(0.0; idxs = :v)] ≈ [2.0, 3.0] rtol = 1e-6
+      #= A pure ODE skipped the init solve: both initial equations were ignored
+         (x(0) = y(0) = 0). x(0) = 1, y(0) = 2, y(1) = 1 + exp(-1). =#
+      local s29 = OM.simulate("InitialEquationTests.IEQ29_SteadyPureODE", file; stopTime = 1.0)
+      @test [s29(0.0; idxs = :x), s29(0.0; idxs = :y), s29(1.0; idxs = :y)] ≈ [1.0, 2.0, 1 + exp(-1)] rtol = 1e-5
+      #= The pure ODE took 2*x = 4 as a start value of nothing (x(0) = 0). =#
+      local s30 = OM.simulate("InitialEquationTests.IEQ30_ScaledInit", file; stopTime = 1.0)
+      @test [s30(0.0; idxs = :x), s30(1.0; idxs = :x)] ≈ [2.0, 2 * exp(-1)] rtol = 1e-5
+      #= An initial algorithm reading der() was skipped, its targets at their
+         starts (OpenModelica: b = 1), and dropped every other one (a = 0): refused. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ31_DerInOneSection", file; stopTime = 1.0)
+      #= The initial algorithm ran for time 0 at any start time: from 0.1 the
+         count is the same (OpenModelica: x(1) = 0.9); a value that differs is
+         refused (OpenModelica: t1 = 0.1). =#
+      local s32 = OM.simulate("InitialEquationTests.IEQ32_InitialAlgorithmReadsTime", file; startTime = 0.1, stopTime = 1.0)
+      @test s32(1.0; idxs = :x) ≈ 0.9 rtol = 1e-6
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ33_TimeOfStart", file;
+                                                             startTime = 0.1, stopTime = 1.0)
+      #= Neither parameter can be solved alone at the build: the initialization
+         solves both (OpenModelica: p = 2, x(1) = 2). =#
+      local s34 = OM.simulate("InitialEquationTests.IEQ34_CoupledParameters", file; stopTime = 1.0)
+      @test s34(1.0; idxs = :x) ≈ 2.0 rtol = 1e-6
+      #= A record argument of an initial equation was passed whole: its fields'
+         names were undefined (MSL Engine1b_analytic). OpenModelica: p = 31. =#
+      local s35 = OM.simulate("InitialEquationTests.IEQ35_RecordArgInInitialEquation", file; stopTime = 1.0)
+      @test s35(1.0; idxs = :x) ≈ 31.0 rtol = 1e-6
+      #= The early initial-algorithm pass read a start that is not a literal
+         (x(start = x0)) as 0.0: a = 1. =#
+      @test OM.simulate("InitialEquationTests.IEQ36_ParameterStartInInitialAlgorithm", file; stopTime = 1.0)(0.5; idxs = :a) ≈ 4.0
+    end
 
   end
 
