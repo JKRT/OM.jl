@@ -511,5 +511,29 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     #= The other when paths read pre(c) as b's new value too (k = 20). =#
     @test _eventSim("PreOfAliasInElsewhen"; stopTime = 1.0)(0.7; idxs = :k) == 10
     @test _eventSim("PreOfAliasInChangeWhen"; stopTime = 1.0)(0.7; idxs = :k) == 10
+    #= pre() at an instant is the value before it for every when at that instant;
+       each callback's own snapshot gave m = 10, k = 0.2, last = 1, 3. =#
+    @test _eventSim("PreAcrossWhens"; stopTime = 1.0)(0.7; idxs = :m) == 0
+    @test _eventSim("PreAcrossTimeWhen"; stopTime = 1.0)(0.7; idxs = :k) == 10
+    local acrossEdge = _eventSim("PreAcrossEdge"; stopTime = 0.8)
+    @test [acrossEdge(t; idxs = :last) for t in (0.2, 0.6)] == [0, 2]
+    #= n's round-off within a step (3.0000000000000004) flipped `mod(n, 2) == 1` and
+       back: edge(odd) fired at every step after 0.5 (rises = 7 at 1). =#
+    local parity = _eventSim("IntegerParityEdge"; stopTime = 1.0)
+    @test [last(parity[:rises]), last(parity[:last])] == [3, 4]
+    #= initial() or c: the crossing function was `0 - (c)`, 0 then -1, and never
+       fired; the algorithm form fired at the initialization too. =#
+    for m in ("InitialOrRelation", "InitialOrRelationAlgorithm")
+      local s = _eventSim(m; stopTime = 1.0)
+      @test [s(0.3; idxs = :n), s(0.7; idxs = :n)] == [0, 1]
+    end
+    #= An Integer alias's start and fixed were dropped (k = 0 until 0.3). =#
+    local aliasStart = _eventSim("IntegerAliasStart"; stopTime = 1.0)
+    @test [aliasStart(0.2; idxs = :k), aliasStart(0.5; idxs = :k), aliasStart(0.5; idxs = :p)] == [3, 7, 1]
+    #= A reinit() takes effect after the first iteration of the instant: a when on a
+       relation of the state fires in the next, a when on a discrete in the first. =#
+    @test _eventSim("ReinitThenRelation"; stopTime = 1.0)(0.7; idxs = :y) == 0
+    @test _eventSim("ReinitAndCounter"; stopTime = 1.0)(0.7; idxs = :y) ≈ 1.5
+    @test _eventSim("BounceThenRise"; stopTime = 1.0)(0.8; idxs = :up) ≈ 3.5436 atol = 1e-3
   end
 end

@@ -1263,4 +1263,122 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       k = if pre(c) then 10 else 20;
     end when;
   end PreOfAliasInChangeWhen;
+  model PreAcrossWhens "a when another when's change triggers at the same instant reads pre() before the instant (OpenModelica: m = 0)"
+    discrete Integer n(start = 0, fixed = true);
+    discrete Integer m(start = -1, fixed = true);
+  equation
+    when sample(0.5, 1) then
+      n = pre(n) + 1;
+    end when;
+    when n > 0 then
+      m = pre(n) * 10;
+    end when;
+  end PreAcrossWhens;
+  model PreAcrossTimeWhen "a when on time >= T, T set by a sample() body at the same instant (OpenModelica: k = 10)"
+    discrete Real T(start = 10, fixed = true);
+    discrete Real k(start = -1, fixed = true);
+  equation
+    when sample(0.5, 1) then
+      T = 0.2;
+    end when;
+    when time >= T then
+      k = pre(T);
+    end when;
+  end PreAcrossTimeWhen;
+  model PreAcrossEdge "edge() of a Boolean a sample() body toggles reads pre(n) before the tick (OpenModelica: last = 0, then 2)"
+    discrete Integer n(start = 0, fixed = true);
+    discrete Boolean odd(start = false, fixed = true);
+    discrete Integer rises(start = 0, fixed = true);
+    discrete Integer last(start = -1, fixed = true);
+  equation
+    when sample(0.1, 0.2) then
+      n = pre(n) + 1;
+      odd = not pre(odd);
+    end when;
+    when edge(odd) then
+      rises = pre(rises) + 1;
+      last = pre(n);
+    end when;
+  end PreAcrossEdge;
+  model IntegerParityEdge "edge() of mod(n, 2) == 1, n a counter (OpenModelica: rises = 3, last = 4 at 1)"
+    discrete Integer n(start = 0, fixed = true);
+    Boolean odd = mod(n, 2) == 1;
+    discrete Integer rises(start = 0, fixed = true);
+    discrete Integer last(start = -1, fixed = true);
+  equation
+    when sample(0.1, 0.2) then
+      n = pre(n) + 1;
+    end when;
+    when edge(odd) then
+      rises = pre(rises) + 1;
+      last = pre(n);
+    end when;
+  end IntegerParityEdge;
+  model InitialOrRelation "when initial() or x > 0.6: not active at the initialization (MLS 8.6), fires at the crossing (OpenModelica: n = 0, then 1)"
+    Real x(start = 0, fixed = true);
+    discrete Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when initial() or x > 0.6 then
+      n = pre(n) + 1;
+    end when;
+  end InitialOrRelation;
+  model InitialOrRelationAlgorithm "the algorithm form (OpenModelica: n = 0, then 1)"
+    Real x(start = 0, fixed = true);
+    discrete Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+  algorithm
+    when initial() or x > 0.6 then
+      n := pre(n) + 1;
+    end when;
+  end InitialOrRelationAlgorithm;
+  model IntegerAliasStart "k(start = 3) and its alias k2 = k: the start survives the alias (OpenModelica: k = 3 until 0.3)"
+    discrete Integer k(start = 3, fixed = true);
+    Integer k2 = k;
+    discrete Integer p(start = 0, fixed = true);
+  equation
+    when time > 0.3 then k = 7; end when;
+    when change(k2) then p = pre(p) + 1; end when;
+  end IntegerAliasStart;
+  model ReinitThenRelation "reinit() in a sample() body flips a when on x: it fires after the reinit, pre(x) = 0 (OpenModelica: y = 0)"
+    Real x(start = 1, fixed = true);
+    discrete Real y(start = -1, fixed = true);
+  equation
+    der(x) = 1;
+    when sample(0.5, 1) then
+      reinit(x, 0);
+    end when;
+    when x < 0.1 then
+      y = pre(x);
+    end when;
+  end ReinitThenRelation;
+  model ReinitAndCounter "reinit() and a counter in one body: a when on the counter reads pre(x) before the instant (OpenModelica: y = 1.5)"
+    Real x(start = 1, fixed = true);
+    discrete Integer n(start = 0, fixed = true);
+    discrete Real y(start = -1, fixed = true);
+  equation
+    der(x) = 1;
+    when sample(0.5, 1) then
+      reinit(x, 0);
+      n = pre(n) + 1;
+    end when;
+    when n > 0 then
+      y = pre(x);
+    end when;
+  end ReinitAndCounter;
+  model BounceThenRise "a bouncing ball: when v > 0 after the bounce reads pre(v) after the reinit (OpenModelica: up = 3.5436)"
+    Real h(start = 1, fixed = true);
+    Real v(start = 0, fixed = true);
+    discrete Real up(start = 0, fixed = true);
+  equation
+    der(h) = v;
+    der(v) = -9.81;
+    when h < 0 and v < 0 then
+      reinit(v, -0.8 * pre(v));
+    end when;
+    when v > 0 then
+      up = pre(v);
+    end when;
+  end BounceThenRise;
 end EventSemantics;
