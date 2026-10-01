@@ -596,6 +596,11 @@ const IEQ_MSL_MODELS = [
       #= A tuple equation in when initial() was evaluated and dropped (a = b = 0). =#
       local s37 = OM.simulate("InitialEquationTests.IEQ37_TupleInInitialWhen", file; stopTime = 1.0)
       @test [s37(0.5; idxs = :a), s37(0.5; idxs = :b)] ≈ [4.0, 6.0]
+      #= Without unknowns, the initial equations were not applied (k = 1); a
+         free parameter, an unknown of an init solve it does not run, is refused. =#
+      @test OM.simulate("InitialEquationTests.IEQ38_AssignedParameterWithoutStates", file; stopTime = 1.0)(0.5; idxs = :y) ≈ 1.0
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ39_FreeParameterWithoutStates", file;
+                                                             stopTime = 1.0)
     end
 
   end

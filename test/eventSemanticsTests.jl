@@ -503,5 +503,13 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
                                                            startTime = 0.1, stopTime = 1.0)
     #= The tick at the stop time (PeriodicCallback skips the final time). =#
     @test last(_eventSim("SampleAtStopTime"; stopTime = 1.0)[:n]) == 5
+    #= pre() in a periodic body read the value an earlier statement set (k = 20). =#
+    @test _eventSim("PreOfAliasInSample"; stopTime = 1.0)(0.7; idxs = :k) == 10
+    #= A system without unknowns lost its events (y = 2 throughout). =#
+    local emptyIf = _eventSim("EmptyIf"; stopTime = 1.0)
+    @test [emptyIf(t; idxs = :y) for t in (0.2, 0.7)] ≈ [2.0, 1.0]
+    #= The other when paths read pre(c) as b's new value too (k = 20). =#
+    @test _eventSim("PreOfAliasInElsewhen"; stopTime = 1.0)(0.7; idxs = :k) == 10
+    @test _eventSim("PreOfAliasInChangeWhen"; stopTime = 1.0)(0.7; idxs = :k) == 10
   end
 end

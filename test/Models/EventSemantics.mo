@@ -1215,4 +1215,52 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       n = pre(n) + 1;
     end when;
   end SampleAtStopTime;
+  model PreOfAliasInSample "b = not pre(c); k = if pre(c) ...: pre(c) is c before the tick, not after b's update (OpenModelica: k = 10)"
+    discrete Boolean b(start = true, fixed = true);
+    Boolean c;
+    Integer k(start = 0, fixed = true);
+  equation
+    c = b;
+    when sample(0.5, 1) then
+      b = not pre(c);
+      k = if pre(c) then 10 else 20;
+    end when;
+  end PreOfAliasInSample;
+  model EmptyIf "no unknowns after simplification, an if-equation on time (OpenModelica: y = 2, then 1)"
+    Real y;
+  equation
+    if time > 0.5 then
+      y = 1;
+    else
+      y = 2;
+    end if;
+  end EmptyIf;
+  model PreOfAliasInElsewhen "the continuous when/elsewhen path: pre(c) is c before the event (OpenModelica: k = 10)"
+    Real x(start = 0, fixed = true);
+    discrete Boolean b(start = true, fixed = true);
+    Boolean c;
+    Integer k(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    c = b;
+    when x > 0.5 then
+      b = not pre(c);
+      k = if pre(c) then 10 else 20;
+    elsewhen x < -1 then
+      b = pre(c);
+      k = 0;
+    end when;
+  end PreOfAliasInElsewhen;
+  model PreOfAliasInChangeWhen "when change(on), on = time >= 0.5 (a discrete when): pre(c) is c before the event (OpenModelica: k = 10)"
+    discrete Boolean b(start = true, fixed = true);
+    Boolean c;
+    Boolean on = time >= 0.5;
+    Integer k(start = 0, fixed = true);
+  equation
+    c = b;
+    when change(on) then
+      b = not pre(c);
+      k = if pre(c) then 10 else 20;
+    end when;
+  end PreOfAliasInChangeWhen;
 end EventSemantics;

@@ -114,4 +114,27 @@ end
     err = _simulateOrError("InInitialWhen")
     @test err isa ModelicaAssertionError && err.time == 0.0
   end
+  @testset "String in messages, as OpenModelica formats it" begin
+    #= Julia's string(x) of every argument before: a Boolean read from the
+       integrator was 1.0, an enumeration its index, and the significant
+       digits, minimum length and format were dropped. =#
+    local (warnings, _) = _warningsOf("StringForms")
+    @test any(endswith(": r=0.8 r6=     0.8 n=4 p=[   4] b=true e=two f=   0.800"), warnings)
+    (warnings, _) = _warningsOf("StringInWhen")
+    @test any(endswith(": flag=true n=2  |"), warnings)
+    (warnings, _) = _warningsOf("StringInFunction")
+    #= The function runs in each right-hand side: its warning comes with each value (%.2g). =#
+    @test any(w -> occursin(r"^mode high at (0\.\d{1,2}|1)$", w), warnings)
+    #= A String parameter in the message was read as a variable of the
+       simulation: the assert was left out with a warning. =#
+    (warnings, _) = _warningsOf("StringParameterInMessage")
+    @test any(endswith(": m: hello"), warnings)
+    #= The literal names of an enumeration were lost on the way through
+       SimulationCode: refused. =#
+    (warnings, _) = _warningsOf("StringEnumerationInWhen")
+    @test any(endswith(": e=  three|"), warnings)
+    #= A String variable that changes during the simulation (here through an
+       eliminated variable) is not supported: refused, not an UndefVarError. =#
+    @test _simulateOrError("StringOfEliminated") isa OMBackend.UnsupportedLowering
+  end
 end

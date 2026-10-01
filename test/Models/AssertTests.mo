@@ -277,4 +277,82 @@ package AssertTests "assert in equation sections, algorithms and functions"
     end when;
     assert(n < 0.5 or x > 0.45, "n set before x reached 0.45");
   end AssertAfterDiscrete;
+
+  model StringForms "String of a Real, an Integer, a Boolean and an enumeration (OpenModelica's message below)"
+    type E = enumeration(one, two);
+    parameter E e = E.two;
+    Real x(start = 0, fixed = true);
+    Integer n(start = 3, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 0.5 then
+      n = pre(n) + 1;
+    end when;
+    assert(x < 0.8, "r=" + String(x) + " r6=" + String(x, significantDigits = 3, minimumLength = 8, leftJustified = false) + " n=" + String(n) + " p=[" + String(n, minimumLength = 4, leftJustified = false) + "] b=" + String(n > 3) + " e=" + String(e) + " f=" + String(x, format = "8.3f"), AssertionLevel.warning);
+  end StringForms;
+
+  model StringInWhen "String of a Boolean and an Integer in a when body's assert"
+    Real x(start = 0, fixed = true);
+    discrete Boolean flag(start = false, fixed = true);
+    Integer n(start = 1, fixed = true);
+  algorithm
+    when x > 0.5 then
+      flag := not pre(flag);
+      n := pre(n) + 1;
+      assert(n < 2, "flag=" + String(flag) + " n=" + String(n, minimumLength = 3) + "|", AssertionLevel.warning);
+    end when;
+  equation
+    der(x) = 1;
+  end StringInWhen;
+
+  type Mode = enumeration(off, low, high);
+  function describe "String of an enumeration argument in a function"
+    input Mode m;
+    input Real v;
+    output Real y;
+  algorithm
+    assert(v < 0.5, "mode " + String(m) + " at " + String(v, significantDigits = 2), AssertionLevel.warning);
+    y := v;
+  end describe;
+
+  model StringInFunction "String of an enumeration in a function"
+    parameter Mode m = Mode.high;
+    Real x(start = 0, fixed = true);
+    Real z(start = 0, fixed = true) "the function feeds a state: it runs in every right-hand side";
+  equation
+    der(x) = 1;
+    der(z) = describe(m, x);
+  end StringInFunction;
+
+  model StringParameterInMessage "an assert whose message reads a String parameter (OpenModelica warns at 0.5: m: hello)"
+    parameter String ps = "hello";
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    assert(x < 0.5, "m: " + ps, AssertionLevel.warning);
+  end StringParameterInMessage;
+
+  model StringEnumerationInWhen "String of an enumeration parameter in a when body's assert (OpenModelica: e=  three|)"
+    type E = enumeration(one, two, three);
+    parameter E e = E.three;
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+  algorithm
+    when x > 0.5 then
+      n := pre(n) + 1;
+      assert(n < 1, "e=" + String(e, minimumLength = 7, leftJustified = false) + "|", AssertionLevel.warning);
+    end when;
+  equation
+    der(x) = 1;
+  end StringEnumerationInWhen;
+
+  model StringOfEliminated "a String variable bound to String(y), y eliminated (OpenModelica: y=1 at 0.5)"
+    Real x(start = 0, fixed = true);
+    Real y;
+    String s = "y=" + String(y);
+  equation
+    der(x) = 1;
+    y = 2 * x;
+    assert(x < 0.5, s, AssertionLevel.warning);
+  end StringOfEliminated;
 end AssertTests;

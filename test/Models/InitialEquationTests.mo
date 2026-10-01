@@ -594,4 +594,20 @@ package InitialEquationTests
       (a, b) = twoOut37(x);
     end when;
   end IEQ37_TupleInInitialWhen;
+
+  model IEQ38_AssignedParameterWithoutStates "no unknowns, a parameter an initial equation defines (OpenModelica: k = 2)"
+    parameter Real k(fixed = false, start = 1);
+    Real y;
+  initial equation
+    k = 2;
+  equation
+    y = k * time;
+  end IEQ38_AssignedParameterWithoutStates;
+
+  model IEQ39_FreeParameterWithoutStates "no unknowns, a free parameter and a fixed start (OpenModelica keeps k = 1, its start, and y = 1)"
+    parameter Real k(fixed = false, start = 1);
+    Real y(start = 3, fixed = true);
+  equation
+    y = k;
+  end IEQ39_FreeParameterWithoutStates;
 end InitialEquationTests;
