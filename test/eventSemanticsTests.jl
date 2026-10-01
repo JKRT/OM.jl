@@ -413,6 +413,16 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test s.retcode == ReturnCode.Terminated
     @test s.t[end] ≈ 0.5 atol = 1e-6
   end
+  @testset "an if-equation in a when-equation" begin
+    #= Dropped before (createWhenOperators skipped it): branch kept its start value. =#
+    local s = _eventSim("IfInWhen"; stopTime = 1.0)
+    @test [s(t; idxs = :branch) for t in (0.2, 0.5, 0.7)] == [1, 3, 2]
+    #= In the order written: twice = 2 * branch reads the new branch. =#
+    @test [s(t; idxs = :twice) for t in (0.2, 0.5, 0.7)] == [0, 6, 4]
+    @test s(0.9; idxs = :n) == 4
+    local r = _eventSim("ReinitInIfInWhen"; stopTime = 1.0)
+    @test [r(t; idxs = :v) for t in (0.2, 0.5, 0.7)] ≈ [1, 11, 21]
+  end
   @testset "the elsewhen after when initial() in an algorithm" begin
     #= k := 10 at the start, then k := pre(k) + 1 at 0.1, 0.35, 0.6, 0.85. The
        elsewhen arm was lost with the algorithm of whens only. =#

@@ -889,4 +889,35 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       terminate("x reached 0.5");
     end when;
   end TerminateInWhen;
+
+  model IfInWhen "an if-equation in a when-equation: one assignment of the branches' values per variable"
+    Integer n(start = 0, fixed = true);
+    Integer branch(start = 0, fixed = true);
+    Integer twice(start = 0, fixed = true);
+  equation
+    when sample(0.1, 0.25) then
+      n = pre(n) + 1;
+      if time > 0.5 then
+        branch = 2;
+        twice = 2 * branch;
+      elseif time > 0.3 then
+        branch = 3;
+        twice = 2 * branch;
+      else
+        branch = 1;
+        twice = 0;
+      end if;
+    end when;
+  end IfInWhen;
+
+  model ReinitInIfInWhen "a reinit under an if-equation in a when-equation"
+    Real v(start = 1, fixed = true);
+  equation
+    der(v) = 0;
+    when sample(0.1, 0.25) then
+      if time > 0.3 then
+        reinit(v, pre(v) + 10);
+      end if;
+    end when;
+  end ReinitInIfInWhen;
 end EventSemantics;
