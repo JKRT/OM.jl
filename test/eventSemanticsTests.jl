@@ -429,4 +429,22 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     local s = _eventSim("InitialThenSample"; stopTime = 1.0)
     @test [s(t; idxs = :k) for t in (0.05, 0.2, 0.5, 0.9)] == [10, 11, 12, 14]
   end
+  @testset "a self-scheduling time when with another trigger" begin
+    #= The time-relation lowering took the whole when and dropped `x > 0.6`;
+       the general path cannot evaluate it either: refused. =#
+    @test_throws OMBackend.UnsupportedLowering _eventSim("SelfSchedOr"; stopTime = 1.0)
+  end
+  @testset "an elsewhen of a when on change()" begin
+    local s = _eventSim("ChangeElsewhen"; stopTime = 1.0)
+    @test [s(t; idxs = :n) for t in (0.2, 0.5, 0.8)] == [0, 1, 11]
+  end
+  @testset "a record target of a tuple assignment in a when" begin
+    #= pairAndScalar returns the record's fields in place: r was bound as a local
+       (r.a = r.b = 0) and q took r.b (y = 100 at 0.55; OpenModelica 160.5). =#
+    for model in ("RecordTupleInWhen", "RecordTupleInWhenAlgorithm")
+      local s = _eventSim(model; stopTime = 1.0)
+      @test [s(t; idxs = :y) for t in (0.25, 0.55)] ≈ [64.2, 160.5]
+      @test s(0.55; idxs = :q) ≈ 1.5
+    end
+  end
 end

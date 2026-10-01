@@ -106,4 +106,35 @@ package AssertTests "assert in equation sections, algorithms and functions"
       assert(c < 5, "c reached 5");
     end when;
   end InWhenOnRelation;
+  function check "asserts on its arguments; no outputs (as MSL Fluid's checkBoundary)"
+    input String name;
+    input Real x[:];
+    input Boolean flag;
+  algorithm
+    assert(flag, "flag is false in " + name);
+    assert(abs(sum(x) - 1) < 1e-10, "x does not sum to 1 in " + name);
+  end check;
+
+  model CallHolds "a function called as an equation, for its asserts"
+    parameter Real X[2] = {0.3, 0.7};
+    Real v(start = 0, fixed = true);
+  equation
+    der(v) = 1;
+    check("CallHolds", X, true);
+  end CallHolds;
+
+  model CallFails "the call's assert fails at the start"
+    parameter Real X[2] = {0.3, 0.6};
+    Real v(start = 0, fixed = true);
+  equation
+    der(v) = 1;
+    check("CallFails", X, true);
+  end CallFails;
+
+  model CallFailsLater "the call's assert fails once v passes 0.5"
+    Real v(start = 0, fixed = true);
+  equation
+    der(v) = 1;
+    check("CallFailsLater", {v, 1 - v}, v < 0.5);
+  end CallFailsLater;
 end AssertTests;

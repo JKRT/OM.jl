@@ -74,4 +74,13 @@ end
     local s = _simulateOrError("InWhenOnRelation")
     @test s.retcode == ReturnCode.Success && s(1.0; idxs = :c) == 1
   end
+  @testset "a function called as an equation" begin
+    #= A call equation for its effects (MSL Fluid's checkBoundary) was dropped:
+       its asserts never ran. It runs where the asserts are checked. =#
+    @test _simulateOrError("CallHolds").retcode == ReturnCode.Success
+    local err = _simulateOrError("CallFails")
+    @test err isa ErrorException && occursin("x does not sum to 1 in CallFails", err.msg)
+    err = _simulateOrError("CallFailsLater")
+    @test err isa ErrorException && occursin("flag is false in CallFailsLater", err.msg)
+  end
 end

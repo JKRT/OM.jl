@@ -920,4 +920,65 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       end if;
     end when;
   end ReinitInIfInWhen;
+  model SelfSchedOr "a self-scheduling time when with another trigger: refused (the other trigger was lost)"
+    Real x(start = 0, fixed = true);
+    discrete Real tnext(start = 0.25, fixed = true);
+    Integer n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when time >= pre(tnext) or x > 0.6 then
+      tnext = pre(tnext) + 0.25;
+      n = pre(n) + 1;
+    end when;
+  end SelfSchedOr;
+
+  model ChangeElsewhen "a when on change() of a Boolean with an elsewhen"
+    Real x(start = 0, fixed = true);
+    Integer n(start = 0, fixed = true);
+    Boolean b = x > 0.3;
+  equation
+    der(x) = 1;
+    when change(b) then
+      n = pre(n) + 1;
+    elsewhen time > 0.7 then
+      n = pre(n) + 10;
+    end when;
+  end ChangeElsewhen;
+
+  record Pair
+    Real a;
+    Real b;
+  end Pair;
+
+  function pairAndScalar "a record output first"
+    input Real x;
+    output Pair r;
+    output Real q;
+  algorithm
+    r := Pair(x, 2 * x);
+    q := 3 * x;
+  end pairAndScalar;
+
+  model RecordTupleInWhen "a record target of a tuple equation in a when"
+    discrete Pair r(a(start = 0, fixed = true), b(start = 0, fixed = true));
+    discrete Real q(start = 0, fixed = true);
+    Real y;
+  equation
+    when sample(0, 0.1) then
+      (r, q) = pairAndScalar(time);
+    end when;
+    y = r.a + 10 * r.b + 100 * q;
+  end RecordTupleInWhen;
+
+  model RecordTupleInWhenAlgorithm "a record target of a tuple assignment in a when algorithm"
+    discrete Pair r(a(start = 0, fixed = true), b(start = 0, fixed = true));
+    discrete Real q(start = 0, fixed = true);
+    Real y;
+  algorithm
+    when sample(0, 0.1) then
+      (r, q) := pairAndScalar(time);
+    end when;
+  equation
+    y = r.a + 10 * r.b + 100 * q;
+  end RecordTupleInWhenAlgorithm;
 end EventSemantics;
