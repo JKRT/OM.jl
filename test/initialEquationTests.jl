@@ -545,7 +545,7 @@ const IEQ_MSL_MODELS = [
       @test sol(0.0; idxs = :G) ≈ 0.3 / 1.4e-5 rtol = 1e-4
       @test sol(1.0; idxs = :G) ≈ 0.3 / (7e-6 * (1 + exp(-1))) rtol = 1e-6
     end
-    @testset "IEQ25-36: fixed=false parameters and initial equations that were lost" begin
+    @testset "IEQ25-37: fixed=false parameters and initial equations that were lost" begin
       local file = "./Models/InitialEquationTests.mo"
       #= A tuple initial equation failed in the frontend (simplifyTupleElement typed
          for statements only). OpenModelica: a = 3, b = 4.5, x(1) = 48. =#
@@ -593,6 +593,9 @@ const IEQ_MSL_MODELS = [
       #= The early initial-algorithm pass read a start that is not a literal
          (x(start = x0)) as 0.0: a = 1. =#
       @test OM.simulate("InitialEquationTests.IEQ36_ParameterStartInInitialAlgorithm", file; stopTime = 1.0)(0.5; idxs = :a) ≈ 4.0
+      #= A tuple equation in when initial() was evaluated and dropped (a = b = 0). =#
+      local s37 = OM.simulate("InitialEquationTests.IEQ37_TupleInInitialWhen", file; stopTime = 1.0)
+      @test [s37(0.5; idxs = :a), s37(0.5; idxs = :b)] ≈ [4.0, 6.0]
     end
 
   end

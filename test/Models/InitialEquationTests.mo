@@ -575,4 +575,23 @@ package InitialEquationTests
       a = pre(a);
     end when;
   end IEQ36_ParameterStartInInitialAlgorithm;
+  function twoOut37
+    input Real u;
+    output Real a;
+    output Real b;
+  algorithm
+    a := u + 1;
+    b := 2 * u;
+  end twoOut37;
+
+  model IEQ37_TupleInInitialWhen "when initial() then (a, b) = f(x) (OpenModelica: a = 4, b = 6)"
+    Real x(start = 3, fixed = true);
+    discrete Real a(start = 0, fixed = true);
+    discrete Real b(start = 0, fixed = true);
+  equation
+    der(x) = 0;
+    when initial() then
+      (a, b) = twoOut37(x);
+    end when;
+  end IEQ37_TupleInInitialWhen;
 end InitialEquationTests;
