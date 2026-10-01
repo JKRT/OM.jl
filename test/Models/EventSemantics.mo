@@ -832,4 +832,51 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       n = pre(n) + 1;
     end when;
   end SelfLatch;
+
+  model TupleInWhen "a tuple assignment in a when algorithm: each target its element of the function's result, an Integer input read from a discrete used as an index (MSL TimeTable's (a, b, nextEventScaled, last) := getInterpolationCoefficients(...))"
+    function coefficients
+      input Real table[:];
+      input Integer last;
+      input Real t;
+      output Real a;
+      output Integer next;
+    algorithm
+      next := if last < size(table, 1) then last + 1 else last;
+      a := table[next] * t;
+    end coefficients;
+    parameter Real table[4] = {1, 2, 3, 4};
+    discrete Real a(start = 0, fixed = true);
+    Integer last(start = 1, fixed = true);
+  algorithm
+    when sample(0.1, 0.25) then
+      (a, last) := coefficients(table, pre(last), time);
+    end when;
+  end TupleInWhen;
+
+  model TupleReadsTarget "a tuple assignment whose function reads one of its targets: each element is of the one call, with the target's old value"
+    function step
+      input Integer s;
+      output Integer next;
+      output Real y;
+    algorithm
+      next := s + 1;
+      y := 10 * s;
+    end step;
+    Integer s(start = 0, fixed = true);
+    discrete Real y(start = -1, fixed = true);
+  algorithm
+    when sample(0.1, 0.25) then
+      (s, y) := step(s);
+    end when;
+  end TupleReadsTarget;
+
+  model InitialThenSample "the elsewhen arm after `when initial()` in an algorithm of whens only (MSL GenerateRandomNumbers' random updates)"
+    Integer k(start = 0);
+  algorithm
+    when initial() then
+      k := 10;
+    elsewhen sample(0.1, 0.25) then
+      k := pre(k) + 1;
+    end when;
+  end InitialThenSample;
 end EventSemantics;

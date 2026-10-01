@@ -392,4 +392,25 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
                            solver = OMBackend.OrdinaryDiffEqBDF.FBDF(autodiff = ADTypes.AutoFiniteDiff()))
     @test s3(1.0; idxs = :tSwitch) ≈ 0.5 atol = 1e-6
   end
+  @testset "a tuple assignment in a when" begin
+    #= (a, last) := coefficients(table, pre(last), time) at 0.1, 0.35, 0.6, 0.85: last
+       steps 2, 3, 4, 4 and a = table[last] * time. Dropped before (the table output of
+       MSL TimeTable had no definition); `last` arrives as a Float64 and is an index. =#
+    local s = _eventSim("TupleInWhen"; stopTime = 1.0)
+    @test [s(t; idxs = :last) for t in (0.2, 0.5, 0.7, 0.9)] == [2, 3, 4, 4]
+    @test [s(t; idxs = :a) for t in (0.2, 0.5, 0.7, 0.9)] ≈ [0.2, 1.05, 2.4, 3.4] atol = 1e-9
+  end
+  @testset "a tuple assignment whose function reads a target" begin
+    #= (s, y) := step(s) at 0.1, 0.35, 0.6, 0.85: y = 10 * (s before the tick). Split
+       per target in order, y was the step from the new s (10, 20, ...). =#
+    local s = _eventSim("TupleReadsTarget"; stopTime = 1.0)
+    @test [s(t; idxs = :s) for t in (0.2, 0.5, 0.7, 0.9)] == [1, 2, 3, 4]
+    @test [s(t; idxs = :y) for t in (0.2, 0.5, 0.7, 0.9)] ≈ [0, 10, 20, 30] atol = 1e-9
+  end
+  @testset "the elsewhen after when initial() in an algorithm" begin
+    #= k := 10 at the start, then k := pre(k) + 1 at 0.1, 0.35, 0.6, 0.85. The
+       elsewhen arm was lost with the algorithm of whens only. =#
+    local s = _eventSim("InitialThenSample"; stopTime = 1.0)
+    @test [s(t; idxs = :k) for t in (0.05, 0.2, 0.5, 0.9)] == [10, 11, 12, 14]
+  end
 end
