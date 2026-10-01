@@ -610,6 +610,17 @@ const IEQ_MSL_MODELS = [
       #= A variable defined through der() and folded away had no observed equation. =#
       local s42 = OM.simulate("InitialEquationTests.IEQ42_DerivativeOutput", file; stopTime = 1.0)
       @test [s42(0.0; idxs = :a), s42(0.0; idxs = :y2)] ≈ [-8.0, -16.0] atol = 1e-6
+      #= The row read der(y), which no observed equation reduces: it was dropped (x(0) = 0). =#
+      @test OM.simulate("InitialEquationTests.IEQ43_DerivativeEqualsDerivative", file; stopTime = 1.0)(0.0; idxs = :x) ≈ 1.0 atol = 1e-8
+      #= Pure ODEs pinned every start, the non-fixed x too: the init solve freed every
+         variable and moved the fixed y (y = 0). =#
+      local s44 = OM.simulate("InitialEquationTests.IEQ44_SignalInPureODE", file; stopTime = 1.0)
+      @test [s44(0.0; idxs = :x), s44(0.0; idxs = :y)] ≈ [5.0, 2.0] atol = 1e-8
+      #= der() of an observed variable: the row was skipped without a word (x(0) = 0). =#
+      local s45 = OM.simulate("InitialEquationTests.IEQ45_DerivativeOfObserved", file; stopTime = 1.0)
+      @test [s45(0.0; idxs = :x), s45(0.0; idxs = :y)] ≈ [-1.0, 1.0] atol = 1e-8
+      #= der(der(x)) was taken as der(x). =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ46_SecondDerivative", file; stopTime = 1.0)
     end
 
   end

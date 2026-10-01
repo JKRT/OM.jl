@@ -639,4 +639,41 @@ package InitialEquationTests
     der(z) = 0;
     der(x) = -x + z;
   end IEQ42_DerivativeOutput;
+
+  model IEQ43_DerivativeEqualsDerivative "initial equation der(x) = der(y): 2 - x = x, x(0) = 1 (OpenModelica)"
+    Real x(start = 0), y(start = 0, fixed = true);
+  initial equation
+    der(x) = der(y);
+  equation
+    der(x) = 2 - x;
+    der(y) = x;
+  end IEQ43_DerivativeEqualsDerivative;
+
+  model IEQ44_SignalInPureODE "x = 2y + 1 with x non-fixed and y fixed at 2: x(0) = 5, y(0) = 2 (OpenModelica)"
+    Real x(start = 3), y(start = 2, fixed = true);
+  initial equation
+    x = 2 * y + 1;
+  equation
+    der(x) = -x;
+    der(y) = -y;
+  end IEQ44_SignalInPureODE;
+
+  model IEQ45_DerivativeOfObserved "der(v) = x - 1 with v = 2y observed, y fixed at 1: x(0) = -1 (OpenModelica)"
+    Real x(start = 0), y(start = 1, fixed = true);
+    Real v = 2 * y;
+  initial equation
+    der(v) = x - 1;
+  equation
+    der(x) = -x;
+    der(y) = -y;
+  end IEQ45_DerivativeOfObserved;
+
+  model IEQ46_SecondDerivative "an initial equation on der(der(x)): refused, as by OpenModelica"
+    Real x(start = 1, fixed = true), v;
+  initial equation
+    der(der(x)) = -3;
+  equation
+    v = der(x);
+    der(v) = -x - v;
+  end IEQ46_SecondDerivative;
 end InitialEquationTests;
