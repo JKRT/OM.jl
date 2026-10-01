@@ -610,4 +610,33 @@ package InitialEquationTests
   equation
     y = k;
   end IEQ39_FreeParameterWithoutStates;
+
+  model IEQ40_IntegerOfParameterStart "a fixed start integer(p27): floor, 2 (OpenModelica)"
+    parameter Real p27 = 2.7;
+    Real zi(start = integer(p27), fixed = true);
+  equation
+    der(zi) = 0;
+  end IEQ40_IntegerOfParameterStart;
+
+  model IEQ41_FixedWithoutStart "v(fixed = true) without a start: v(0) = 0, so xa(0) = -1 (OpenModelica)"
+    Real xa;
+    Real v(fixed = true);
+  equation
+    der(xa) = -xa;
+    v = xa + 1;
+  end IEQ41_FixedWithoutStart;
+
+  model IEQ42_DerivativeOutput "a = der(x) read by nothing but y2: both in the result (OpenModelica: a(0) = -8, y2(0) = -16)"
+    parameter Real p = 2;
+    Real z(start = 3);
+    Real x(start = 0);
+    Real a = der(x);
+    Real y2 = 2 * a;
+  initial equation
+    x = 12;
+    z = 2 * p;
+  equation
+    der(z) = 0;
+    der(x) = -x + z;
+  end IEQ42_DerivativeOutput;
 end InitialEquationTests;

@@ -601,6 +601,15 @@ const IEQ_MSL_MODELS = [
       @test OM.simulate("InitialEquationTests.IEQ38_AssignedParameterWithoutStates", file; stopTime = 1.0)(0.5; idxs = :y) ≈ 1.0
       @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ39_FreeParameterWithoutStates", file;
                                                              stopTime = 1.0)
+      #= floor(p27) was a symbolic call the start's evaluation did not fold: 0.0 with a
+         warning (and integer() rounded where it was evaluated). =#
+      @test OM.simulate("InitialEquationTests.IEQ40_IntegerOfParameterStart", file; stopTime = 1.0)(0.5; idxs = :zi) ≈ 2.0
+      #= fixed = true without a start fixes the default start 0; v was folded away (xa(0) = 0). =#
+      local s41 = OM.simulate("InitialEquationTests.IEQ41_FixedWithoutStart", file; stopTime = 1.0)
+      @test [s41(0.0; idxs = :xa), s41(0.0; idxs = :v)] ≈ [-1.0, 0.0] atol = 1e-8
+      #= A variable defined through der() and folded away had no observed equation. =#
+      local s42 = OM.simulate("InitialEquationTests.IEQ42_DerivativeOutput", file; stopTime = 1.0)
+      @test [s42(0.0; idxs = :a), s42(0.0; idxs = :y2)] ≈ [-8.0, -16.0] atol = 1e-6
     end
 
   end

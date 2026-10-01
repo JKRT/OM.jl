@@ -1381,4 +1381,86 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       up = pre(v);
     end when;
   end BounceThenRise;
+  model SelfSchedulingNoInitial "when time >= pre(next) without initial(): first at 0.5 (OpenModelica)"
+    discrete Real next(start = 0.5, fixed = true);
+    discrete Integer n(start = 0, fixed = true);
+  equation
+    when time >= pre(next) then
+      next = pre(next) + 1;
+      n = pre(n) + 1;
+    end when;
+  end SelfSchedulingNoInitial;
+  model SelfSchedulingInitial "{time >= pre(next), initial()}: once at the start (OpenModelica: n = 1)"
+    discrete Real next(start = 0.5, fixed = true);
+    discrete Integer n(start = 0, fixed = true);
+  equation
+    when {time >= pre(next), initial()} then
+      next = pre(next) + 1;
+      n = pre(n) + 1;
+    end when;
+  end SelfSchedulingInitial;
+  model ChangeInEquation "ch = change(k), when ch (OpenModelica: q = 1)"
+    discrete Integer k(start = 3, fixed = true);
+    Boolean ch = change(k);
+    discrete Integer q(start = 0, fixed = true);
+  equation
+    when time > 0.3 then k = 7; end when;
+    when ch then q = pre(q) + 1; end when;
+  end ChangeInEquation;
+  model EdgeInEquation "e = edge(b), b a discrete Boolean (OpenModelica: q = 1)"
+    discrete Boolean b(start = false, fixed = true);
+    Boolean e = edge(b);
+    discrete Integer q(start = 0, fixed = true);
+  equation
+    when time > 0.3 then b = true; end when;
+    when e then q = pre(q) + 1; end when;
+  end EdgeInEquation;
+  model RelationThenRelation "a when on a relation sets d; a when on x + d > 1.2 fires at once, pre(d) = 0 (OpenModelica: y = 0)"
+    Real x(start = 0, fixed = true);
+    discrete Real d(start = 0, fixed = true);
+    discrete Real y(start = -1, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 0.5 then
+      d = 1;
+    end when;
+    when x + d > 1.2 then
+      y = pre(d);
+    end when;
+  end RelationThenRelation;
+  model InitialTickTriggers "a sample(0, 0.5) tick at the start triggers a when on its counter (OpenModelica: m = 0)"
+    discrete Integer n(start = 0, fixed = true);
+    discrete Integer m(start = -1, fixed = true);
+  equation
+    when sample(0, 0.5) then
+      n = pre(n) + 1;
+    end when;
+    when n > 0 then
+      m = pre(n) * 10;
+    end when;
+  end InitialTickTriggers;
+  model EdgeOfSelfScheduled "b toggled by when time >= pre(next); e = edge(b) (OpenModelica: q = 1 at 0.4, 2 at 0.9)"
+    discrete Real next(start = 0.25, fixed = true);
+    discrete Boolean b(start = false, fixed = true);
+    Boolean e = edge(b);
+    discrete Integer q(start = 0, fixed = true);
+  equation
+    when time >= pre(next) then
+      next = pre(next) + 0.25;
+      b = not pre(b);
+    end when;
+    when e then q = pre(q) + 1; end when;
+  end EdgeOfSelfScheduled;
+  model ChangeOfSelfScheduled "k counted by when time >= pre(next); ch = change(k) (OpenModelica: q = 3 at 0.9)"
+    discrete Real next(start = 0.25, fixed = true);
+    discrete Integer k(start = 0, fixed = true);
+    Boolean ch = change(k);
+    discrete Integer q(start = 0, fixed = true);
+  equation
+    when time >= pre(next) then
+      next = pre(next) + 0.25;
+      k = pre(k) + 1;
+    end when;
+    when ch then q = pre(q) + 1; end when;
+  end ChangeOfSelfScheduled;
 end EventSemantics;

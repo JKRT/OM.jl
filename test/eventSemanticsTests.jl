@@ -535,5 +535,26 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test _eventSim("ReinitThenRelation"; stopTime = 1.0)(0.7; idxs = :y) == 0
     @test _eventSim("ReinitAndCounter"; stopTime = 1.0)(0.7; idxs = :y) ≈ 1.5
     @test _eventSim("BounceThenRise"; stopTime = 1.0)(0.8; idxs = :up) ≈ 3.5436 atol = 1e-3
+    #= A self-scheduling when ran at the start as well: without initial() (n = 1 at
+       0.2), and twice with it (n = 2). =#
+    local noInitial = _eventSim("SelfSchedulingNoInitial"; stopTime = 1.0)
+    @test [noInitial(0.2; idxs = :n), noInitial(0.7; idxs = :n)] == [0, 1]
+    @test _eventSim("SelfSchedulingInitial"; stopTime = 1.0)(0.7; idxs = :n) == 1
+    #= change() and edge() in an equation were false throughout (q = 0). =#
+    @test _eventSim("ChangeInEquation"; stopTime = 1.0)(0.7; idxs = :q) == 1
+    @test _eventSim("EdgeInEquation"; stopTime = 1.0)(0.7; idxs = :q) == 1
+    #= The second when fired a sweep later, with pre(d) moved (y = 1). =#
+    @test _eventSim("RelationThenRelation"; stopTime = 1.0)(0.9; idxs = :y) == 0
+    #= The start's tick set the latch of `when n > 0` (m = -1 throughout). =#
+    @test _eventSim("InitialTickTriggers"; stopTime = 1.0)(0.2; idxs = :m) == 0
+    #= edge()/change() of a discrete a self-scheduling when sets: its affect did not
+       record the state before the instant (q = 0). =#
+    local edgeSelf = _eventSim("EdgeOfSelfScheduled"; stopTime = 1.0)
+    @test [edgeSelf(0.4; idxs = :q), edgeSelf(0.9; idxs = :q)] == [1, 2]
+    @test _eventSim("ChangeOfSelfScheduled"; stopTime = 1.0)(0.9; idxs = :q) == 3
+    #= The MSL edge and change blocks on a BooleanTable were refused (edge() of the
+       table's output inlined into it). =#
+    local tableEdges = OM.simulate("TableEdgeBlocks", "./Models/TableEdgeBlocks.mo"; MSL = true, stopTime = 1.0)
+    @test [tableEdges(0.5; idxs = :nRise), tableEdges(0.5; idxs = :nChange), last(tableEdges[:nChange])] == [1, 2, 3]
   end
 end
