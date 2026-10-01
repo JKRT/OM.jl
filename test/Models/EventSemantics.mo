@@ -879,4 +879,14 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
       k := pre(k) + 1;
     end when;
   end InitialThenSample;
+
+  model TerminateInWhen "terminate() in a when algorithm ends the simulation at the event"
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+  algorithm
+    when x >= 0.5 then
+      terminate("x reached 0.5");
+    end when;
+  end TerminateInWhen;
 end EventSemantics;

@@ -60,4 +60,18 @@ end
     local err = _simulateOrError("FunctionError")
     @test err isa ErrorException && occursin("u beyond 0.5 (error)", err.msg)
   end
+  @testset "a when algorithm" begin
+    #= n := pre(n) + 1 at 0.1, 0.35, 0.6: the assert fails at 0.6. Dropped before
+       (the when lifter had no arm for it); an error-level assert only warned. =#
+    local err = _simulateOrError("InWhenError")
+    @test err isa ModelicaAssertionError && isapprox(err.time, 0.6; atol = 1e-9)
+    @test startswith(err.message, "n reached 3")
+    local (warnings, sol) = _warningsOf("InWhenWarning")
+    @test sol.retcode == ReturnCode.Success
+    @test count(w -> occursin("n beyond 2", w), warnings) == 2   # at 0.6 and 0.85
+    #= The cluster lowering runs only the assignments: the when must not be lost
+       with its assert (the assert is reported as not checked). =#
+    local s = _simulateOrError("InWhenOnRelation")
+    @test s.retcode == ReturnCode.Success && s(1.0; idxs = :c) == 1
+  end
 end

@@ -407,6 +407,12 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s(t; idxs = :s) for t in (0.2, 0.5, 0.7, 0.9)] == [1, 2, 3, 4]
     @test [s(t; idxs = :y) for t in (0.2, 0.5, 0.7, 0.9)] ≈ [0, 10, 20, 30] atol = 1e-9
   end
+  @testset "terminate() in a when algorithm" begin
+    #= Dropped before (the when lifter had no arm for it): the run went on to stopTime. =#
+    local s = _eventSim("TerminateInWhen"; stopTime = 1.0)
+    @test s.retcode == ReturnCode.Terminated
+    @test s.t[end] ≈ 0.5 atol = 1e-6
+  end
   @testset "the elsewhen after when initial() in an algorithm" begin
     #= k := 10 at the start, then k := pre(k) + 1 at 0.1, 0.35, 0.6, 0.85. The
        elsewhen arm was lost with the algorithm of whens only. =#
