@@ -310,4 +310,179 @@ package AlgInitTest
   equation
     der(s) = 0;
   end IteratorNamedLikeArray;
+  model ReadsFixedState "reads a fixed state: its start is its value (OpenModelica: y0 = 4)"
+    Real x(start = 3, fixed = true);
+    discrete Real y0(start = 0, fixed = false);
+  initial algorithm
+    y0 := x + 1;
+  equation
+    der(x) = 0;
+    when time > 10 then
+      y0 = pre(y0);
+    end when;
+  end ReadsFixedState;
+
+  model ReadsInitialized "reads z, which an initial equation sets (OpenModelica: q = 6; refused)"
+    Real z(start = 0);
+    discrete Real q(start = 0, fixed = false);
+  initial equation
+    z = 5;
+  initial algorithm
+    q := z + 1;
+  equation
+    der(z) = 0;
+    when time > 10 then
+      q = pre(q);
+    end when;
+  end ReadsInitialized;
+
+  model ReadsEliminated "reads w2, eliminated as w's equal (OpenModelica: r = 2; refused)"
+    Real w = 2 * time + 1;
+    Real w2 = 2 * time + 1;
+    discrete Real r(start = 0, fixed = false);
+  initial algorithm
+    r := w2 + 1;
+  equation
+    when time > 10 then
+      r = pre(r);
+    end when;
+  end ReadsEliminated;
+
+  model AgainstInitialEquation "x := 2 and initial equation y = 3 with y = x (OpenModelica: inconsistent; refused)"
+    Real x(start = 0);
+    Real y;
+  initial algorithm
+    x := 2;
+  initial equation
+    y = 3;
+  equation
+    y = x;
+    der(x) = -x;
+  end AgainstInitialEquation;
+
+  model ReadsStringParameter "reads a String parameter (as the MSL TraceSubstances sensors): ind = 2 (OpenModelica)"
+    parameter String name = "b";
+    discrete Integer ind(start = 0, fixed = false);
+    Real x(start = 0, fixed = true);
+  initial algorithm
+    ind := -1;
+    if name == "b" then
+      ind := 2;
+    end if;
+  equation
+    der(x) = ind;
+    when time > 10 then
+      ind = pre(ind);
+    end when;
+  end ReadsStringParameter;
+
+  model ReadsComputedStart "reads fixed variables whose starts are expressions (OpenModelica: y0 = 4, y1 = 3)"
+    parameter Real p = 4;
+    Real x(start = sqrt(p) + exp(0 * p), fixed = true);
+    Real w(start = if p > 0 then 2 else 3, fixed = true);
+    discrete Real y0(start = 0, fixed = false);
+    discrete Real y1(start = 0, fixed = false);
+  initial algorithm
+    y0 := x + 1;
+    y1 := w + 1;
+  equation
+    der(x) = 0;
+    der(w) = 0;
+    when time > 10 then
+      y0 = pre(y0);
+      y1 = pre(y1);
+    end when;
+  end ReadsComputedStart;
+
+  model ReadsComputedParameter "reads k(fixed = false), k = x (OpenModelica: s = 4): refused"
+    parameter Real k(fixed = false, start = 0);
+    discrete Real s(start = 0, fixed = false);
+    Real x(start = 3, fixed = true);
+  initial equation
+    k = x;
+  initial algorithm
+    s := k + 1;
+  equation
+    der(x) = 0;
+    when time > 10 then
+      s = pre(s);
+    end when;
+  end ReadsComputedParameter;
+
+  model WhenInitialDiscreteReads "when initial() reads an Integer -2 and a discrete Real 0.3 (OpenModelica: n = 3, r = 5.3)"
+    discrete Integer m(start = -2, fixed = true);
+    discrete Real d(start = 0.3, fixed = true);
+    discrete Integer n(start = 0, fixed = false);
+    discrete Real r(start = 0, fixed = false);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = n + r;
+    when initial() then
+      n = m + 5;
+      r = d + 5;
+    end when;
+    when time > 10 then
+      m = 0;
+      d = 0;
+    end when;
+  end WhenInitialDiscreteReads;
+
+  model ReadsStringOfNumber "reads name = String(k), not a literal (OpenModelica: ind = 2)"
+    parameter Integer k = 2;
+    parameter String name = String(k);
+    discrete Integer ind(start = 0, fixed = false);
+    Real x(start = 0, fixed = true);
+  initial algorithm
+    ind := -1;
+    if name == "2" then
+      ind := 2;
+    end if;
+  equation
+    der(x) = ind;
+    when time > 10 then
+      ind = pre(ind);
+    end when;
+  end ReadsStringOfNumber;
+
+  model ReinitAtInitial "when initial() then reinit(x, 5) (OpenModelica ignores it: x(0) = 1): refused"
+    Real x(start = 1, fixed = true);
+  equation
+    der(x) = -x;
+    when initial() then
+      reinit(x, 5);
+    end when;
+  end ReinitAtInitial;
+
+  model WhenInitialReadsInitialized "when initial() then q = z + 1, initial equation z = 5 (OpenModelica: q = 6)"
+    Real z(start = 0);
+    discrete Real q(start = 0, fixed = false);
+  initial equation
+    z = 5;
+  equation
+    der(z) = 0;
+    when initial() then
+      q = z + 1;
+    end when;
+  end WhenInitialReadsInitialized;
+
+  model WhenInitialReads "when initial() reads an initialized, an eliminated and a folded variable (OpenModelica: q = 6, r = 2, s = 12)"
+    parameter Real p = 2;
+    Real v[3] = {1, 2, 3} * p;
+    Real w = 2 * time + 1;
+    Real w2 = 2 * time + 1;
+    Real z(start = 0);
+    discrete Real q(start = 0, fixed = false);
+    discrete Real r(start = 0, fixed = false);
+    discrete Real s(start = 0, fixed = false);
+  initial equation
+    z = 5;
+  equation
+    der(z) = 0;
+    when initial() then
+      q = z + 1;
+      r = w2 + 1;
+      s = sum(v);
+    end when;
+  end WhenInitialReads;
+
 end AlgInitTest;

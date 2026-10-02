@@ -630,6 +630,13 @@ const IEQ_MSL_MODELS = [
       #= A start that reads a free parameter is no user value to hold: not refused. =#
       local s50 = OM.simulate("InitialEquationTests.IEQ50_FixedStartOfFreeParameter", file; stopTime = 1.0)
       @test s50(0.0; idxs = :x) ≈ 1.0 atol = 1e-6
+      #= A free parameter alone on the right (`x = q`) was neither free nor
+         assigned: q kept its start 0.5, and x = 0.5. =#
+      @test OM.simulate("InitialEquationTests.IEQ51_FreeParameterOnTheRight", file; stopTime = 1.0)(0.0; idxs = :x) ≈ 1.0 atol = 1e-6
+      #= With eliminateNonDynamic, b and a were eliminated as output-only: the
+         initial equation read an undefined b (UndefVarError). =#
+      @test OM.simulate("InitialEquationTests.IEQ52_InitialEquationReadsOutputOnly", file; stopTime = 1.0,
+                        eliminateNonDynamic = true)(0.0; idxs = :z) ≈ 3.0 atol = 1e-6
     end
 
   end

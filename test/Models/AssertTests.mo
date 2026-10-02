@@ -355,4 +355,13 @@ package AssertTests "assert in equation sections, algorithms and functions"
     y = 2 * x;
     assert(x < 0.5, s, AssertionLevel.warning);
   end StringOfEliminated;
+  model StringByEquation "a String variable set by an equation (OpenModelica: x(1) = 2.5): refused"
+    String s;
+    Integer k;
+    Real x(start = 0, fixed = true);
+  equation
+    s = if time > 0.5 then "ab" else "abc";
+    k = if s == "ab" then 2 else 3;
+    der(x) = k;
+  end StringByEquation;
 end AssertTests;

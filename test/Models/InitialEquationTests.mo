@@ -713,4 +713,28 @@ package InitialEquationTests
   initial equation
     der(x) = 0;
   end IEQ50_FixedStartOfFreeParameter;
+
+  model IEQ51_FreeParameterOnTheRight "q + r = 2, q - r = 0, x = q: x(0) = 1 (OpenModelica)"
+    parameter Real q(fixed = false, start = 0.5);
+    parameter Real r(fixed = false, start = 0.5);
+    Real x;
+  initial equation
+    q + r = 2;
+    q - r = 0;
+    x = q;
+  equation
+    der(x) = -r * x;
+  end IEQ51_FreeParameterOnTheRight;
+
+  model IEQ52_InitialEquationReadsOutputOnly "z = b, b = a + 1, a = 2x read by nothing else: z = 3 (OpenModelica)"
+    Real x(start = 1, fixed = true);
+    Real a = 2 * x;
+    Real b = a + 1;
+    Real z(start = 0);
+  initial equation
+    z = b;
+  equation
+    der(x) = -x;
+    der(z) = 0;
+  end IEQ52_InitialEquationReadsOutputOnly;
 end InitialEquationTests;

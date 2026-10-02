@@ -151,4 +151,91 @@ const SII = OMBackend.Runtime.ModelingToolkit.SymbolicIndexingInterface
   OM.translate("TunableParameters.StartParameter", mo; mode = OMBackend.MTK_MODE)
   @test OMBackend.pristineParameters("TunableParameters.StartParameter") === nothing
   @test !OMBackend.isTunable("TunableParameters.StartParameter", ["k"])
+
+  #= The initialization for the run's values (OpenModelica's -override, a
+     compile at those values): start values, initial equations and the
+     parameters they compute read p. They kept the compiled ones. =#
+  for (m, value, expected) in (("InitStart", 2.0, (:x => 2.0, :z => 1.378796700129551)),
+                               ("InitEquation", 2.0, (:x => 2.0, :z => 1.378796700129551)),
+                               ("InitPureStart", 2.0, (:x => 2.0,)),
+                               ("InitPureEquation", 2.0, (:x => 6.0,)),
+                               ("InitRow", 2.0, (:x => 2.5438358, :z => 1.4561642)),
+                               ("InitFreeParameter", 2.0, (:x => 4.0,)),
+                               ("InitBoundStart", 2.0, (:x => 4.0,)),
+                               ("InitBoundEquation", 2.0, (:x => 5.0, :z => 1.7392039)),
+                               ("InitBoundCref", 2.0, (:x => 4.0, :z => 1.6343653)),
+                               ("InitAliasCref", 2.0, (:x => 2.0,)),
+                               ("InitDerivativePure", 2.0, (:x => -1.0,)))
+    OMBackend.withTunableParameters(["p"]) do
+      OM.translate("TunableParameters.$m", mo)
+    end
+    local run = OM.simulate("TunableParameters.$m"; MSL = false, stopTime = 1.0, parameters = Dict("p" => value))
+    @testset "$m" for (v, val) in expected
+      @test isapprox(run(0.0; idxs = v), val; rtol = 1e-6)
+    end
+  end
+  #= The compiled values again give the compiled state. =#
+  OMBackend.withTunableParameters(["p"]) do
+    OM.translate("TunableParameters.InitStart", mo)
+  end
+  local compiled = OM.simulate("TunableParameters.InitStart"; MSL = false, stopTime = 1.0)
+  local again = OM.simulate("TunableParameters.InitStart"; MSL = false, stopTime = 1.0, parameters = Dict("p" => 1.0))
+  @test again(0.0; idxs = :z) == compiled(0.0; idxs = :z)
+  #= der(x) = p: the derivative target is the run's (x = -2; z^3 = 0, a triple root). =#
+  OMBackend.withTunableParameters(["p"]) do
+    OM.translate("TunableParameters.InitDerivative", mo)
+  end
+  @test OM.simulate("TunableParameters.InitDerivative"; MSL = false, stopTime = 1.0,
+                    parameters = Dict("p" => 2.0))(0.0; idxs = :x) ≈ -2.0 atol = 1e-3
+  #= A free parameter alone on the right of `p = q`, `2 * p = q` is bound to
+     the left: q = p. It was solved nowhere (q = 0, and p overwritten). =#
+  for (m, k) in (("InitFreeRight", 1.0), ("InitFreeRightExpression", 2.0))
+    OMBackend.withTunableParameters(["p"]) do
+      OM.translate("TunableParameters.$m", mo)
+    end
+    @test OM.simulate("TunableParameters.$m"; MSL = false, stopTime = 1.0)(1.0; idxs = :x) ≈ exp(-k) rtol = 1e-5
+    @test OM.simulate("TunableParameters.$m"; MSL = false, stopTime = 1.0,
+                      parameters = Dict("p" => 2.0))(1.0; idxs = :x) ≈ exp(-2k) rtol = 1e-5
+  end
+  #= p alone on the left, the free q inside the right (`p = 2 * q`, `p = q * q`):
+     the tunable p was assigned from q's start (p = 2, q = 1), at the compiled
+     values too. Only parameters without a value are assigned; the equation is
+     a residual row of the initialization, which computes q. =#
+  for (m, compiledQ, runP, runQ) in (("InitFreeLeftScaled", 2.0, 6.0, 3.0), ("InitFreeLeftSquare", 2.0, 9.0, 3.0))
+    OMBackend.withTunableParameters(["p"]) do
+      OM.translate("TunableParameters.$m", mo)
+    end
+    local c = OM.simulate("TunableParameters.$m"; MSL = false, stopTime = 1.0)
+    @test [c.ps[:p], c.ps[:q]] ≈ [4.0, compiledQ] rtol = 1e-6
+    local r = OM.simulate("TunableParameters.$m"; MSL = false, stopTime = 1.0, parameters = Dict("p" => runP))
+    @test [r.ps[:p], r.ps[:q], r(1.0; idxs = :x)] ≈ [runP, runQ, exp(-runQ)] rtol = 1e-5
+  end
+  #= The settles re-solve with the run's derivative target: the relation flips
+     at x = 3 (1 - x = -2), and with the compiled target the settle gave x = 2. =#
+  OMBackend.withTunableParameters(["p"]) do
+    OM.translate("TunableParameters.InitDerivativeRelation", mo)
+  end
+  local dr = OM.simulate("TunableParameters.InitDerivativeRelation"; MSL = false, stopTime = 1.0, parameters = Dict("p" => -2.0))
+  @test [dr(0.0; idxs = :x), dr(0.0; idxs = :y)] ≈ [5.0, 2.0] atol = 1e-6
+  #= A parameter bound to p, read by a when condition, follows p: the event at
+     x = 3q = 12, t = 8 (it fired at x = 6 for p = 2). =#
+  OMBackend.withTunableParameters(["p"]) do
+    OM.translate("TunableParameters.BoundInWhen", mo)
+  end
+  local bw = OM.simulate("TunableParameters.BoundInWhen"; MSL = false, stopTime = 10.0, parameters = Dict("p" => 2.0))
+  @test [bw(0.0; idxs = :x), bw(5.5; idxs = :n), bw(9.0; idxs = :n)] == [4.0, 0.0, 1.0]
+  @test bw.ps[:q] == 4.0
+  #= The same through an array element (`var"k[2]"` was not seen as tunable). =#
+  OMBackend.withTunableParameters(["k"]) do
+    OM.translate("TunableParameters.BoundArrayInWhen", mo)
+  end
+  local bk = OM.simulate("TunableParameters.BoundArrayInWhen"; MSL = false, stopTime = 10.0, parameters = Dict("k[2]" => 2.0))
+  @test [bk(0.0; idxs = :x), bk(5.5; idxs = :n), bk(9.0; idxs = :n)] == [4.0, 0.0, 1.0]
+  #= A fixed value the run's values cannot hold is refused, not moved. =#
+  OMBackend.withTunableParameters(["c"]) do
+    OM.translate("TunableParameters.InitImpossible", mo)
+  end
+  @test OM.simulate("TunableParameters.InitImpossible"; MSL = false, stopTime = 1.0)(0.0; idxs = :xa) ≈ 0.9
+  @test_throws OMBackend.UnsupportedLowering OM.simulate("TunableParameters.InitImpossible"; MSL = false, stopTime = 1.0,
+                                                         parameters = Dict("c" => 1.0))
 end

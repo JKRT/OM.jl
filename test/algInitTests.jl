@@ -147,4 +147,41 @@ const ALG_INIT_FILE = "./Models/AlgInitTest.mo"
     @test last(sol[:a_b]) ≈ 20.0
   end
 
+  #= The pass runs before the initialization: what it reads must have its
+     value then. A fixed state has its start; a variable the initialization
+     determines, or one the backend eliminated, was read as its start or 0.0
+     (q = 1, r = 1; OpenModelica 6 and 2). =#
+  #= A refusal for the reason the test means (one for another reason passed). =#
+  local refusedFor = (m, what) -> try
+    OM.simulate("AlgInitTest.$m", ALG_INIT_FILE; stopTime = 1.0)
+    false
+  catch e
+    e isa OMBackend.UnsupportedLowering && occursin(what, sprint(showerror, e))
+  end
+  @testset "what an initial algorithm reads" begin
+    @test OM.simulate("AlgInitTest.ReadsFixedState", ALG_INIT_FILE; stopTime = 1.0)(0.5; idxs = :y0) ≈ 4.0
+    #= A String parameter: its literal (it was read as 0.0, and the section failed). =#
+    @test OM.simulate("AlgInitTest.ReadsStringParameter", ALG_INIT_FILE; stopTime = 1.0)(1.0; idxs = :x) ≈ 2.0
+    #= Bound to a call (MSL ReadRealMatrixFromFile's `file = loadResource(...)`): the module's value. =#
+    @test OM.simulate("AlgInitTest.ReadsStringOfNumber", ALG_INIT_FILE; stopTime = 1.0)(1.0; idxs = :x) ≈ 2.0
+    @test refusedFor("ReadsInitialized", "reading a variable the initialization determines: z")
+    @test refusedFor("ReadsEliminated", "reading a variable the backend eliminated: w2")
+    #= A parameter the initialization computes: the section's results were dropped (s = 0). =#
+    @test refusedFor("ReadsComputedParameter", "reading a parameter the initialization computes: k")
+    #= A fixed start that is an expression was read as 0.0 (y0 = 1). =#
+    local rcs = OM.simulate("AlgInitTest.ReadsComputedStart", ALG_INIT_FILE; stopTime = 1.0)
+    @test [rcs(0.5; idxs = :y0), rcs(0.5; idxs = :y1)] ≈ [4.0, 3.0]
+    #= x := 2 against `initial equation y = 3` with y = x: x was 2 (OpenModelica: inconsistent). =#
+    @test refusedFor("AgainstInitialEquation", "initialization equations that give a variable two values")
+    #= A when initial() body reads the initialized values (the runtime pass);
+       one that reads a variable the problem does not have was 0.0 (s = 0, OpenModelica 12). =#
+    @test OM.simulate("AlgInitTest.WhenInitialReadsInitialized", ALG_INIT_FILE; stopTime = 1.0)(0.5; idxs = :q) ≈ 6.0
+    @test refusedFor("WhenInitialReads", "not in the solved system: v[1]")
+    #= reinit in when initial(): a MethodError at the build (OpenModelica ignores it). =#
+    @test refusedFor("ReinitAtInitial", "reinit in a when initial() body: x")
+    #= Discretes as they are: they were rounded and clamped to at least 1 (n = 6, r = 6). =#
+    local wd = OM.simulate("AlgInitTest.WhenInitialDiscreteReads", ALG_INIT_FILE; stopTime = 1.0)
+    @test [wd(0.5; idxs = :n), wd(0.5; idxs = :r)] ≈ [3.0, 5.3]
+  end
+
 end

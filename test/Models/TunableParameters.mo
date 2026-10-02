@@ -110,4 +110,212 @@ package TunableParameters "Models for test/tunableParameterTests.jl"
     der(x) = -k * x;
   end StartParameter;
 
+  model InitStart "x(start = p, fixed = true), an algebraic loop: p = 2 gives x(0) = 2, z(0) = 1.3788"
+    parameter Real p = 1;
+    Real x(start = p, fixed = true);
+    Real z(start = 0.5);
+  equation
+    der(x) = z - x;
+    z + z^3 = 2 + x;
+  end InitStart;
+
+  model InitEquation "initial equation x = p, an algebraic loop: p = 2 gives x(0) = 2"
+    parameter Real p = 1;
+    Real x(start = 0);
+    Real z(start = 0.5);
+  initial equation
+    x = p;
+  equation
+    der(x) = z - x;
+    z + z^3 = 2 + x;
+  end InitEquation;
+
+  model InitPureStart "pure ODE, x(start = p, fixed = true): p = 2 gives x(0) = 2"
+    parameter Real p = 1;
+    Real x(start = p, fixed = true);
+  equation
+    der(x) = -x;
+  end InitPureStart;
+
+  model InitPureEquation "pure ODE, initial equation x = 3 * p: p = 2 gives x(0) = 6"
+    parameter Real p = 1;
+    Real x;
+  initial equation
+    x = 3 * p;
+  equation
+    der(x) = -x;
+  end InitPureEquation;
+
+  model InitRow "initial equation x + z = 2 * p: p = 2 gives z^3 + 2z = 6, z(0) = 1.4562"
+    parameter Real p = 1;
+    Real x(start = 0);
+    Real z(start = 0.5);
+  initial equation
+    x + z = 2 * p;
+  equation
+    der(x) = z - x;
+    z + z^3 = 2 + x;
+  end InitRow;
+
+  model InitFreeParameter "q(fixed = false), initial equation q = 2 * p: p = 2 gives q = 4, x(0) = 4"
+    parameter Real p = 1;
+    parameter Real q(fixed = false);
+    Real x;
+  initial equation
+    q = 2 * p;
+    x = q;
+  equation
+    der(x) = -x;
+  end InitFreeParameter;
+
+  model InitBoundStart "q = 2 * p, x(start = q, fixed = true): p = 2 gives x(0) = 4"
+    parameter Real p = 1;
+    parameter Real q = 2 * p;
+    Real x(start = q, fixed = true);
+  equation
+    der(x) = -x;
+  end InitBoundStart;
+
+  model InitBoundEquation "q = 2 * p, initial equation x = q + 1: p = 2 gives x(0) = 5, z(0) = 1.7392"
+    parameter Real p = 1;
+    parameter Real q = 2 * p;
+    Real x;
+    Real z(start = 0.5);
+  initial equation
+    x = q + 1;
+  equation
+    der(x) = z - x;
+    z + z^3 = 2 + x;
+  end InitBoundEquation;
+
+  model InitImpossible "v fixed, its start from xa's (-0.19 at c = -1): c = 1 leaves no xa (OpenModelica fails the run)"
+    parameter Real c = -1;
+    Real v(fixed = true);
+    Real xa(start = 0.9);
+  equation
+    der(xa) = -xa;
+    v = xa^2 + c;
+  end InitImpossible;
+
+  model InitFreeRight "q(fixed = false), initial equation p = q: q = p (p = 2: x(1) = exp(-2))"
+    parameter Real p = 1;
+    parameter Real q(fixed = false);
+    Real x(start = 1, fixed = true);
+  initial equation
+    p = q;
+  equation
+    der(x) = -q * x;
+  end InitFreeRight;
+
+  model InitFreeRightExpression "q(fixed = false), initial equation 2 * p = q (p = 2: q = 4, x(1) = exp(-4))"
+    parameter Real p = 1;
+    parameter Real q(fixed = false);
+    Real x(start = 1, fixed = true);
+  initial equation
+    2 * p = q;
+  equation
+    der(x) = -q * x;
+  end InitFreeRightExpression;
+
+  model InitDerivative "initial equation der(x) = p, an algebraic loop (p = 2: x = -2, z = 0)"
+    parameter Real p = 1;
+    Real x(start = 0);
+    Real z(start = 0.5);
+  initial equation
+    der(x) = p;
+  equation
+    der(x) = z - x;
+    z + z^3 = 2 + x;
+  end InitDerivative;
+
+  model InitDerivativePure "pure ODE, initial equation der(x) = p, der(x) = 1 - x (p = 2: x = -1)"
+    parameter Real p = 1;
+    Real x(start = 0);
+  initial equation
+    der(x) = p;
+  equation
+    der(x) = 1 - x;
+  end InitDerivativePure;
+
+  model InitBoundCref "q = 2 * p, initial equation x = q, an algebraic loop (p = 2: x = 4, z = 1.6344)"
+    parameter Real p = 1;
+    parameter Real q = 2 * p;
+    Real x;
+    Real z(start = 0.5);
+  initial equation
+    x = q;
+  equation
+    der(x) = z - x;
+    z + z^3 = 2 + x;
+  end InitBoundCref;
+
+  model InitAliasCref "q = p, initial equation x = q (p = 2: x = 2)"
+    parameter Real p = 1;
+    parameter Real q = p;
+    Real x;
+  initial equation
+    x = q;
+  equation
+    der(x) = -x;
+  end InitAliasCref;
+
+  model InitFreeLeftScaled "initial equation p = 2 * q, q free (p = 4: q = 2; p = 6: q = 3)"
+    parameter Real p = 4;
+    parameter Real q(fixed = false, start = 1);
+    Real x(start = 1, fixed = true);
+  initial equation
+    p = 2 * q;
+  equation
+    der(x) = -q * x;
+  end InitFreeLeftScaled;
+
+  model InitFreeLeftSquare "initial equation p = q * q, q free, start 1 (p = 4: q = 2; p = 9: q = 3)"
+    parameter Real p = 4;
+    parameter Real q(fixed = false, start = 1);
+    Real x(start = 1, fixed = true);
+  initial equation
+    p = q * q;
+  equation
+    der(x) = -q * x;
+  end InitFreeLeftSquare;
+
+  model InitDerivativeRelation "der(x) = p, der(x) = 1 - x + y, y = 2 when x > 0.5 (p = -2: x = 5, y = 2)"
+    parameter Real p = 1;
+    Real x(start = 0);
+    Real y;
+  initial equation
+    der(x) = p;
+  equation
+    der(x) = 1 - x + y;
+    if x > 0.5 then
+      y = 2;
+    else
+      y = 0;
+    end if;
+  end InitDerivativeRelation;
+
+  model BoundArrayInWhen "q = 2 * k[2] read by a when condition (k[2] = 2: x(0) = 4, the event at t = 8)"
+    parameter Real k[2] = {1, 1};
+    parameter Real q = 2 * k[2];
+    Real x(start = q, fixed = true);
+    discrete Real n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 3 * q then
+      n = pre(n) + 1;
+    end when;
+  end BoundArrayInWhen;
+
+  model BoundInWhen "q = 2 * p read by a start and a when condition (p = 2: x(0) = 4, the event at t = 8)"
+    parameter Real p = 1;
+    parameter Real q = 2 * p;
+    Real x(start = q, fixed = true);
+    discrete Real n(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when x > 3 * q then
+      n = pre(n) + 1;
+    end when;
+  end BoundInWhen;
+
 end TunableParameters;

@@ -136,5 +136,7 @@ end
     #= A String variable that changes during the simulation (here through an
        eliminated variable) is not supported: refused, not an UndefVarError. =#
     @test _simulateOrError("StringOfEliminated") isa OMBackend.UnsupportedLowering
+    #= Set by an equation, it was assigned nowhere: an UndefVarError at module load. =#
+    @test _simulateOrError("StringByEquation") isa OMBackend.UnsupportedLowering
   end
 end
