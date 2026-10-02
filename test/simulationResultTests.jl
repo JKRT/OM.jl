@@ -38,4 +38,21 @@ end
                         Transistor1_Tr_C_v = 7.1298, Transistor2_Tr_C_v = 7.1298),
       rtol = 0.01)
   end
+  #= DifferenceAmplifier with the default solver, to t = 1 and in its MSL
+     experiment (to 1e-8), against OpenModelica 1.27.1. It went Unstable or
+     InitialFailure by process (2026-10-02): the builds depended on the
+     process; the merged continuous callback re-solved at every event and the
+     pure time events never; the re-solve at the ramp's end (t = 1e-9) stalls
+     on an ill-conditioned Jacobian within the solver's tolerance; the
+     transistors' der(vbc), der(vbe) (algebraic, ~1e9 V/s) held the steps at
+     1e-11 s under error control. =#
+  @test true == begin
+    sol = OM.simulate("Modelica.Electrical.Analog.Examples.DifferenceAmplifier"; MSL = true, MSL_Version = "MSL:3.2.3")
+    testResultRetCodeSuccess(sol; expectedValues = (C2_v = 7.137623, C4_v = -7.137623, C5_v = -0.883234), rtol = 1e-4)
+  end
+  @test true == begin
+    sol = OM.simulate("Modelica.Electrical.Analog.Examples.DifferenceAmplifier"; MSL = true, MSL_Version = "MSL:3.2.3",
+                      stopTime = 1e-8)
+    testResultRetCodeSuccess(sol; expectedValues = (C2_v = 5.383077, C4_v = -3.755086, C5_v = -0.886087), rtol = 1e-3)
+  end
 end
