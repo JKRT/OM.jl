@@ -1,0 +1,130 @@
+name: OM.jl integration
+
+# Reusable workflow: every OM.jl package calls it from its own
+# .github/workflows/omjl.yml, so a pull request in any package is tested
+# together with OM.jl before it is merged.
+#
+# 1. Check out OM.jl and every sibling package at the branch that matches the
+#    change (.github/actions/checkout-siblings: a PR's feature branch if it
+#    exists in that repository, else the PR base branch or `line`, e.g. 1.13,
+#    else master), in the layout of OM.jl's submodules, with the package under
+#    test in its place.
+# 2. Build the native libraries (OMParser from source when no release exists
+#    for the Julia version), set up and precompile OM.jl (ci/setup.jl).
+# 3. Run the package's own tests against the checked-out siblings
+#    (ci/test-package.jl), then OM.jl's test suite (test/runtests.jl), also
+#    when the package's own tests fail.
+#
+# The ci/ scripts come from the OM.jl checkout, so each OM.jl line (master,
+# 1.13, ...) defines how it is tested. The checkout-siblings action is used
+# from OM.jl's master branch.
+
+on:
+  workflow_call:
+    inputs:
+      package:
+        description: Package under test, without .jl (OM for OM.jl itself)
+        required: true
+        type: string
+      julia-versions:
+        description: JSON list of Julia versions
+        required: false
+        type: string
+        default: '["1.13"]'
+      package-tests:
+        description: Run the package's own tests against the siblings
+        required: false
+        type: boolean
+        default: true
+      om-tests:
+        description: Run OM.jl's test suite
+        required: false
+        type: boolean
+        default: true
+      om-repository:
+        description: Repository of OM.jl
+        required: false
+        type: string
+        default: JKRT/OM.jl
+      line:
+        description: >
+          Test against this line (e.g. 1.13) instead of the PR base branch or
+          the pushed branch; for a package with one branch for all lines
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  test:
+    name: ${{ inputs.package }} with OM.jl, Julia ${{ matrix.julia }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        julia: ${{ fromJSON(inputs.julia-versions) }}
+    env:
+      # Native libraries first, precompile after (see ci/setup.jl).
+      JULIA_PKG_PRECOMPILE_AUTO: "0"
+    steps:
+      - name: Check out OM.jl
+        if: inputs.package != 'OM'
+        uses: JKRT/OM.jl/.github/actions/checkout-siblings@master
+        with:
+          packages: OM
+          path: .
+          om-repository: ${{ inputs.om-repository }}
+          line: ${{ inputs.line }}
+
+      - name: Check out ${{ inputs.package }} (under test)
+        uses: actions/checkout@v4
+        with:
+          path: ${{ inputs.package == 'OM' && 'OM.jl' || format('OM.jl/{0}.jl', inputs.package) }}
+
+      - name: Check out the other packages
+        uses: JKRT/OM.jl/.github/actions/checkout-siblings@master
+        with:
+          path: OM.jl
+          exclude: ${{ inputs.package }}
+          om-repository: ${{ inputs.om-repository }}
+          line: ${{ inputs.line }}
+
+      - uses: actions/setup-java@v4  # ANTLR, if the parser is built from source
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: ${{ matrix.julia }}
+
+      - uses: julia-actions/cache@v2
+
+      - name: OMParser library
+        env:
+          PACKAGE: ${{ inputs.package }}
+        run: OM.jl/ci/build-parser.sh
+
+      - name: Set up OM.jl
+        id: setup
+        run: julia --color=yes --project=OM.jl OM.jl/ci/setup.jl
+
+      - name: ${{ inputs.package }} tests
+        if: inputs.package-tests && inputs.package != 'OM'
+        env:
+          PACKAGE: ${{ inputs.package }}
+          LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
+        run: julia --color=yes OM.jl/ci/test-package.jl "$PACKAGE"
+
+      # Also after failing package tests: whether OM.jl still works is the point.
+      - name: MSL reference results
+        if: ${{ !cancelled() && inputs.om-tests && steps.setup.outcome == 'success' }}
+        run: OM.jl/ci/fetch-msl-refs.sh
+
+      - name: OM.jl tests
+        if: ${{ !cancelled() && inputs.om-tests && steps.setup.outcome == 'success' }}
+        working-directory: OM.jl/test
+        env:
+          LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
+        # With threads: OMFrontend's parallel path, as users run it (package tests: ci/test-package.jl).
+        run: julia --color=yes --project=.. --threads=auto -e 'include("runtests.jl")'

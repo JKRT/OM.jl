@@ -1,0 +1,64 @@
+name: Check out OM.jl sibling packages
+description: >
+  Clone OM.jl and its sibling packages (Absyn.jl, DAE.jl, ..., OMParser.jl) at
+  the branch matching the change under test: for a pull request from a feature
+  branch that branch (in the author's fork or upstream), else the PR base
+  branch, else master; for a push the pushed branch, else master. See
+  checkout-siblings.sh.
+
+inputs:
+  path:
+    description: Directory to clone into; each package goes to <path>/<Package>.jl
+    required: false
+    default: "."
+  packages:
+    description: >
+      Space-separated package names without .jl ("OM" is OM.jl itself), or
+      "all" for every sibling package (not OM)
+    required: false
+    default: all
+  exclude:
+    description: Space-separated package names to leave out (for example the package under test)
+    required: false
+    default: ""
+  om-repository:
+    description: Repository of OM.jl
+    required: false
+    default: JKRT/OM.jl
+  siblings-owner:
+    description: Owner of the sibling package repositories
+    required: false
+    default: OpenModelica
+  line:
+    description: >
+      Line to test against (e.g. 1.13) instead of the PR base branch or the
+      pushed branch; for a package that has one branch for all lines (OMParser)
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Clone siblings
+      shell: bash
+      env:
+        EVENT_NAME: ${{ github.event_name }}
+        HEAD_REF: ${{ github.head_ref }}
+        BASE_REF: ${{ github.base_ref }}
+        REF_NAME: ${{ github.ref_name }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        BASE_REPO: ${{ github.repository }}
+        LINE: ${{ inputs.line }}
+        OM_REPOSITORY: ${{ inputs.om-repository }}
+        SIBLINGS_OWNER: ${{ inputs.siblings-owner }}
+        DEST: ${{ inputs.path }}
+        PACKAGES: ${{ inputs.packages }}
+        EXCLUDE: ${{ inputs.exclude }}
+      run: |
+        all="Absyn ArrayUtil DAE DoubleEnded ImmutableList ListUtil MetaModelica OMBackend OMFrontend OMLibraryTesting OMParser OMRuntimeExternalC SCode"
+        [ "$PACKAGES" = all ] && PACKAGES=$all
+        selected=()
+        for p in $PACKAGES; do
+          case " $EXCLUDE " in *" $p "*) ;; *) selected+=("$p") ;; esac
+        done
+        "$GITHUB_ACTION_PATH/checkout-siblings.sh" "$DEST" "${selected[@]}"
