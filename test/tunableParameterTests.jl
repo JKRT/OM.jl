@@ -231,6 +231,14 @@ const SII = OMBackend.Runtime.ModelingToolkit.SymbolicIndexingInterface
   end
   local bk = OM.simulate("TunableParameters.BoundArrayInWhen"; MSL = false, stopTime = 10.0, parameters = Dict("k[2]" => 2.0))
   @test [bk(0.0; idxs = :x), bk(5.5; idxs = :n), bk(9.0; idxs = :n)] == [4.0, 0.0, 1.0]
+  #= homotopy(): a run goes through the continuation from its entry (OpenModelica's
+     `-override`); warm from the compiled solution it kept that root. =#
+  OMBackend.withTunableParameters(["s"]) do
+    OM.translate("TunableParameters.InitHomotopy", mo)
+  end
+  @test OM.simulate("TunableParameters.InitHomotopy"; MSL = false, stopTime = 1.0)(0.0; idxs = :x) ≈ 1.879385242 atol = 1e-6
+  @test OM.simulate("TunableParameters.InitHomotopy"; MSL = false, stopTime = 1.0,
+                    parameters = Dict("s" => -2.0))(0.0; idxs = :x) ≈ -1.532088886 atol = 1e-6
   #= A fixed value the run's values cannot hold is refused, not moved. =#
   OMBackend.withTunableParameters(["c"]) do
     OM.translate("TunableParameters.InitImpossible", mo)

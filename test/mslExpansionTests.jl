@@ -210,6 +210,15 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
     end
   end
 
+  #= homotopy() beside a discrete cluster: the clusters' start path solved
+     from the entry with the actual expressions and its root was taken
+     (x = -0.347). Reference: OpenModelica 1.27.1. =#
+  @testset "homotopy beside an ideal diode" begin
+    local sol = OM.simulate("HomotopyClusters.CubicWithDiode", "./Models/MSL/HomotopyClusters.mo"; MSL = true,
+                            MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+    @test isapprox(sol(0.0; idxs = :x), 1.879385242; atol = 1e-6)
+  end
+
   @testset verbose=true "Electrical" begin
 
     #= ChuaCircuit: nonlinear circuit with inductor, two capacitors.

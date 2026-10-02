@@ -294,6 +294,15 @@ package TunableParameters "Models for test/tunableParameterTests.jl"
     end if;
   end InitDerivativeRelation;
 
+  model InitHomotopy "0 = homotopy(x^3 - 3x - 1, x - s): from s = 2 the path ends at 1.8794, from s = -2 at -1.5321"
+    parameter Real s = 2;
+    Real x(start = 0);
+    Real y(start = 0, fixed = true);
+  equation
+    0 = homotopy(actual = x ^ 3 - 3 * x - 1, simplified = x - s);
+    der(y) = x;
+  end InitHomotopy;
+
   model BoundArrayInWhen "q = 2 * k[2] read by a when condition (k[2] = 2: x(0) = 4, the event at t = 8)"
     parameter Real k[2] = {1, 1};
     parameter Real q = 2 * k[2];

@@ -637,6 +637,16 @@ const IEQ_MSL_MODELS = [
          initial equation read an undefined b (UndefVarError). =#
       @test OM.simulate("InitialEquationTests.IEQ52_InitialEquationReadsOutputOnly", file; stopTime = 1.0,
                         eliminateNonDynamic = true)(0.0; idxs = :z) ≈ 3.0 atol = 1e-6
+      #= homotopy(): the initialization goes from the simplified expressions to
+         the actual ones (OpenModelica's default); it took the actual one only. =#
+      @test OM.simulate("InitialEquationTests.IEQ53_HomotopyRoot", file; stopTime = 1.0)(0.0; idxs = :x) ≈ 1.879385242 atol = 1e-6
+      #= Three roots (y = 1, -1, 0 with u = 2y): the simplified expression picks one. =#
+      @test OM.simulate("InitialEquationTests.IEQ54_HomotopyLimiterUpper", file; stopTime = 1.0)(0.0; idxs = :y) ≈ 1.0 atol = 1e-6
+      @test OM.simulate("InitialEquationTests.IEQ55_HomotopyLimiterLower", file; stopTime = 1.0)(0.0; idxs = :y) ≈ -1.0 atol = 1e-6
+      #= Outside the continuous equations it is the actual expression (an undefined λ there was an UndefVarError). =#
+      @test OM.simulate("InitialEquationTests.IEQ56_HomotopyInWhen", file; stopTime = 2.0)(2.0; idxs = :d) ≈ 1.0 atol = 1e-4
+      #= The simulation's RHS is at λ = 1: the simplified expression is not evaluated (it asserted at x < 0). =#
+      @test OM.simulate("InitialEquationTests.IEQ57_HomotopySimplifiedOnlyAtInit", file; stopTime = 1.0)(1.0; idxs = :y) ≈ -1.0 atol = 1e-6
     end
 
   end

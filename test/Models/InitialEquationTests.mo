@@ -737,4 +737,58 @@ package InitialEquationTests
     der(x) = -x;
     der(z) = 0;
   end IEQ52_InitialEquationReadsOutputOnly;
+
+  model IEQ53_HomotopyRoot "0 = homotopy(x^3 - 3x - 1, x - 2): from x = 2 the path ends at the root 1.8794 (OpenModelica; the actual alone gave -0.347)"
+    Real x(start = 0);
+    Real y(start = 0, fixed = true);
+  equation
+    0 = homotopy(actual = x^3 - 3 * x - 1, simplified = x - 2);
+    der(y) = x;
+  end IEQ53_HomotopyRoot;
+
+  model IEQ54_HomotopyLimiterUpper "positive feedback around a limiter, simplified = its upper limit: y = 1 (OpenModelica; three roots 1, -1, 0)"
+    Real u;
+    Real y;
+    Real x(start = 0, fixed = true);
+  equation
+    u = 2 * y + 0.1 * x;
+    y = homotopy(actual = smooth(0, if u > 1 then 1 elseif u < -1 then -1 else u), simplified = 1);
+    der(x) = -x;
+  end IEQ54_HomotopyLimiterUpper;
+
+  model IEQ55_HomotopyLimiterLower "as IEQ54, simplified = the lower limit: y = -1 (OpenModelica)"
+    Real u;
+    Real y;
+    Real x(start = 0, fixed = true);
+  equation
+    u = 2 * y + 0.1 * x;
+    y = homotopy(actual = smooth(0, if u > 1 then 1 elseif u < -1 then -1 else u), simplified = -1);
+    der(x) = -x;
+  end IEQ55_HomotopyLimiterLower;
+
+  model IEQ56_HomotopyInWhen "homotopy in a when body: the actual expression, d = 2x at x < 0.5, d = 1 (OpenModelica)"
+    Real x(start = 1, fixed = true);
+    discrete Real d(start = 0, fixed = true);
+  equation
+    der(x) = -x;
+    when x < 0.5 then
+      d = homotopy(actual = 2 * x, simplified = x);
+    end when;
+  end IEQ56_HomotopyInWhen;
+
+  function ieq57Positive "an assert where the simplified expression is evaluated"
+    input Real x;
+    output Real y;
+  algorithm
+    assert(x >= 0, "x must be >= 0");
+    y := x;
+  end ieq57Positive;
+
+  model IEQ57_HomotopySimplifiedOnlyAtInit "the simplified expression asserts at x < 0, which the run reaches: not evaluated in the simulation (OpenModelica)"
+    Real x(start = 1, fixed = true);
+    Real y;
+  equation
+    der(x) = -2;
+    y = homotopy(actual = x, simplified = ieq57Positive(x));
+  end IEQ57_HomotopySimplifiedOnlyAtInit;
 end InitialEquationTests;
