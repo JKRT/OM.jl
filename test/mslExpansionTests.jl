@@ -465,21 +465,20 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
          inertias + spring/damper + constant load torque) driven by LimPID,
          with KinematicPTP+Integrator replaced by a constant setpoint. If this
          passes while PID_Controller fails, KinematicPTP alone is the blocker. =#
-      #= Broken (2026-10-02, B16): the initialization cannot hold the fixed
-         inertia1.phi = 0, inertia1.a = 0 and spring.w_rel = 0 with the PI's
-         steady state (it stalls at a residual of 1e-3, about the spring's
-         deflection 10/c, with spring.phi_rel reached only through a dummy
-         derivative). Before B16 the pins were moved without a word
-         (phi = -0.001, a = 7.33) and the run passed; now it is refused.
-         OpenModelica: phi = 0, a = 0, w = 1.5708, PI.y = -10. =#
+      #= The initialization holds the fixed inertia1.phi = 0, inertia1.a = 0 and
+         spring.w_rel = 0 with the PI's steady state through the LimPID
+         limiter's homotopy (B19; OpenModelica: phi = 0, a = 0, w = 1.5708,
+         PI.y = -10). Without it the solve stalled at a residual of 1e-3, and
+         before B16 the fixed values were moved without a word. =#
       @testset "PIDrivingSpringMassWithConstant" begin
-        @test_broken begin
-          sol = OM.simulate("PIDDecomposition.PIDrivingSpringMassWithConstant",
-                            "./Models/PIDDecomposition.mo";
-                            MSL = true, MSL_Version = "MSL:3.2.3",
-                            stopTime = 2.0)
-          sol.retcode == _SUCCESS
-        end
+        local sol = OM.simulate("PIDDecomposition.PIDrivingSpringMassWithConstant",
+                                "./Models/PIDDecomposition.mo";
+                                MSL = true, MSL_Version = "MSL:3.2.3",
+                                stopTime = 2.0)
+        @test sol.retcode == _SUCCESS
+        @test [sol(0.0; idxs = :inertia1_phi), sol(0.0; idxs = :inertia1_a), sol(0.0; idxs = :inertia1_w)] ≈
+              [0.0, 0.0, 1.5708] atol = 1e-6
+        @test sol(2.0; idxs = :PI_y) ≈ -10.0 atol = 1e-6
       end
     end
 
