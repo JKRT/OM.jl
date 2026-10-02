@@ -221,6 +221,28 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
 
   @testset verbose=true "Electrical" begin
 
+    #= SignalGenerator: a comparator with positive feedback (opAmp1, a Schmitt
+       trigger) and an integrator. It starts saturated at -15 V (the homotopy
+       initialization, B19) and switches every 0.05 s: at each switch the
+       if-equation relations cycled through the linear branch's unstable
+       solution (B20: the combination that holds at its own solution). The run
+       matches the MSL reference at every sampled point. =#
+    @testset "SignalGenerator" begin
+      local sol = OM.simulate("Modelica.Electrical.Analog.Examples.OpAmps.SignalGenerator"; stopTime = 2.0)
+      @test sol.retcode == _SUCCESS
+      @test [sol(t; idxs = :opAmp1_out_v) for t in (0.01, 0.05, 0.1, 1.99)] ≈ [-15.0, 15.0, -15.0, -15.0] atol = 1e-3
+      local v = sol[:opAmp1_out_v]
+      local flips = [sol.t[i] for i in 2:length(sol.t) if sign(v[i]) != sign(v[i - 1])]
+      @test length(flips) == 40 && isapprox(flips[2], 0.074993; atol = 1e-4)
+      #= An independent relation at its threshold beside it: it holds either
+         way, is not flipped and does not block the selection (MaxIters at 0.42). =#
+      local idle = OM.simulate("SchmittVariants.SGIdle", "./Models/MSL/SchmittVariants.mo"; MSL = true,
+                               MSL_Version = "MSL:3.2.3", stopTime = 2.0)
+      @test idle.retcode == _SUCCESS
+      @test idle(2.0; idxs = :w) == 2.0
+      @test idle(2.0; idxs = :q) ≈ 4.0 atol = 1e-6
+    end
+
     #= ChuaCircuit: nonlinear circuit with inductor, two capacitors.
        omc reference (t=5.0): L.i=0.01535, C1.v=3.8829, C2.v=0.10943 =#
     @testset "ChuaCircuit" begin
