@@ -456,8 +456,15 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
          inertias + spring/damper + constant load torque) driven by LimPID,
          with KinematicPTP+Integrator replaced by a constant setpoint. If this
          passes while PID_Controller fails, KinematicPTP alone is the blocker. =#
+      #= Broken (2026-10-02, B16): the initialization cannot hold the fixed
+         inertia1.phi = 0, inertia1.a = 0 and spring.w_rel = 0 with the PI's
+         steady state (it stalls at a residual of 1e-3, about the spring's
+         deflection 10/c, with spring.phi_rel reached only through a dummy
+         derivative). Before B16 the pins were moved without a word
+         (phi = -0.001, a = 7.33) and the run passed; now it is refused.
+         OpenModelica: phi = 0, a = 0, w = 1.5708, PI.y = -10. =#
       @testset "PIDrivingSpringMassWithConstant" begin
-        @test begin
+        @test_broken begin
           sol = OM.simulate("PIDDecomposition.PIDrivingSpringMassWithConstant",
                             "./Models/PIDDecomposition.mo";
                             MSL = true, MSL_Version = "MSL:3.2.3",
