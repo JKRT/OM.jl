@@ -30,7 +30,7 @@ on:
         description: JSON list of Julia versions
         required: false
         type: string
-        default: '["1.12", "1.13"]'
+        default: '["1.13"]'
       package-tests:
         description: Run the package's own tests against the siblings
         required: false

@@ -46,7 +46,7 @@ SCode = {path = "SCode.jl"}
 ModelingToolkit = "11.21.0"
 OMJulia = "0.3.3"
 SymbolicUtils = "4.24.1"
-julia = "1.12"
+julia = "1.13"
 
 [extras]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"

@@ -1,7 +1,7 @@
 name: CI
 
 # OM.jl with every sibling package at the matching branch: the 1.13 line on
-# Julia 1.13, master on 1.12 and 1.13 (the same workflow the sibling packages
+# Julia 1.13, master too (the same workflow the sibling packages
 # call; see omjl-ci.yml).
 on:
   pull_request:
@@ -23,6 +23,4 @@ jobs:
     uses: ./.github/workflows/omjl-ci.yml
     with:
       package: OM
-      # The 1.13 line (pushes to 1.13, pull requests into it) is tested on Julia 1.13;
-      # master on 1.12 and 1.13.
-      julia-versions: ${{ (github.ref_name == '1.13' || github.base_ref == '1.13') && '["1.13"]' || '["1.12", "1.13"]' }}
+      julia-versions: '["1.13"]'  # OM.jl's packages require Julia 1.13
