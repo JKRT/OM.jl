@@ -676,4 +676,41 @@ package InitialEquationTests
     v = der(x);
     der(v) = -x - v;
   end IEQ46_SecondDerivative;
+
+  model IEQ47_FixedCannotHold "v(fixed = true) = 0 with v = xa^2 + 1: no initial state holds it (OpenModelica refuses)"
+    Real xa;
+    Real v(fixed = true);
+  equation
+    der(xa) = -xa;
+    v = xa^2 + 1;
+  end IEQ47_FixedCannotHold;
+
+  model IEQ48_ArrayElementCannotHold "x[1] fixed at 1, the initial equation wants another x[1] (OpenModelica refuses)"
+    Real x[2](each start = 1, each fixed = true);
+    Real y(start = 0);
+  initial equation
+    y = 2 * x[1] + 1;
+  equation
+    der(x) = -x;
+    y + y^3 = x[1] + 9;
+  end IEQ48_ArrayElementCannotHold;
+
+  model IEQ49_FixedAndInitialEquation "x(start = 1, fixed = true) and initial equation x = 2 (OpenModelica refuses)"
+    Real x(start = 1, fixed = true);
+  initial equation
+    x = 2;
+  equation
+    der(x) = -x;
+  end IEQ49_FixedAndInitialEquation;
+
+  model IEQ50_FixedStartOfFreeParameter "x(start = p, fixed = true), p free: x = p = 1 (OpenModelica)"
+    parameter Real p(fixed = false, start = 0.5);
+    Real x(start = p, fixed = true);
+    Real z(start = 0.5);
+  equation
+    der(x) = z - x;
+    z + z^3 = 2 + x - p;
+  initial equation
+    der(x) = 0;
+  end IEQ50_FixedStartOfFreeParameter;
 end InitialEquationTests;

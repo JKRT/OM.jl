@@ -621,6 +621,15 @@ const IEQ_MSL_MODELS = [
       @test [s45(0.0; idxs = :x), s45(0.0; idxs = :y)] ≈ [-1.0, 1.0] atol = 1e-8
       #= der(der(x)) was taken as der(x). =#
       @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ46_SecondDerivative", file; stopTime = 1.0)
+      #= The init solve freed the fixed v and returned v = 1, without a word. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ47_FixedCannotHold", file; stopTime = 1.0)
+      #= An array element's pin did not match (var"x[1]"): x[1] = 0.48 was accepted. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ48_ArrayElementCannotHold", file; stopTime = 1.0)
+      #= The initial equation's value was taken without a word. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ49_FixedAndInitialEquation", file; stopTime = 1.0)
+      #= A start that reads a free parameter is no user value to hold: not refused. =#
+      local s50 = OM.simulate("InitialEquationTests.IEQ50_FixedStartOfFreeParameter", file; stopTime = 1.0)
+      @test s50(0.0; idxs = :x) ≈ 1.0 atol = 1e-6
     end
 
   end
