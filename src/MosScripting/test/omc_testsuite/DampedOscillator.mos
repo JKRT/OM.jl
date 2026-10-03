@@ -1,0 +1,24 @@
+// name: DampedOscillatorSimulation
+// keywords: simulation, second-order, damping, instantiateModel, val
+// status: correct
+//
+// A damped second-order system must lose mechanical energy.
+
+loaded := loadFile("DampedOscillator.mo");
+flatModel := instantiateModel(DampedOscillator);
+simulation := simulate(DampedOscillator, stopTime=10.0,
+                       numberOfIntervals=200, tolerance=1e-8);
+positionFinal := val(position, 10.0);
+velocityFinal := val(velocity, 10.0);
+energyFinal := 0.5 * velocityFinal^2 + 2.0 * positionFinal^2;
+print(loaded, "\n");
+print(size(flatModel) > 100, "\n");
+print(size(simulation.solution.t) >= 201, "\n");
+print(energyFinal > 0.0 and energyFinal < 0.05, "\n");
+
+// Result:
+// true
+// true
+// true
+// true
+// endResult
