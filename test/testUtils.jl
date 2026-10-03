@@ -19,7 +19,7 @@ import OMFrontend
 import OMBackend
 import OM
 
-using DifferentialEquations: ReturnCode, Rodas5
+using DifferentialEquations: ReturnCode, Rodas5P
 import Sundials
 
 #=
@@ -104,7 +104,7 @@ function runModelMTK(model,
                      file;
                      MSL = false,
                      timeSpan = (0.0, 1.0),
-                     solver = Rodas5(), kwargs...)
+                     solver = OMBackend.defaultSolver(), kwargs...)
   @info "Translating : " model
   OM.translate(model, file; MSL = MSL)
   @info "Simulating:"
@@ -401,6 +401,14 @@ function validateMSLModel(sol, refFile::String;
       end
       abs_err = abs(actual - expected)
       threshold = atol + reltol * abs(expected)
+      #= An event instant: the reference has a row per value there (both limits,
+         and a pulse of zero width: 0.015 in MultiPhaseTwoLevel_R). The actual
+         value matching any of them is the same instant. =#
+      if abs_err > threshold
+        local tol = 1e-9 * max(1.0, abs(t))
+        local rows = searchsortedfirst(ref_time, t - tol):searchsortedlast(ref_time, t + tol)
+        length(rows) > 1 && any(k -> abs(actual - ref_values[k]) <= atol + reltol * abs(ref_values[k]), rows) && continue
+      end
       if abs_err > threshold && knot_eps > 0.0
         expected_lo = interpolateRef(ref_time, ref_values, t - knot_eps)
         expected_hi = interpolateRef(ref_time, ref_values, t + knot_eps)
@@ -429,6 +437,10 @@ function validateMSLModel(sol, refFile::String;
     end
   end
 
+  #= No signal compared is no validation (as OMLibraryTesting's validate_against_reference). =#
+  if !isempty(signal_names) && skipped == length(signal_names)
+    return (false, "None of the $(length(signal_names)) reference signals is in the solution")
+  end
   if isempty(failures)
     msg = "All $(length(signal_names) - skipped) signals validated"
     if skipped > 0
@@ -449,7 +461,7 @@ Suppresses large solution output.
 """
 function runVSSTest(model::String, file::String;
                     timeSpan = (0.0, 1.0),
-                    solver = Rodas5(),
+                    solver = OMBackend.defaultSolver(),
                     solutionIndex::Int,
                     symbol::Symbol,
                     expectedValue,

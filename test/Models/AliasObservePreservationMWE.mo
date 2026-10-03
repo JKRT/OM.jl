@@ -57,4 +57,15 @@ package AliasObservePreservationMWE
     phi_rel = phi;
   end StateStateAlias;
 
+  model FoldedSum "algebraic variables an earlier pass folded away, read back"
+    Real x(start = 1, fixed = true);
+    Real v[3];
+    Real total;
+  equation
+    der(x) = -x;
+    for i in 1:3 loop
+      v[i] = i * x;
+    end for;
+    total = v[1] + v[2] + v[3];
+  end FoldedSum;
 end AliasObservePreservationMWE;

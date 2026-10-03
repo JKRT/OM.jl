@@ -1,57 +1,26 @@
 name: CI
+
+# OM.jl with every sibling package at the matching branch: the 1.13 line on
+# Julia 1.13, master too (the same workflow the sibling packages
+# call; see omjl-ci.yml).
 on:
   pull_request:
   push:
-    branches:
-      - master
-    tags: '*'
+    branches: [master, "1.13"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write  # julia-actions/cache deletes the caches it replaces
+
+concurrency:
+  group: ci-${{ github.ref }}
+  # Superseded PR runs only; every push to master/1.13 is tested.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
-  test:
-    name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: true
-      matrix:
-        include:
-          - os: windows-latest
-            arch: 'x64'
-            version: '1.7'
-          - os: ubuntu-latest
-            arch: 'x64'
-            version: '1.7'
-          - os: macos-latest
-            arch: 'x64'
-            version: '1.7'
-    steps:
-      - uses: actions/checkout@v2
-
-      - uses: julia-actions/setup-julia@v1
-        with:
-          version: ${{ matrix.version }}
-          arch: ${{ matrix.arch }}
-
-      - uses: actions/cache@v1
-        env:
-          cache-name: cache-artifacts
-        with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-
-      - name: Build
-        # Use bash always to avoid having to escape quotes for Windows
-        shell: bash
-        run: julia --compiled-modules=no --color=yes --project -e 'import Pkg; Pkg.Registry.add("General"); Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git")); Pkg.build(;verbose = true);Pkg.instantiate()'
-
-      - name: Test
-        uses: julia-actions/julia-runtest@v1
-
-      - name: Calculate process coverage
-        uses: julia-actions/julia-processcoverage@v1
-
-      - name: Coverage report
-        uses: codecov/codecov-action@v1
-        with:
-          file: lcov.info
+  omjl:
+    uses: ./.github/workflows/omjl-ci.yml
+    with:
+      package: OM
+      julia-versions: '["1.13"]'  # OM.jl's packages require Julia 1.13

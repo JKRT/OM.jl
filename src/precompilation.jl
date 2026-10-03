@@ -38,7 +38,30 @@ using PrecompileTools
   using DifferentialEquations
 end
 
-include("precompile_statements.jl")
+#= The hints come from --trace-compile runs and go stale when a signature
+   changes (a renamed function, a uniontype variant that became a constructor
+   function). They are only hints, so evaluate each one on its own and skip
+   the ones that no longer resolve instead of failing the whole precompile. =#
+let hintsFile = joinpath(@__DIR__, "precompile_statements.jl")
+  include_dependency(hintsFile)
+  local total = 0
+  local stale = 0
+  local notCompiled = 0
+  for hint in Meta.parseall(read(hintsFile, String); filename = hintsFile).args
+    hint isa Expr || continue
+    total += 1
+    try
+      #= precompile(...) returns false for a signature that no longer compiles. =#
+      Core.eval(@__MODULE__, hint) === false && (notCompiled += 1)
+    catch err
+      stale += 1
+      @debug "Skipping stale precompile hint" hint exception = err
+    end
+  end
+  #= One line, so a stale hints file is noticed (efficiency review 2026-09-29). =#
+  (stale + notCompiled) > 0 &&
+    @info "OM precompile hints: $stale of $total no longer resolve, $notCompiled do not compile; regenerate precompile_statements.jl"
+end
 
 PrecompileTools.@compile_workload begin
   @info "Precompiling OM.jl..."
@@ -143,13 +166,13 @@ PrecompileTools.@compile_workload begin
       nothing
     end
     local prob = DifferentialEquations.ODEProblem(ode!, [1.0], (0.0, 0.1))
-    DifferentialEquations.solve(prob, DifferentialEquations.Rodas5(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.defaultSolver();
                                 abstol = 1e-3, reltol = 1e-3)
 
     local cb = DifferentialEquations.DiscreteCallback(
       (u, t, integrator) -> t == 0.05,
       integrator -> (integrator.u[1] = 0.5 * integrator.u[1]))
-    DifferentialEquations.solve(prob, DifferentialEquations.Rodas5(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.defaultSolver();
                                 callback = cb, tstops = [0.05],
                                 abstol = 1e-3, reltol = 1e-3)
     nothing
@@ -164,7 +187,7 @@ PrecompileTools.@compile_workload begin
     local massMatrix = [1.0 0.0; 0.0 0.0]
     local f = DifferentialEquations.ODEFunction(dae!, mass_matrix = massMatrix)
     local prob = DifferentialEquations.ODEProblem(f, [1.0, 0.0], (0.0, 0.1))
-    DifferentialEquations.solve(prob, DifferentialEquations.FBDF(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.daeFallbackSolver();
                                 abstol = 1e-3, reltol = 1e-3)
     nothing
   end
@@ -186,9 +209,9 @@ PrecompileTools.@compile_workload begin
                                                                  split = false)
     local prob = OMBackend.CodeGeneration.buildDirectRHSProblem(
       reduced, Pair{Any, Any}[], Pair{Any, Any}[], (0.0, 0.1), nothing)
-    DifferentialEquations.solve(prob, DifferentialEquations.Rodas5(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.defaultSolver();
                                 abstol = 1e-3, reltol = 1e-3)
-    DifferentialEquations.solve(prob, DifferentialEquations.FBDF(autodiff = false);
+    DifferentialEquations.solve(prob, OMBackend.daeFallbackSolver();
                                 abstol = 1e-3, reltol = 1e-3)
     nothing
   end
@@ -213,7 +236,7 @@ PrecompileTools.@compile_workload begin
       local sys = ModelingToolkit.ODESystem([D(x) ~ -x], t; name = :_OMFullWarmupSystem)
       sys = ModelingToolkit.structural_simplify(sys)
       local prob = ModelingToolkit.ODEProblem(sys, [x => 1.0], (0.0, 1.0))
-      DifferentialEquations.solve(prob, DifferentialEquations.Rodas5();
+      DifferentialEquations.solve(prob, OMBackend.defaultSolver();
                                   abstol = 1e-3, reltol = 1e-3)
 
       local dae! = function (du, u, p, t)
@@ -225,7 +248,7 @@ PrecompileTools.@compile_workload begin
       local f = DifferentialEquations.ODEFunction(dae!, mass_matrix = massMatrix)
       local massProb = DifferentialEquations.ODEProblem(f, [1.0, 0.0], (0.0, 0.1))
       local daeProb = OMBackend.CodeGeneration.ode_to_dae(massProb)
-      DifferentialEquations.solve(daeProb, DifferentialEquations.DFBDF();
+      DifferentialEquations.solve(daeProb, OMBackend.OrdinaryDiffEqBDF.DFBDF();
                                   abstol = 1e-3, reltol = 1e-3)
     end
   end

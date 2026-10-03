@@ -40,7 +40,6 @@
    wrong solution. The following testsets need proper signal comparisons
    (against reference/csv/*.csv via validateMSLModel or inline isapprox
    with explicit targets):
-     - Rotational.Friction (currently @test_broken — but when it unbreaks)
      - Electrical.Analog.Examples.ShowVariableResistor
      - Mechanics.Translational.Examples.Oscillator (the MSL one, not the
        OMJL-custom Oscillator that is validated elsewhere)
@@ -89,33 +88,47 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
     end
 
     #= Rotational.Friction: two coupled PartialFriction elements (clutch + brake).
-       The discrete `mode` FSM is updated through the per-model pre-memory path
-       (OMBACKEND_DISCRETE_PRE_MEMORY), so the stuck<->sliding breakaway at
-       w_relfric=0 resolves without Zeno chatter. Matches the OMC 3.2.3 reference:
-       inertia1 brakes to ~0 by t~1, the clutch slides (w_rel~-53 at t=1) then
-       relocks, and the inertias decay together. =#
+       Their discrete equations are clusters the event iteration solves with the
+       algebraic loop they are in (discreteClusters.jl), with relations buffered
+       with a hysteresis. OpenModelica 1.27.1 (tolerance 1e-6): events at
+       0.00678, 0.05934, 0.10929, 0.5, 0.53425, 0.64061, 1.66364 and none after;
+       the stuck torque sa(0.03) = -56.81, sa(1.7) = -66.22, sa(2.0) = 32.55;
+       w_rel ~ 0 while locked. =#
     @testset "Rotational.Friction" begin
-      withenv("OMBACKEND_DISCRETE_PRE_MEMORY" => "true") do
-        local sol = nothing
-        @test true == begin
-          try
-            sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.Friction";
-                              MSL_Version = "MSL:3.2.3", stopTime = 5.0,
-                              overwriteCache = true)
-            sol.retcode == _SUCCESS
-          catch e
-            @info "Failed: Rotational.Friction" exception=(e, catch_backtrace())
-            false
-          end
+      local frictionSim = (; kw...) -> OM.simulate("Modelica.Mechanics.Rotational.Examples.Friction";
+                                                   MSL_Version = "MSL:3.2.3", stopTime = 5.0, kw...)
+      local sol = nothing
+      @test true == begin
+        try
+          sol = frictionSim(; overwriteCache = true)
+          sol.retcode == _SUCCESS
+        catch e
+          @info "Failed: Rotational.Friction" exception=(e, catch_backtrace())
+          false
         end
-        if sol !== nothing && sol.retcode == _SUCCESS
-          #= Sliding window (clutch slips, inertia1 braked to rest). =#
-          @test isapprox(sol(1.0; idxs = :inertia1_w), 0.0; atol = 0.5)
-          @test isapprox(sol(1.0; idxs = :inertia3_w), 53.1; atol = 3.0)
-          @test isapprox(sol(1.0; idxs = :clutch_w_rel), -53.2; atol = 3.0)
-          #= Re-locked long tail: clutch held at w_rel=0, inertia1 at rest. =#
-          @test isapprox(sol(2.0; idxs = :inertia1_w), 0.0; atol = 0.5)
-          @test isapprox(sol(2.0; idxs = :clutch_w_rel), 0.0; atol = 0.5)
+      end
+      if sol !== nothing && sol.retcode == _SUCCESS
+        #= Sliding window (clutch slips, inertia1 braked to rest). =#
+        @test isapprox(sol(1.0; idxs = :inertia1_w), 0.0; atol = 0.5)
+        @test isapprox(sol(1.0; idxs = :inertia3_w), 53.1; atol = 3.0)
+        @test isapprox(sol(1.0; idxs = :clutch_w_rel), -53.2; atol = 3.0)
+        #= Re-locked long tail: clutch held at w_rel=0, inertia1 at rest. =#
+        @test isapprox(sol(2.0; idxs = :inertia1_w), 0.0; atol = 0.5)
+        @test isapprox(sol(2.0; idxs = :clutch_w_rel), 0.0; atol = 0.5)
+        #= The stuck torque: the one of the locked configuration, not the sliding one. =#
+        @test all(isapprox.([sol(t; idxs = :clutch_sa) for t in (0.03, 1.7, 2.0)], [-56.81, -66.22, 32.55]; atol = 0.5))
+      end
+      local tight = frictionSim(; reltol = 1e-6, abstol = 1e-7)
+      @test tight.retcode == _SUCCESS
+      if tight.retcode == _SUCCESS
+        local ev = unique([tight.t[i] for i in 2:length(tight.t) if tight.t[i] == tight.t[i - 1]])
+        for tOmc in (0.00678, 0.05934, 0.10929, 0.5, 0.53425, 0.64061, 1.66364)
+          @test any(t -> abs(t - tOmc) < 1e-5, ev)
+        end
+        @test maximum(ev) < 1.6637
+        @test all(isapprox.([tight(t; idxs = :clutch_sa) for t in (0.03, 1.7, 2.0)], [-56.81, -66.22, 32.55]; atol = 0.01))
+        for (a, b) in ((0.01, 0.05), (0.12, 0.5), (1.67, 5.0))
+          @test maximum(abs(tight(t; idxs = :clutch_w_rel)) for t in range(a, b; length = 200)) < 1e-5
         end
       end
     end
@@ -148,12 +161,87 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
         @test isapprox(sol(0.75; idxs = :oneWayClutch_w_rel), 0.0, atol = 0.05)
       end
     end
+
+    #= Event chattering regression. `w_rel <= 0` and `w_rel > 0` had one event
+       callback each on the same root; where the integrator stopped on it they
+       fired alternately and flipped {startForward, locked, stuck} back and
+       forth without time advancing, until maxiters (Rodas5 at these tolerances
+       stopped at t = 0.437; which settings hit it depended on package versions).
+       Now relations with one zero set share a callback, and its affect
+       iterates the cluster to a fixpoint (Modelica event iteration), which the
+       second callback used to stand in for: `locked = pre(stuck) and ...` needs
+       the second pass. =#
+    @testset "Rotational.OneWayClutchDisengaged, tight tolerances" begin
+      local sol = nothing
+      @test true == begin
+        try
+          sol = OM.simulate("Modelica.Mechanics.Rotational.Examples.OneWayClutchDisengaged";
+                            MSL_Version = "MSL:3.2.3", tspan = (0.0, 1.0),
+                            solver = Rodas5P(autodiff = ADTypes.AutoFiniteDiff()), reltol = 1e-6, abstol = 1e-9)
+          sol.retcode == _SUCCESS
+        catch e
+          @info "Failed: Rotational.OneWayClutchDisengaged, tight tolerances" exception=(e, catch_backtrace())
+          false
+        end
+      end
+      if sol !== nothing && sol.retcode == _SUCCESS
+        @test isapprox(sol(0.5; idxs = :oneWayClutch_w_rel), 1.443, atol = 0.05)
+        @test isapprox(sol(0.75; idxs = :oneWayClutch_w_rel), 0.0, atol = 0.05)
+      end
+    end
   end
 
   #= ----------------------------------------------------------------
      Modelica.Electrical.Analog
      ---------------------------------------------------------------- =#
+  #= One cylinder of the V6 engine (EngineV6_analytic's Utilities.CylinderBase:
+     analytic slider-crank JointRRP, GasForce2) with cylinder 2's crank offset
+     and inclination. Its FixedRotation components carry the record parameter
+     `R_rel_inv = Frames.from_T(transpose(R_rel.T), zeros(3))`, which ends up
+     among the initial equations and has to be expanded there. Reference:
+     OpenModelica 1.27.1 (tolerance 1e-8). =#
+  @testset verbose=true "MultiBody loops" begin
+    @testset "V6 engine cylinder, crank offset 90, inclination 30" begin
+      local sol = OM.simulate("EngineCylinder.CylinderRigFree90", "./Models/MSL/EngineCylinder.mo"; MSL = true,
+                              MSL_Version = "MSL:3.2.3", stopTime = 0.5, abstol = 1e-10, reltol = 1e-8)
+      @test sol.retcode == _SUCCESS
+      @test isapprox(sol(0.5; idxs = :phi), 31.88599149896368; rtol = 1e-5)
+      @test isapprox(sol(0.5; idxs = :flywheel_w), 76.57342671018588; rtol = 1e-5)
+    end
+  end
+
+  #= homotopy() beside a discrete cluster: the clusters' start path solved
+     from the entry with the actual expressions and its root was taken
+     (x = -0.347). Reference: OpenModelica 1.27.1. =#
+  @testset "homotopy beside an ideal diode" begin
+    local sol = OM.simulate("HomotopyClusters.CubicWithDiode", "./Models/MSL/HomotopyClusters.mo"; MSL = true,
+                            MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+    @test isapprox(sol(0.0; idxs = :x), 1.879385242; atol = 1e-6)
+  end
+
   @testset verbose=true "Electrical" begin
+
+    #= SignalGenerator: a comparator with positive feedback (opAmp1, a Schmitt
+       trigger) and an integrator. It starts saturated at -15 V (the homotopy
+       initialization, B19) and switches every 0.05 s: at each switch the
+       if-equation relations cycled through the linear branch's unstable
+       solution (B20: the combination that holds at its own solution). The run
+       matches the MSL reference at every sampled point. =#
+    @testset "SignalGenerator" begin
+      local sol = OM.simulate("Modelica.Electrical.Analog.Examples.OpAmps.SignalGenerator"; stopTime = 2.0)
+      @test sol.retcode == _SUCCESS
+      @test [sol(t; idxs = :opAmp1_out_v) for t in (0.01, 0.05, 0.1, 1.99)] ≈ [-15.0, 15.0, -15.0, -15.0] atol = 1e-3
+      local v = sol[:opAmp1_out_v]
+      local flips = [sol.t[i] for i in 2:length(sol.t) if sign(v[i]) != sign(v[i - 1])]
+      @test length(flips) == 40 && isapprox(flips[2], 0.074993; atol = 1e-4)
+      #= An independent relation at its threshold beside it: it holds either
+         way, is not flipped and does not block the selection (MaxIters at 0.42). =#
+      local idle = OM.simulate("SchmittVariants.SGIdle", "./Models/MSL/SchmittVariants.mo"; MSL = true,
+                               MSL_Version = "MSL:3.2.3", stopTime = 2.0)
+      @test idle.retcode == _SUCCESS
+      @test idle(2.0; idxs = :w) == 2.0
+      @test idle(2.0; idxs = :q) ≈ 4.0 atol = 1e-6
+    end
 
     #= ChuaCircuit: nonlinear circuit with inductor, two capacitors.
        omc reference (t=5.0): L.i=0.01535, C1.v=3.8829, C2.v=0.10943 =#
@@ -288,8 +376,8 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
           sol = OM.simulate("Modelica.Mechanics.Translational.Examples.SignConvention";
                             MSL_Version = "MSL:3.2.3", stopTime = 1.0)
           sol.retcode == _SUCCESS &&
-            isapprox(sol.u[end][1], 0.5, atol = 1e-4) &&
-            isapprox(sol.u[end][2], 1.0, atol = 1e-4)
+            isapprox(sol[:mass1_s][end], 0.5, atol = 1e-4) &&
+            isapprox(sol[:mass1_v][end], 1.0, atol = 1e-4)
         catch e
           @info "Failed: SignConvention" exception=(e, catch_backtrace())
           false
@@ -399,14 +487,20 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
          inertias + spring/damper + constant load torque) driven by LimPID,
          with KinematicPTP+Integrator replaced by a constant setpoint. If this
          passes while PID_Controller fails, KinematicPTP alone is the blocker. =#
+      #= The initialization holds the fixed inertia1.phi = 0, inertia1.a = 0 and
+         spring.w_rel = 0 with the PI's steady state through the LimPID
+         limiter's homotopy (B19; OpenModelica: phi = 0, a = 0, w = 1.5708,
+         PI.y = -10). Without it the solve stalled at a residual of 1e-3, and
+         before B16 the fixed values were moved without a word. =#
       @testset "PIDrivingSpringMassWithConstant" begin
-        @test begin
-          sol = OM.simulate("PIDDecomposition.PIDrivingSpringMassWithConstant",
-                            "./Models/PIDDecomposition.mo";
-                            MSL = true, MSL_Version = "MSL:3.2.3",
-                            stopTime = 2.0)
-          sol.retcode == _SUCCESS
-        end
+        local sol = OM.simulate("PIDDecomposition.PIDrivingSpringMassWithConstant",
+                                "./Models/PIDDecomposition.mo";
+                                MSL = true, MSL_Version = "MSL:3.2.3",
+                                stopTime = 2.0)
+        @test sol.retcode == _SUCCESS
+        @test [sol(0.0; idxs = :inertia1_phi), sol(0.0; idxs = :inertia1_a), sol(0.0; idxs = :inertia1_w)] ≈
+              [0.0, 0.0, 1.5708] atol = 1e-6
+        @test sol(2.0; idxs = :PI_y) ≈ -10.0 atol = 1e-6
       end
     end
 

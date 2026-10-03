@@ -54,12 +54,16 @@
                                    rtol = 1.0e-2,);
         end
 
+        #= The Pendulum mode sets start values only on x and y (not fixed). As in
+           OpenModelica, phi and phid are the states and start at 0: the pendulum
+           rests at x = 0, y = -L = -14.142. The ball starts below the floor, where
+           `when y <= 0` is already true, so it never bounces: y(7) = -14.142 - 9.81*2^2/2. =#
         @test true == begin
           sols = runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumStaticBouncingBall", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())::Vector;
           testResultRetCodeSuccess(sols,
                                    solutionIndex = 2,
                                    symbol = :bouncingBall_y,
-                                   expectedValue = 4.004,
+                                   expectedValue = -33.762,
                                    expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
                                    atol = 1.0e-2,
                                    rtol = 1.0e-2,);
@@ -79,18 +83,19 @@
                                    rtol = 1.0e-2,);
         end
 
+        #= As in the static variant: the pendulum rests at y = -14.142, and the ball falls from there. =#
         @test true == begin
         sols::Vector = runModelMTK("Pendulums.BreakingPendulums.BreakingPendulumDynamicBouncingBall", "./Models/VSS/BreakingPendulums.mo"; timeSpan=(0.0, 7.0), solver = FBDF())
         testResultRetCodeSuccess(sols,
                                  solutionIndex = 2,
                                  symbol = :bouncingBall_y,
-                                 expectedValue = 4.004,
+                                 expectedValue = -33.762,
                                  expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
                                  atol = 1.0e-2,
                                  rtol = 1.0e-2,)
         end
         @test true == begin
-          sols::Vector = runModelMTK("CircuitExamples.Circuit", "./Models/VSS/dynamicCircuit.mo"; timeSpan=(0.0, 20.0), solver = Rodas5())
+          sols::Vector = runModelMTK("CircuitExamples.Circuit", "./Models/VSS/dynamicCircuit.mo"; timeSpan=(0.0, 20.0), solver = Rodas5P())
 
           circuit1_freqOK = testResultRetCodeSuccess(sols,
                                                      solutionIndex = 2,

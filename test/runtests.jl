@@ -49,10 +49,17 @@ OMBackend.warnMissingStartValues(false)
     include("matrixTests.jl")
     include("eventTests.jl")
     include("vssTests.jl")
+    include("tunableParameterTests.jl")
+    include("assertTests.jl")
+    include("eventSemanticsTests.jl")
+    include("frictionEventTests.jl")
+    include("stateSelectionTests.jl")
+    include("deModeTests.jl")
   end
   @info "Testing procedural/algorithmic Modelica..."
   @testset "Procedural Modelica:" begin
     include("proceduralTests.jl")
+    include("expressionTests.jl")
   end
   @info "Testing external builtin functions..."
   @testset "External Builtin Functions:" begin
@@ -97,12 +104,10 @@ OMBackend.warnMissingStartValues(false)
   else
     @info "Skipping heavy MSL tests (set OM_HEAVY_TESTS=1 to enable)."
   end
-  #= DOCC tests deactivated — run manually from test/ with include("DOCC/doccTests.jl")
   @info "Testing DOCC (Dynamically Overconstrained Connectors)..."
   @testset "DOCC Tests:" begin
     include("DOCC/doccTests.jl")
   end
-  =#
 end #= End OM tests =#
 
 if get(ENV, "AGENTIC_MODELICA", "") != ""

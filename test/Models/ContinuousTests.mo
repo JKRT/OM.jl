@@ -119,3 +119,9 @@ equation
   der(x) = y;
   der(y) = mu * (1 - x^2) * y - x;
 end NonlinearODE;
+
+model ExplicitTimeForcing "der(x) = 2*sin(50*time) - x: the problem's tgrad is the exact explicit time derivative 100*cos(50*time)"
+  Real x(start = 0, fixed = true);
+equation
+  der(x) = 2*sin(50*time) - x;
+end ExplicitTimeForcing;

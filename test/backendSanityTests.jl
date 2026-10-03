@@ -65,16 +65,15 @@
     @test SC.toDAEExp(rsubSim) isa DAE.RSUB
 
     local sc = SC.SIM_CODE("mock",
-      SC.OrderedDict{String, Tuple{Integer, SC.SimVar}}(),
+      SC.OrderedDict{String, Tuple{Int, SC.SimVar}}(),
       SC.RESIDUAL_EQUATION[], SC.Equation[], SC.WHEN_EQUATION[], SC.IF_EQUATION[],
       false, Int[], SC.Graphs.SimpleDiGraph(0), [], SC.StructuralTransition[], [],
-      String[], String[], SC.Equation[], "mock", NONE(), NONE(), String[],
+      String[], String[], SC.Equation[], "mock", NONE(), String[],
       SC.ModelicaFunction[], false, SC.RESIDUAL_EQUATION[], String[], SC.AliasEntry[],
-      nothing, SC.INITIAL_ALGORITHM[])
-    local emitted = Expr[]
-    OMBackend.CodeGeneration._emitWhenTupleElementAssignMTK!(
-      emitted, SC.EXP_CREF(SC.SimCref(:x), SC.TYPE_REAL()), :(rhs), sc)
-    @test length(emitted) == 1
-    @test emitted[1] == :(x = rhs)
+      nothing, SC.INITIAL_ALGORITHM[], SC.BDAE.ASSERT_EQUATION[])
+    #= A SimCode cref is a tuple target too; one missing from the variable
+       table is refused (it was bound as a local of the affect, its value lost). =#
+    @test_throws OMBackend.UnsupportedLowering OMBackend.CodeGeneration._emitWhenTupleElementAssignMTK!(
+      Expr[], SC.EXP_CREF(SC.SimCref(:x), SC.TYPE_REAL()), :(rhs), sc)
   end
 end

@@ -174,3 +174,20 @@
     end
   end
 end
+
+#= External "FORTRAN 77" functions (Modelica.Math.Matrices.LAPACK) call Julia's
+   own LAPACK (libblastrampoline): no OMRuntimeExternalC library, every platform. =#
+@testset "External FORTRAN 77 functions (LAPACK)" begin
+  local sol = OM.simulate("LapackExternal.Solve", "./Models/LapackExternal.mo"; MSL = true, stopTime = 1.0)
+  @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+  #= y' = x[1] + x[2] = 0.8 + 1.4 =#
+  @test isapprox(sol(1.0; idxs = :y), 3.2; atol = 1e-6)
+  #= dgesv_vec: x = A \ b and info; A and b left as they were (Awork and x are copies). =#
+  local dgesv = OMBackend.CodeGeneration.MODELICA_FUNCTION_IMPLS[:Modelica_Math_Matrices_LAPACK_dgesv_vec]
+  local A = [2.0 1.0; 1.0 3.0]; local b = [3.0, 5.0]
+  local (x, info) = dgesv(A, b)
+  @test x ≈ [0.8, 1.4] && info == 0
+  @test A == [2.0 1.0; 1.0 3.0] && b == [3.0, 5.0]
+  #= A singular matrix: LAPACK's info > 0. =#
+  @test last(dgesv([1.0 2.0; 2.0 4.0], [1.0, 1.0])) > 0
+end

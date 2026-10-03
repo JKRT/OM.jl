@@ -86,7 +86,7 @@
     @test true == begin
       #= Stiff system requires implicit solver =#
       OM.translate("StiffSystem", "./Models/ContinuousTests.mo")
-      sol = OM.simulate("StiffSystem"; stopTime = 1.0, solver = Rodas5(autodiff = false))
+      sol = OM.simulate("StiffSystem"; stopTime = 1.0, solver = Rodas5P(autodiff = ADTypes.AutoFiniteDiff()))
       sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
     end
 
@@ -96,6 +96,21 @@
       sol = OM.simulate("NonlinearODE"; stopTime = 10.0)
       sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
     end
+  end
+
+  @testset "Explicit time derivative (tgrad)" begin
+    #= The direct-RHS problem carries dF/dt: a Rosenbrock method's finite difference in t
+       has a step growing with t, and its error in the MSL SMEE machines' 50 Hz sources
+       set a floor the step control chased until maxiters. dF/dt = 100 cos(50 t);
+       x(1) = 2/2501 (sin 50 - 50 cos 50) + 100/2501 exp(-1). =#
+    OM.translate("ExplicitTimeForcing", "./Models/ContinuousTests.mo")
+    local sol = OM.simulate("ExplicitTimeForcing"; stopTime = 1.0)
+    @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+    @test sol.prob.f.tgrad !== nothing
+    local dT = zeros(length(sol.prob.u0))
+    sol.prob.f.tgrad(dT, copy(sol.prob.u0), sol.prob.p, 0.3)
+    @test dT ≈ [100 * cos(50 * 0.3)] atol = 1e-9
+    @test sol(1.0; idxs = :x) ≈ -0.024083729883836447 atol = 1e-5
   end
 
 end

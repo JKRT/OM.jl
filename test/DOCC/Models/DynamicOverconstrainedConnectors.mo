@@ -172,4 +172,9 @@ package DynamicOverconstrainedConnectors
     connect(G2.port, T2.port_b);
   annotation(experiment(StopTime = 50, Interval = 0.02));
   end System4;
+
+  model System5 "System4 whose breaker closes again at t = 30"
+    extends System4(T2(close = time >= 30));
+  annotation(experiment(StopTime = 50, Interval = 0.02));
+  end System5;
 end DynamicOverconstrainedConnectors;

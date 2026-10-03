@@ -79,4 +79,16 @@
     end
   end
 
+  #= `e * rotateZ(f, a)`: a scalar product with a vector-valued call as operand
+     reaches the backend unexpanded; Julia's `*` has no vector-vector method, so
+     it is generated as vectorDot. s = x ((cos a - 2 sin a) cos t + (sin a + 2 cos a) sin t),
+     der(x) = -s, x(0) = 1. =#
+  @testset "Scalar product with a vector-valued call" begin
+    local sol = OM.simulate("ScalarProductWithCall", "./Models/MatrixTests.mo"; startTime = 0.0, stopTime = 1.0,
+                            abstol = 1e-10, reltol = 1e-8)
+    @test testSimulationSuccess(sol)
+    local (c, sn) = (cos(0.5), sin(0.5))
+    local expected = exp(-((c - 2 * sn) * sin(1.0) + (sn + 2 * c) * (1 - cos(1.0))))
+    @test isapprox(sol(1.0; idxs = :x), expected; rtol = 1e-6)
+  end
 end

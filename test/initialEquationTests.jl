@@ -411,6 +411,244 @@ const IEQ_MSL_MODELS = [
       end
     end
 
+    @testset "IEQ10: a state's start beside an initialized discrete" begin
+      #= The diode's `off` becomes an initialization equation, and vc (in
+         the algebraic `vs = vd + vc`) turns from a hard start into a guess;
+         the 0.0 default for states without a start then replaced it: vc(0)
+         = 0 (the MSL diode rectifiers' capacitors). Values from OpenModelica
+         1.27.1; the diode blocks until 0.0435. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ10_StartKeptBesideDiscreteInit",
+                              "./Models/InitialEquationTests.mo"; stopTime = 0.03)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :vc), sol(0.0; idxs = :s), sol(0.0; idxs = :off)] ≈ [10.0, -8.0, 1.0] atol = 1e-6
+      @test [sol(0.01; idxs = :vc), sol(0.03; idxs = :vc)] ≈ [9.0479625, 7.4067552] atol = 1e-4
+    end
+
+    @testset "IEQ11: an ideal diode that starts in the wrong mode" begin
+      #= IEQ10 with s(start = 0): off is initialized conducting, and the algebraic solve has
+         s = -8e5 against Ron = 1e-5. Its Jacobian is badly scaled, not singular; pinv's rank
+         cutoff dropped the direction that corrects s, the solve crept above its tolerance,
+         and a later phase moved vc to 2 (the MSL diode rectifiers' capacitors and their
+         means' x = 0, y = 0). Values from OpenModelica 1.27.1, as IEQ10's. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ11_DiodeStartsInWrongMode",
+                              "./Models/InitialEquationTests.mo"; stopTime = 0.03)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :vc), sol(0.0; idxs = :s), sol(0.0; idxs = :off)] ≈ [10.0, -8.0, 1.0] atol = 1e-6
+      @test [sol(0.01; idxs = :vc), sol(0.03; idxs = :vc)] ≈ [9.0479625, 7.4067552] atol = 1e-4
+    end
+
+    @testset "IEQ12: a fixed start on an alias of a state" begin
+      #= x(start = 0.1, fixed = true) = s(start = 0), s the state. Merging the alias's
+         attributes field by field kept s's free start 0 with x's fixed = true; a fixed start
+         goes with its fixed (the MSL RollingWheelSet's x of its prismatic joint's s).
+         Values from OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ12_AliasFixedStart", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :s), sol(1.0; idxs = :x)] ≈ [0.1, 1.1] atol = 1e-8
+    end
+
+    @testset "IEQ13: a fixed start on a negated alias of a state" begin
+      #= IEQ12 with y = -s: the alias's start flips sign, its fixed does not. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ13_NegatedAliasFixedStart", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :s), sol(1.0; idxs = :y)] ≈ [0.1, -1.1] atol = 1e-8
+    end
+
+    @testset "IEQ14: a parameter an initial equation computes from the initial state" begin
+      #= positive(fixed = false) = k*x > 0 (the MSL JointSSP's positiveBranch). Kept at its
+         default false, the initial equation was a residual row no unknown satisfies: d
+         started on the other branch (-0.47) and x left its fixed start. Values from
+         OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ14_BranchFromInitialState", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.0; idxs = :d)] ≈ [0.6, 0.7330835739] atol = 1e-6
+      @test [sol(1.0; idxs = :x), sol(1.0; idxs = :d)] ≈ [0.5242376381, 0.7811615459] atol = 1e-5
+    end
+
+    @testset "IEQ15: IEQ14 as a pure ODE (no initialization solve)" begin
+      #= positive = x > 0 assigned at the initial state; kept at its default false, x grew
+         (0.6*e at 1 s). Values from OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ15_BranchFromInitialStateODE", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(1.0; idxs = :x)] ≈ [0.6, 0.2207289885] atol = 1e-5
+    end
+
+    @testset "IEQ16: a parameter the initialization computes (fixed = false)" begin
+      #= k(fixed = false) is what makes der(x) = 0 at x = 0.5 (so k = y(0)), and k2 = 2*k
+         follows it (the MSL InitSpringConstant's spring.c). Kept at its start 1, the
+         initialization could not hold both. Values from OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ16_FreeParameter", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.0; idxs = :y), sol(1.0; idxs = :x)] ≈ [0.5, 0.9204147203, 0.5559353162] atol = 1e-5
+      @test [sol.ps[:k], sol.ps[:k2]] ≈ [0.9204147203, 1.8408294406] atol = 1e-6
+    end
+
+    @testset "IEQ17: IEQ16 as a pure ODE" begin
+      #= Without an algebraic unknown the problem has no initialization solve: k stayed at its
+         start 1. Values from OpenModelica 1.27.1 (k = 0.8). =#
+      local sol = OM.simulate("InitialEquationTests.IEQ17_FreeParameterODE", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.5; idxs = :x), sol(1.0; idxs = :x)] ≈ [0.5, 0.519478771, 0.5626476075] atol = 1e-5
+      @test [sol.ps[:k], sol.ps[:k2]] ≈ [0.8, 1.6] atol = 1e-8
+    end
+
+    @testset "IEQ18/19: relations settled at initialization" begin
+      #= f = if v < 0 then 10 else 1 with der(x) = 0: the relation's value at the solved
+         initial state selects the branch (MLS 8.6), then x is solved again. Solved with the
+         relation's compiled value (false: v from start values), x started at 1 (the MSL
+         EngineV6_analytic's steady-state filter settled on the wrong gas-force branch).
+         OpenModelica 1.27.1. =#
+      local s18 = OM.simulate("InitialEquationTests.IEQ18_SteadyStateAfterRelation", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test s18.retcode == ReturnCode.Success
+      @test [s18(0.0; idxs = :x), s18(0.5; idxs = :x), s18(1.0; idxs = :x)] ≈ [10.0, 10.0, 10.0] atol = 1e-6
+      #= The relation reads the steady-state variable itself: x = 1 flips it, x = 2 settles. =#
+      local s19 = OM.simulate("InitialEquationTests.IEQ19_SteadyStateSelectsBranch", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test s19.retcode == ReturnCode.Success
+      @test [s19(0.0; idxs = :x), s19(1.0; idxs = :x)] ≈ [2.0, 2.0] atol = 1e-6
+      #= No consistent branch (x = 2 selects 1, x = 1 selects 2): a cycle keeps the first
+         solution, x = 2, instead of failing. =#
+      local s20 = OM.simulate("InitialEquationTests.IEQ20_RelationsDoNotSettle", "./Models/InitialEquationTests.mo"; stopTime = 0.1)
+      @test s20.retcode == ReturnCode.Success
+      @test s20(0.0; idxs = :x) ≈ 2.0 atol = 1e-6
+    end
+
+    @testset "IEQ21: der(z) = 0 on an algebraic unknown" begin
+      #= z + 0.1*sin(z) = x + 0.5*time keeps z algebraic; der(z) = 0 then asks der(x) = -0.5,
+         x(0) = 1.5 (with the explicit time term). The init solve's derivative targets need a
+         differential state and dropped the row: x started at 0 (the MSL AIMC_Initialize's
+         steady-state stator currents). OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ21_SteadyStateOnAlgebraic", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.0; idxs = :z), sol(1.0; idxs = :x)] ≈ [1.5, 1.401430809, 1.183939645] atol = 1e-6
+    end
+
+    @testset "IEQ22: der(w) = 0 on an observed variable" begin
+      #= w = 2*x + 0.5*time + 0.1*z is eliminated; the backend substitutes it into der(w),
+         which crashed code generation (der of an expression). der(w) = 0 reads der(z) of the
+         algebraic z + 0.1*sin(z) = x too, and x's start 0.3 is only a guess (the MSL
+         FundamentalWave AIMC_Initialize's steady state on the observed air-gap potentials).
+         OpenModelica 1.27.1. =#
+      local sol = OM.simulate("InitialEquationTests.IEQ22_SteadyStateOnObserved", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol(0.0; idxs = :x), sol(0.0; idxs = :z), sol(1.0; idxs = :x)] ≈ [1.238543548, 1.147374708, 1.087755726] atol = 1e-6
+      #= The same on a pure ODE: its initialization used to take the start values only. =#
+      local ode = OM.simulate("InitialEquationTests.IEQ23_SteadyStateOnObservedODE", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test ode.retcode == ReturnCode.Success
+      @test [ode(0.0; idxs = :x), ode(1.0; idxs = :x)] ≈ [1.25, 1.091970315] atol = 1e-6
+    end
+
+    @testset "IEQ24: a guess of 0 that makes the entry residual non-finite" begin
+      #= G = 0.3/(7e-6 (1 + x)), x = exp(-t) =#
+      local sol = OM.simulate("InitialEquationTests.IEQ24_ReciprocalWithoutStart", "./Models/InitialEquationTests.mo"; stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      #= at t = 0 the init solve's absolute tolerance on a row of size 1e-5 (5e-6 relative) =#
+      @test sol(0.0; idxs = :G) ≈ 0.3 / 1.4e-5 rtol = 1e-4
+      @test sol(1.0; idxs = :G) ≈ 0.3 / (7e-6 * (1 + exp(-1))) rtol = 1e-6
+    end
+    @testset "IEQ25-37: fixed=false parameters and initial equations that were lost" begin
+      local file = "./Models/InitialEquationTests.mo"
+      #= A tuple initial equation failed in the frontend (simplifyTupleElement typed
+         for statements only). OpenModelica: a = 3, b = 4.5, x(1) = 48. =#
+      local s25 = OM.simulate("InitialEquationTests.IEQ25_TupleParameters", file; stopTime = 1.0)
+      @test s25(1.0; idxs = :x) ≈ 48.0 rtol = 1e-6
+      #= t0 = time could not be evaluated at the build and t0 kept its start (0.6)
+         for any start time: computed for 0, another start time is refused. =#
+      local s26 = OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file; stopTime = 1.0)
+      @test s26(0.9; idxs = :n) == 3   # samples at 0.25, 0.5, 0.75
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file;
+                                                             startTime = 0.1, stopTime = 1.0)
+      #= Parameter targets of the initial algorithm were never set (k stayed 0).
+         OpenModelica: k = 20, x(1) = 20. =#
+      local s27 = OM.simulate("InitialEquationTests.IEQ27_ParameterFromInitialAlgorithm", file; stopTime = 1.0)
+      @test s27(1.0; idxs = :x) ≈ 20.0 rtol = 1e-6
+      #= The explicit fold removed v and its fixed start (x(0) = 0, v(0) = 1).
+         OpenModelica: x(0) = 2, v(0) = 3. =#
+      local s28 = OM.simulate("InitialEquationTests.IEQ28_FixedAlgebraic", file; stopTime = 1.0)
+      @test [s28(0.0; idxs = :x), s28(0.0; idxs = :v)] ≈ [2.0, 3.0] rtol = 1e-6
+      #= A pure ODE skipped the init solve: both initial equations were ignored
+         (x(0) = y(0) = 0). x(0) = 1, y(0) = 2, y(1) = 1 + exp(-1). =#
+      local s29 = OM.simulate("InitialEquationTests.IEQ29_SteadyPureODE", file; stopTime = 1.0)
+      @test [s29(0.0; idxs = :x), s29(0.0; idxs = :y), s29(1.0; idxs = :y)] ≈ [1.0, 2.0, 1 + exp(-1)] rtol = 1e-5
+      #= The pure ODE took 2*x = 4 as a start value of nothing (x(0) = 0). =#
+      local s30 = OM.simulate("InitialEquationTests.IEQ30_ScaledInit", file; stopTime = 1.0)
+      @test [s30(0.0; idxs = :x), s30(1.0; idxs = :x)] ≈ [2.0, 2 * exp(-1)] rtol = 1e-5
+      #= An initial algorithm reading der() was skipped, its targets at their
+         starts (OpenModelica: b = 1), and dropped every other one (a = 0): refused. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ31_DerInOneSection", file; stopTime = 1.0)
+      #= The initial algorithm ran for time 0 at any start time: from 0.1 the
+         count is the same (OpenModelica: x(1) = 0.9); a value that differs is
+         refused (OpenModelica: t1 = 0.1). =#
+      local s32 = OM.simulate("InitialEquationTests.IEQ32_InitialAlgorithmReadsTime", file; startTime = 0.1, stopTime = 1.0)
+      @test s32(1.0; idxs = :x) ≈ 0.9 rtol = 1e-6
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ33_TimeOfStart", file;
+                                                             startTime = 0.1, stopTime = 1.0)
+      #= Neither parameter can be solved alone at the build: the initialization
+         solves both (OpenModelica: p = 2, x(1) = 2). =#
+      local s34 = OM.simulate("InitialEquationTests.IEQ34_CoupledParameters", file; stopTime = 1.0)
+      @test s34(1.0; idxs = :x) ≈ 2.0 rtol = 1e-6
+      #= A record argument of an initial equation was passed whole: its fields'
+         names were undefined (MSL Engine1b_analytic). OpenModelica: p = 31. =#
+      local s35 = OM.simulate("InitialEquationTests.IEQ35_RecordArgInInitialEquation", file; stopTime = 1.0)
+      @test s35(1.0; idxs = :x) ≈ 31.0 rtol = 1e-6
+      #= The early initial-algorithm pass read a start that is not a literal
+         (x(start = x0)) as 0.0: a = 1. =#
+      @test OM.simulate("InitialEquationTests.IEQ36_ParameterStartInInitialAlgorithm", file; stopTime = 1.0)(0.5; idxs = :a) ≈ 4.0
+      #= A tuple equation in when initial() was evaluated and dropped (a = b = 0). =#
+      local s37 = OM.simulate("InitialEquationTests.IEQ37_TupleInInitialWhen", file; stopTime = 1.0)
+      @test [s37(0.5; idxs = :a), s37(0.5; idxs = :b)] ≈ [4.0, 6.0]
+      #= Without unknowns, the initial equations were not applied (k = 1); a
+         free parameter, an unknown of an init solve it does not run, is refused. =#
+      @test OM.simulate("InitialEquationTests.IEQ38_AssignedParameterWithoutStates", file; stopTime = 1.0)(0.5; idxs = :y) ≈ 1.0
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ39_FreeParameterWithoutStates", file;
+                                                             stopTime = 1.0)
+      #= floor(p27) was a symbolic call the start's evaluation did not fold: 0.0 with a
+         warning (and integer() rounded where it was evaluated). =#
+      @test OM.simulate("InitialEquationTests.IEQ40_IntegerOfParameterStart", file; stopTime = 1.0)(0.5; idxs = :zi) ≈ 2.0
+      #= fixed = true without a start fixes the default start 0; v was folded away (xa(0) = 0). =#
+      local s41 = OM.simulate("InitialEquationTests.IEQ41_FixedWithoutStart", file; stopTime = 1.0)
+      @test [s41(0.0; idxs = :xa), s41(0.0; idxs = :v)] ≈ [-1.0, 0.0] atol = 1e-8
+      #= A variable defined through der() and folded away had no observed equation. =#
+      local s42 = OM.simulate("InitialEquationTests.IEQ42_DerivativeOutput", file; stopTime = 1.0)
+      @test [s42(0.0; idxs = :a), s42(0.0; idxs = :y2)] ≈ [-8.0, -16.0] atol = 1e-6
+      #= The row read der(y), which no observed equation reduces: it was dropped (x(0) = 0). =#
+      @test OM.simulate("InitialEquationTests.IEQ43_DerivativeEqualsDerivative", file; stopTime = 1.0)(0.0; idxs = :x) ≈ 1.0 atol = 1e-8
+      #= Pure ODEs pinned every start, the non-fixed x too: the init solve freed every
+         variable and moved the fixed y (y = 0). =#
+      local s44 = OM.simulate("InitialEquationTests.IEQ44_SignalInPureODE", file; stopTime = 1.0)
+      @test [s44(0.0; idxs = :x), s44(0.0; idxs = :y)] ≈ [5.0, 2.0] atol = 1e-8
+      #= der() of an observed variable: the row was skipped without a word (x(0) = 0). =#
+      local s45 = OM.simulate("InitialEquationTests.IEQ45_DerivativeOfObserved", file; stopTime = 1.0)
+      @test [s45(0.0; idxs = :x), s45(0.0; idxs = :y)] ≈ [-1.0, 1.0] atol = 1e-8
+      #= der(der(x)) was taken as der(x). =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ46_SecondDerivative", file; stopTime = 1.0)
+      #= The init solve freed the fixed v and returned v = 1, without a word. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ47_FixedCannotHold", file; stopTime = 1.0)
+      #= An array element's pin did not match (var"x[1]"): x[1] = 0.48 was accepted. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ48_ArrayElementCannotHold", file; stopTime = 1.0)
+      #= The initial equation's value was taken without a word. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ49_FixedAndInitialEquation", file; stopTime = 1.0)
+      #= A start that reads a free parameter is no user value to hold: not refused. =#
+      local s50 = OM.simulate("InitialEquationTests.IEQ50_FixedStartOfFreeParameter", file; stopTime = 1.0)
+      @test s50(0.0; idxs = :x) ≈ 1.0 atol = 1e-6
+      #= A free parameter alone on the right (`x = q`) was neither free nor
+         assigned: q kept its start 0.5, and x = 0.5. =#
+      @test OM.simulate("InitialEquationTests.IEQ51_FreeParameterOnTheRight", file; stopTime = 1.0)(0.0; idxs = :x) ≈ 1.0 atol = 1e-6
+      #= With eliminateNonDynamic, b and a were eliminated as output-only: the
+         initial equation read an undefined b (UndefVarError). =#
+      @test OM.simulate("InitialEquationTests.IEQ52_InitialEquationReadsOutputOnly", file; stopTime = 1.0,
+                        eliminateNonDynamic = true)(0.0; idxs = :z) ≈ 3.0 atol = 1e-6
+      #= homotopy(): the initialization goes from the simplified expressions to
+         the actual ones (OpenModelica's default); it took the actual one only. =#
+      @test OM.simulate("InitialEquationTests.IEQ53_HomotopyRoot", file; stopTime = 1.0)(0.0; idxs = :x) ≈ 1.879385242 atol = 1e-6
+      #= Three roots (y = 1, -1, 0 with u = 2y): the simplified expression picks one. =#
+      @test OM.simulate("InitialEquationTests.IEQ54_HomotopyLimiterUpper", file; stopTime = 1.0)(0.0; idxs = :y) ≈ 1.0 atol = 1e-6
+      @test OM.simulate("InitialEquationTests.IEQ55_HomotopyLimiterLower", file; stopTime = 1.0)(0.0; idxs = :y) ≈ -1.0 atol = 1e-6
+      #= Outside the continuous equations it is the actual expression (an undefined λ there was an UndefVarError). =#
+      @test OM.simulate("InitialEquationTests.IEQ56_HomotopyInWhen", file; stopTime = 2.0)(2.0; idxs = :d) ≈ 1.0 atol = 1e-4
+      #= The simulation's RHS is at λ = 1: the simplified expression is not evaluated (it asserted at x < 0). =#
+      @test OM.simulate("InitialEquationTests.IEQ57_HomotopySimplifiedOnlyAtInit", file; stopTime = 1.0)(1.0; idxs = :y) ≈ -1.0 atol = 1e-6
+    end
+
   end
 
 end

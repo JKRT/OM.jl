@@ -14,19 +14,19 @@
        defining residual; structural_simplify raises
        ExtraVariablesSystemException before any value can be observed.
        After the pass T_last is DISCRETE, gets a `der(T_last) ~ 0` dummy,
-       and the when-callback updates T_last at t = 0.5 (within rootfind
-       precision). Pre-event x = t (der(x) = 1), post-event der(x) = 1 -
-       T_last_event so x at t = 1.0 is ~0.69 with rootfind precision near
-       0.5. Tolerance 0.05 absorbs the rootfind step variability. =#
+       and the when-callback updates T_last at t = 0.5. Pre-event x = t
+       (der(x) = 1), post-event der(x) = 1 - 0.5, so x(1.0) = 0.75
+       (OpenModelica 1.27.1: 0.75; this test used to expect 0.692, what
+       OM.jl gave before). =#
     @test true == begin
       sol = runModelMTK("RealWhenDrivenDiscrete",
                         "Models/RealWhenDrivenDiscrete.mo";
                         timeSpan = (0.0, 1.0))
       testResultRetCodeSuccess(sol;
                                symbol = :x,
-                               expectedValue = 0.692,
-                               rtol = 0.05,
-                               atol = 0.05)
+                               expectedValue = 0.75,
+                               rtol = 1e-4,
+                               atol = 1e-4)
     end
   end
 

@@ -120,17 +120,38 @@
   end
 
   #= lowerComplexOperatorRecords reproducer set (test/Models/ComplexLoweringTests.mo).
-     SKIPPED: OMFrontend cannot resolve the top-level operator-record `Complex`
-     for a standalone custom .mo (not in scope); these only ever passed when a
-     prior MSL test left `Complex` in OMFrontend's global scope, so they are
-     order-dependent. The SimCode complex-lowering pass they target is covered
-     by the MSL model test `ShowTransferFunction` (translate+simulate+validate,
-     mslExpansionTests.jl) and by UnsymmetricalLoad. Un-skip if OMFrontend gains
-     Complex-in-scope support for custom files. =#
-  @testset "Lowering: Complex operator-record patterns (skipped — see note)" begin
-    for m in ("DirectAssign", "ConstructorProjection", "ArrayElementAccess",
-              "MatrixVectorMul", "InitialEqAssign")
-      @test_skip OM.translate("ComplexLoweringTests." * m, "./Models/ComplexLoweringTests.mo")
+     `Complex` is a top-level operator record of the MSL, so the file is
+     translated with the MSL loaded (without it, these passed only when an
+     earlier test had loaded the MSL). The models have no states, so their
+     variables cannot be read from the solution; the tests check that the
+     lowering translates and the models simulate. InitialEqAssign's initial
+     equation contradicts its equation at t = 0 (overdetermined): translate
+     only, which is what it reproduces. The OperatorCall models have a state that
+     integrates the fields of Complex equations between an operator call and a
+     constructor (the shape that stopped 59 MSL models in the backend);
+     ArrayArgFunctions passes Complex arrays to functions (ComplexBlocks Sum,
+     QuasiStationary quasiRMS); ArrayRecordOutputs returns one from a function.
+     SymmetricTransformation evaluates the MSL's symmetricTransformationMatrix at
+     compile time; when every row came out as the last one, 17 QuasiStatic
+     machine models were unbalanced. =#
+  @testset "Lowering: Complex operator-record patterns" begin
+    local file = "./Models/ComplexLoweringTests.mo"
+    for m in ("DirectAssign", "ConstructorProjection", "ArrayElementAccess", "MatrixVectorMul")
+      local sol = OM.simulate("ComplexLoweringTests." * m, file; MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+    end
+    @test begin
+      OM.translate("ComplexLoweringTests.InitialEqAssign", file; MSL = true, MSL_Version = "MSL:3.2.3")
+      true
+    end
+    for (m, x1) in (("OperatorCallEquation", 0.5 + cos(1.0) - 1 - 2 * sin(1.0)),
+                    ("ArrayOperatorCallEquation", 3.5 + 7 * (cos(1.0) - 1) - 14 * sin(1.0)),
+                    ("ArrayArgFunctions", 2.02820976),    # the integral of y.re + 2 y.im + r; OpenModelica 2.02820969
+                    ("ArrayRecordOutputs", -8.74339361),  # analytic (OpenModelica 1.27.1 fails in wrapFunctionCalls)
+                    ("SymmetricTransformation", -0.48042261))  # analytic = OpenModelica 1.27.1
+      local sol = OM.simulate("ComplexLoweringTests." * m, file; MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+      @test sol.retcode == ReturnCode.Success
+      @test isapprox(sol[:x][end], x1; atol = 1.0e-4)
     end
   end
 
@@ -245,6 +266,47 @@
     @test true == begin
       sol = OM.simulate("RecordFunctionTest.ControlFlowFuncSymbolicArgs", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
       testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 1.0)
+    end
+  end
+
+  @testset "Record-valued call as a record argument in a function" begin
+    #= sumOfMadePair calls sumWithPair(1.0, makePair(z)): a record input takes its fields,
+       and a call returning a record returns them as a tuple, which is splatted (it went in
+       as one argument: BoundsError; the MSL ReferenceAir's rho_props_pT(p, T,
+       airBaseProp_pT(p, T))). der(x) = 1 + 3 time, so x(1) = 2.5. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.RecordArgFromCall", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 2.5)
+    end
+  end
+
+  @testset "Field of a record-valued call in a function" begin
+    #= secondOf(makePair(z)) inlines to makePair(z).b: the field of a tuple, by position
+       (`.b` on the tuple: FieldError; the MSL Media's temperature(setState_psX(...))).
+       der(x) = 2 time, so x(1) = 1. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.FieldOfRecordCall", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 1.0)
+    end
+  end
+
+  @testset "Record-valued if-expression assigned to a record" begin
+    #= r := if first then PairRecord(...) else PairRecord(...) went to an unused local, and the
+       flattened fields r_a, r_b stayed 0 (the MSL MixtureGasNasa setState_pTX returned a zero
+       state). der(x) = 2 time until 0.5, then 1 (the else branch), so x(1) = 0.75: within 1e-2,
+       as the switch is inside a function (no event), and 0 (the bug) or 0.25 (no else) are far. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.RecordIfAssignment", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 0.75, atol = 1e-2, rtol = 0.0)
+    end
+  end
+
+  @testset "Protected array sized by an input" begin
+    #= Real w[size(x, 1)] was declared a scalar 0.0, and w[i] := ... failed (setindex! on a
+       Float64; the MSL Media massToMoleFractions). der(x) = 1.5 (1 + 2 + 3) = 9. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.ProtectedArrayFromInputSize", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 9.0)
     end
   end
 
