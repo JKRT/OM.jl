@@ -1,0 +1,64 @@
+name: Documentation
+
+# Builds the Documenter site (docs/) with every sibling package at the
+# matching branch, set up as in omjl-ci.yml, and deploys it from master.
+on:
+  pull_request:
+  push:
+    branches: [master]
+    tags: ['*']
+  workflow_dispatch:
+
+permissions:
+  contents: write  # deploydocs pushes the gh-pages branch
+  statuses: write
+  actions: write   # julia-actions/cache deletes the caches it replaces
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  docs:
+    name: Build and deploy docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      # Native libraries first, precompile after (see ci/setup.jl).
+      JULIA_PKG_PRECOMPILE_AUTO: "0"
+    steps:
+      - name: Check out OM.jl
+        uses: actions/checkout@v4
+        with:
+          path: OM.jl
+
+      - name: Check out the other packages
+        uses: JKRT/OM.jl/.github/actions/checkout-siblings@master
+        with:
+          path: OM.jl
+          exclude: OM
+
+      - uses: actions/setup-java@v4  # ANTLR, if the parser is built from source
+        with:
+          distribution: zulu
+          java-version: "21"
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.13"
+
+      - uses: julia-actions/cache@v2
+
+      - name: OMParser library
+        run: OM.jl/ci/build-parser.sh
+
+      - name: Set up OM.jl
+        run: julia --color=yes --project=OM.jl OM.jl/ci/setup.jl
+
+      - name: Build and deploy
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
+        run: |
+          julia --color=yes --project=OM.jl/docs -e 'import Pkg; Pkg.instantiate()'
+          julia --color=yes --project=OM.jl/docs OM.jl/docs/make.jl

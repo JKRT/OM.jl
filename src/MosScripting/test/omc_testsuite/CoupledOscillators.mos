@@ -1,0 +1,28 @@
+// name: CoupledOscillatorsSimulation
+// keywords: simulation, coupled-system, conservation, instantiateModel, val
+// status: correct
+//
+// Two coupled oscillators exchange energy while conserving total energy.
+
+loaded := loadFile("CoupledOscillators.mo");
+flatModel := instantiateModel(CoupledOscillators);
+simulation := simulate(CoupledOscillators, stopTime=5.0,
+                       numberOfIntervals=200, tolerance=1e-8);
+position1Final := val(position1, 5.0);
+velocity1Final := val(velocity1, 5.0);
+position2Final := val(position2, 5.0);
+velocity2Final := val(velocity2, 5.0);
+energyFinal := 0.5 * velocity1Final^2 + 0.5 * velocity2Final^2 +
+               0.5 * position1Final^2 + 0.5 * position2Final^2 +
+               0.25 * (position1Final - position2Final)^2;
+print(loaded, "\n");
+print(size(flatModel) > 100, "\n");
+print(position2Final <> 0.0, "\n");
+print(energyFinal > 0.745 and energyFinal < 0.755, "\n");
+
+// Result:
+// true
+// true
+// true
+// true
+// endResult
