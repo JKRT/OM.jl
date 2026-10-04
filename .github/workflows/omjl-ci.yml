@@ -13,7 +13,9 @@ name: OM.jl integration
 #    for the Julia version), set up and precompile OM.jl (ci/setup.jl).
 # 3. Run the package's own tests against the checked-out siblings
 #    (ci/test-package.jl), then OM.jl's test suite (test/runtests.jl), also
-#    when the package's own tests fail.
+#    when the package's own tests fail. The suite runs as parallel jobs, one
+#    per group of test/runtests.jl (OM_TEST_GROUP); the package's own tests
+#    run in the core job.
 #
 # The ci/ scripts come from the OM.jl checkout, so each OM.jl line (master,
 # 1.13, ...) defines how it is tested. The checkout-siblings action is used
@@ -56,16 +58,21 @@ on:
 
 jobs:
   test:
-    name: ${{ inputs.package }} with OM.jl, Julia ${{ matrix.julia }}
+    name: ${{ inputs.package }} with OM.jl, Julia ${{ matrix.julia }} (${{ matrix.group }})
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
       fail-fast: false
       matrix:
         julia: ${{ fromJSON(inputs.julia-versions) }}
+        group: [core, results, events, msl]
     env:
       # Native libraries first, precompile after (see ci/setup.jl).
       JULIA_PKG_PRECOMPILE_AUTO: "0"
+      # Package images for any x86-64 runner with AVX2 instead of the runner's
+      # own CPU: the runners are Intel or AMD, and a cache built on the other kind
+      # was rejected, so ~90 packages were precompiled again in every run.
+      JULIA_CPU_TARGET: x86-64-v3
     steps:
       - name: Check out OM.jl
         if: inputs.package != 'OM'
@@ -99,6 +106,8 @@ jobs:
           version: ${{ matrix.julia }}
 
       - uses: julia-actions/cache@v2
+        with:
+          include-matrix: false  # the groups share one depot
 
       - name: OMParser library
         env:
@@ -110,7 +119,7 @@ jobs:
         run: julia --color=yes --project=OM.jl OM.jl/ci/setup.jl
 
       - name: ${{ inputs.package }} tests
-        if: inputs.package-tests && inputs.package != 'OM'
+        if: inputs.package-tests && inputs.package != 'OM' && matrix.group == 'core'
         env:
           PACKAGE: ${{ inputs.package }}
           LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
@@ -121,10 +130,11 @@ jobs:
         if: ${{ !cancelled() && inputs.om-tests && steps.setup.outcome == 'success' }}
         run: OM.jl/ci/fetch-msl-refs.sh
 
-      - name: OM.jl tests
+      - name: OM.jl tests (${{ matrix.group }})
         if: ${{ !cancelled() && inputs.om-tests && steps.setup.outcome == 'success' }}
         working-directory: OM.jl/test
         env:
           LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
+          OM_TEST_GROUP: ${{ matrix.group }}
         # With threads: OMFrontend's parallel path, as users run it (package tests: ci/test-package.jl).
         run: julia --color=yes --project=.. --threads=auto -e 'include("runtests.jl")'
