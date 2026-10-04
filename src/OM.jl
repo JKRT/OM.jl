@@ -448,19 +448,26 @@ function flatten(modelName::String, modelFile::String;
 end
 
 """
-    flatten(modelName; MSL_Version="MSL:3.2.3")
+    flatten(modelName; MSL_Version="MSL:3.2.3", libraries=String[])
 
-Flatten an MSL model by name. Returns a Tuple of the flattened representation
-and the function cache.
+Flatten a model by name: an MSL model, or one of `libraries`. Returns a Tuple of
+the flattened representation and the function cache.
+
+- `libraries`: the libraries the model is in, instead of the MSL: cache keys
+  (`loadInstalledLibrary`, `loadLibrary`, `loadPackage`) or file/directory paths.
+  The libraries an installed library uses come along with its key.
 
 # Examples
 ```julia
 OM.flatten("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
 OM.flatten("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
            MSL_Version="MSL:3.2.3")
+key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
+OM.flatten("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
 ```
 """
-function flatten(modelName::String; MSL_Version = "MSL:3.2.3")::Tuple
+function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector{String} = String[])::Tuple
+  isempty(libraries) || return flatten(modelName, ""; libraries = libraries)
   return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version)
 end
 
@@ -573,11 +580,15 @@ _builtAtTranslate(modelName::String)::Bool =
 """
     simulate(modelName; MSL_Version="MSL:3.2.3", startTime=0.0, stopTime=1.0, ...)
 
-Translate and simulate an MSL model by name. Defaults to `MSL=true`.
+Translate and simulate a model by name, an MSL model or one of `libraries`.
+Defaults to `MSL=true`.
 
 # Keyword arguments
 - `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0)
 - `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
+- `libraries`: the libraries the model is in, instead of the MSL: cache keys
+  (`loadInstalledLibrary`, `loadLibrary`, `loadPackage`) or file/directory paths.
+  The libraries an installed library uses come along with its key.
 - `solver`: ODE solver (default `OMBackend.defaultSolver()`: Rodas5P with finite-difference Jacobians)
 - `mode`: backend mode (default `OMBackend.MTK_MODE`)
 - `warnMissingStartValues`: override missing-start-value warnings
@@ -611,6 +622,9 @@ sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
 # Force re-translation (e.g. after code generation changes):
 sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
                   MSL_Version="MSL:3.2.3", overwriteCache=true)
+# A model of an installed library:
+key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
+sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
 ```
 """
 function simulate(modelName::String;
@@ -618,6 +632,7 @@ function simulate(modelName::String;
                   stopTime = 1.0,
                   MSL = true,
                   MSL_Version = "MSL:3.2.3",
+                  libraries::Vector{String} = String[],
                   solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
@@ -630,10 +645,11 @@ function simulate(modelName::String;
     internalName = OMBackend.canonicalName(modelName)
     alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
     local rebuilt = false
-    if (!alreadyCompiled || overwriteCache) && MSL
+    if (!alreadyCompiled || overwriteCache) && (MSL || !isempty(libraries))
       rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
       translate(modelName;
                 MSL_Version = MSL_Version,
+                libraries = libraries,
                 mode = mode,
                 warnMissingStartValues = warnMissingStartValues,
                 eliminateNonDynamic = eliminateNonDynamic,
@@ -735,13 +751,16 @@ function translate(modelName::String,
 end
 
 """
-    translate(modelName; MSL_Version="MSL:3.2.3", mode, eliminateNonDynamic=nothing)
+    translate(modelName; MSL_Version="MSL:3.2.3", libraries=String[], mode, eliminateNonDynamic=nothing)
 
-Translate an MSL model by name and load it in memory.
+Translate a model by name, an MSL model or one of `libraries`, and load it in memory.
 
 # Keyword arguments
 
 - `MSL_Version::String = "MSL:3.2.3"`: which MSL version to use.
+- `libraries`: the libraries the model is in, instead of the MSL: cache keys
+  (`loadInstalledLibrary`, `loadLibrary`, `loadPackage`) or file/directory paths.
+  The libraries an installed library uses come along with its key.
 - `mode`: backend mode (default `OMBackend.MTK_MODE`).
 - `warnMissingStartValues`: control warnings for missing start values.
 - `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
@@ -765,6 +784,7 @@ OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
 """
 function translate(modelName::String;
                    MSL_Version = "MSL:3.2.3",
+                   libraries::Vector{String} = String[],
                    mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
@@ -772,7 +792,7 @@ function translate(modelName::String;
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true)
   return withDirectRHS(directRHS) do
-    (dae, cache) = flatten(modelName; MSL_Version = MSL_Version)
+    (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)
     functionList = OMFrontend.cacheToFunctionList(cache)
     OMBackend.translate(dae;
                         functionList = functionList,
