@@ -110,6 +110,16 @@ OMBackend.warnMissingStartValues(false)
   end
 end #= End OM tests =#
 
+#= The .mos scripting engine (src/MosScripting): its parser/evaluator tests against a
+   mock OM, then OMC-style regression scripts run through OM.runScript. Both files
+   define modules, so they are included at top level. =#
+@info "Testing .mos scripting..."
+@eval module MosScriptingUnitTests
+  include(joinpath($(@__DIR__), "..", "src", "MosScripting", "test", "runtests.jl"))
+end
+include(joinpath(@__DIR__, "..", "src", "MosScripting", "test", "omc_testsuite", "runtests.jl"))
+MosOmcStyleTests.run_suite()
+
 if get(ENV, "AGENTIC_MODELICA", "") != ""
   @info "AGENTIC_MODELICA set — running agentic tests..."
   include("Agentic/agenticTests.jl")
