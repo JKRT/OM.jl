@@ -26,6 +26,8 @@ jobs:
     env:
       # Native libraries first, precompile after (see ci/setup.jl).
       JULIA_PKG_PRECOMPILE_AUTO: "0"
+      # Package images for any x86-64 runner with AVX2, as in omjl-ci.yml.
+      JULIA_CPU_TARGET: x86-64-v3
     steps:
       - name: Check out OM.jl
         uses: actions/checkout@v4

@@ -19,14 +19,21 @@ include("testUtils.jl")
 OM.clearCaches!()
 OMBackend.warnMissingStartValues(false)
 
+#= CI runs the suite as parallel jobs, one group each (OM_TEST_GROUP): core,
+   results, events (event semantics, the longest file) and msl. Unset or "all"
+   runs everything. =#
+const TEST_GROUP = get(ENV, "OM_TEST_GROUP", "all")
+TEST_GROUP in ("all", "core", "results", "events", "msl") || error("Unknown OM_TEST_GROUP: $(TEST_GROUP)")
+ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
+
 @testset "OM Tests:" begin
   #= These tests are the bare minimum of the tests that needs to be run.=#
-  @testset "Sanity Tests:" begin
+  ingroup("core") && @testset "Sanity Tests:" begin
     include("sanityTests.jl")
     include("backendSanityTests.jl")
     include("simCodeCheckTests.jl")
   end
-  @testset "Libraries And Language Extensions:" begin
+  ingroup("core") && @testset "Libraries And Language Extensions:" begin
     #= Translate and run some "advanced" models. Does not check the results =#
     @testset "Libraries:" begin
       include("libraries.jl")
@@ -43,60 +50,60 @@ OMBackend.warnMissingStartValues(false)
     end
   end #= Libraries and extensions=#
   @info "Testing simulation results..."
-  @testset "Simulation Results:" begin
-    include("simulationResultTests.jl")
-    include("recordTests.jl")
-    include("matrixTests.jl")
-    include("eventTests.jl")
-    include("vssTests.jl")
-    include("tunableParameterTests.jl")
-    include("assertTests.jl")
-    include("eventSemanticsTests.jl")
-    include("frictionEventTests.jl")
-    include("stateSelectionTests.jl")
-    include("deModeTests.jl")
+  (ingroup("results") || ingroup("events")) && @testset "Simulation Results:" begin
+    ingroup("results") && include("simulationResultTests.jl")
+    ingroup("results") && include("recordTests.jl")
+    ingroup("results") && include("matrixTests.jl")
+    ingroup("results") && include("eventTests.jl")
+    ingroup("results") && include("vssTests.jl")
+    ingroup("results") && include("tunableParameterTests.jl")
+    ingroup("results") && include("assertTests.jl")
+    ingroup("events") && include("eventSemanticsTests.jl")
+    ingroup("results") && include("frictionEventTests.jl")
+    ingroup("results") && include("stateSelectionTests.jl")
+    ingroup("results") && include("deModeTests.jl")
   end
   @info "Testing procedural/algorithmic Modelica..."
-  @testset "Procedural Modelica:" begin
+  ingroup("core") && @testset "Procedural Modelica:" begin
     include("proceduralTests.jl")
     include("expressionTests.jl")
   end
   @info "Testing external builtin functions..."
-  @testset "External Builtin Functions:" begin
+  ingroup("core") && @testset "External Builtin Functions:" begin
     include("externalBuiltinTests.jl")
   end
   @info "Testing MSL models..."
-  @testset "MSL Tests:" begin
+  ingroup("msl") && @testset "MSL Tests:" begin
     include("mslTests.jl")
   end
   @info "Testing MSL expansion models (Rotational, Electrical, Translational, Thermal, Blocks)..."
-  @testset "MSL Expansion Tests:" begin
+  ingroup("msl") && @testset "MSL Expansion Tests:" begin
     include("mslExpansionTests.jl")
   end
   @info "Testing initial equation handling..."
-  @testset "Initial Equation Tests:" begin
+  ingroup("msl") && @testset "Initial Equation Tests:" begin
     include("initialEquationTests.jl")
   end
   @info "Testing initial-algorithm construct coverage..."
-  @testset "Initial Algorithm Tests:" begin
+  ingroup("core") && @testset "Initial Algorithm Tests:" begin
     include("algInitTests.jl")
   end
   @info "Testing foldParameterClosure regression MWEs..."
-  @testset "Fold Regression MWEs:" begin
+  ingroup("core") && @testset "Fold Regression MWEs:" begin
     include("foldRegressionTests.jl")
   end
   @info "Testing discrete classification (when-driven Real vars)..."
-  @testset "Discrete Classification Regression:" begin
+  ingroup("core") && @testset "Discrete Classification Regression:" begin
     include("discreteClassificationTests.jl")
   end
   @info "Testing model-feature MWEs (fixed-start / nested-der / nonlinear-loop)..."
-  @testset "Model-feature MWEs:" begin
+  ingroup("core") && @testset "Model-feature MWEs:" begin
     include("modelFeatureMWEs.jl")
   end
 
   #= Heavy MSL tests (Engine1a, DCEE/DCPM_Start, PID_Controller) add 15-30 min.
      Opt in with ENV["OM_HEAVY_TESTS"] set to anything non-empty. =#
-  if get(ENV, "OM_HEAVY_TESTS", "") != ""
+  if ingroup("msl") && get(ENV, "OM_HEAVY_TESTS", "") != ""
     @info "OM_HEAVY_TESTS is set — running heavy MSL tests..."
     @testset "Heavy MSL Tests:" begin
       include("heavyTests.jl")
@@ -105,7 +112,7 @@ OMBackend.warnMissingStartValues(false)
     @info "Skipping heavy MSL tests (set OM_HEAVY_TESTS=1 to enable)."
   end
   @info "Testing DOCC (Dynamically Overconstrained Connectors)..."
-  @testset "DOCC Tests:" begin
+  ingroup("core") && @testset "DOCC Tests:" begin
     include("DOCC/doccTests.jl")
   end
 end #= End OM tests =#
@@ -113,12 +120,14 @@ end #= End OM tests =#
 #= The .mos scripting engine (src/MosScripting): its parser/evaluator tests against a
    mock OM, then OMC-style regression scripts run through OM.runScript. Both files
    define modules, so they are included at top level. =#
-@info "Testing .mos scripting..."
-@eval module MosScriptingUnitTests
-  include(joinpath($(@__DIR__), "..", "src", "MosScripting", "test", "runtests.jl"))
+if ingroup("core")
+  @info "Testing .mos scripting..."
+  @eval module MosScriptingUnitTests
+    include(joinpath($(@__DIR__), "..", "src", "MosScripting", "test", "runtests.jl"))
+  end
+  include(joinpath(@__DIR__, "..", "src", "MosScripting", "test", "omc_testsuite", "runtests.jl"))
+  MosOmcStyleTests.run_suite()
 end
-include(joinpath(@__DIR__, "..", "src", "MosScripting", "test", "omc_testsuite", "runtests.jl"))
-MosOmcStyleTests.run_suite()
 
 if get(ENV, "AGENTIC_MODELICA", "") != ""
   @info "AGENTIC_MODELICA set — running agentic tests..."
