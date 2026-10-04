@@ -648,12 +648,18 @@ function simulate(modelName::String;
 end
 
 """
-    getMTKProblem(modelName; tspan=(0.0, 1.0), overwriteCache=false) -> ODEProblem
+    getMTKProblem(modelName; tspan=(0.0, 1.0), overwriteCache=false) -> Tuple
 
-Build and return the `ModelingToolkit.ODEProblem` for an already-translated
-model, without invoking the solver. The model must first be compiled via
-`translate` (or implicitly by a prior `simulate`). Useful for inspection
-or for passing the problem to a custom solve.
+Build the problem of an already-translated model without solving it. The
+model must first be compiled via `translate` (or implicitly by a prior
+`simulate`). Returns the tuple of the generated model function; its first
+two elements are the `ODEProblem` and the model's event callbacks, which a
+solve needs too:
+
+```julia
+prob, callbacks = OM.getMTKProblem("LotkaVolterra"; tspan = (0.0, 30.0))
+sol = solve(prob, Rodas5P(); callback = callbacks)
+```
 
 # Keyword arguments
 - `tspan`: time span used when constructing the problem.
