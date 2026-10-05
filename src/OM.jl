@@ -494,8 +494,9 @@ Default for the `scalarize` keyword of `translate` and `simulate`. `false` (the 
 flat model keeps its array variables, array equations and for-equations, and the backend
 generates code that keeps the loops (`OMBackend.ARRAY_ODE_GENERATION`): its size does not grow
 with the arrays, and every parameter can be changed in `resimulate`. A model outside that code
-generation's scope (algebraic loops, index reduction, Modelica functions, ...) is scalarized
-when the backend receives it; the reason is logged. `true`: the frontend scalarizes, as before.
+generation's scope (algebraic loops, index reduction, Modelica functions, ...) is flattened
+again with scalarization and translated as with `true` (the reason is logged). `true`: the
+frontend scalarizes, as before.
 `flatten` returns the scalarized flat model unless asked otherwise.
 
 ```julia
@@ -786,8 +787,15 @@ function translate(modelName::String,
                            MSL = MSL, MSL_Version = MSL_Version,
                            libraries = libraries,
                            scalarize = scalarize)
-    functionList = OMFrontend.cacheToFunctionList(cache)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+    if !scalarize && repr == :FM
+      #= Arrays kept: the array-preserving translation, else the scalarizing flatten. =#
+      local arrays = OMBackend.translateArrays(dae)
+      arrays === nothing || return arrays
+      (dae, cache) = flatten(modelName, modelFile; repr = repr, MSL = MSL, MSL_Version = MSL_Version,
+                             libraries = libraries, scalarize = true)
+    end
+    functionList = OMFrontend.cacheToFunctionList(cache)
     OMBackend.translate(dae;
                         functionList = functionList,
                         BackendMode = mode,
@@ -795,7 +803,7 @@ function translate(modelName::String,
                         eliminateNonDynamic = eliminateNonDynamic,
                         observedFilter = observedFilter,
                         checkSimCode = checkSimCode,
-                        scalarized = scalarize)
+                        scalarized = true)
   end
 end
 
@@ -844,8 +852,14 @@ function translate(modelName::String;
   return withDirectRHS(directRHS) do
     (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
                            scalarize = scalarize)
-    functionList = OMFrontend.cacheToFunctionList(cache)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+    if !scalarize
+      #= Arrays kept: the array-preserving translation, else the scalarizing flatten. =#
+      local arrays = OMBackend.translateArrays(dae)
+      arrays === nothing || return arrays
+      (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
+    end
+    functionList = OMFrontend.cacheToFunctionList(cache)
     OMBackend.translate(dae;
                         functionList = functionList,
                         BackendMode = mode,
@@ -853,7 +867,7 @@ function translate(modelName::String;
                         eliminateNonDynamic = eliminateNonDynamic,
                         observedFilter = observedFilter,
                         checkSimCode = checkSimCode,
-                        scalarized = scalarize)
+                        scalarized = true)
   end
 end
 

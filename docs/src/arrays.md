@@ -1,20 +1,19 @@
 # Large array models
 
-By default the frontend scalarizes a model: an array of 10 000 components becomes
-10 000 copies of every variable and equation, and the generated code grows with
-them. With `scalarize = false` (experimental) the arrays stay arrays: the frontend
-keeps array variables, for-equations and array equations, and the backend
-generates code that keeps the loops. Translating and simulating then take about
-as long for 10 000 elements as for 10.
-
-```julia
-OM.simulate("Rod", "Rod.mo"; scalarize = false)   # one call
-OM.SCALARIZE[] = false                            # or for all later calls
-```
+`translate` and `simulate` keep a model's arrays: the frontend keeps array
+variables, for-equations and array equations, and the backend generates code that
+keeps the loops. Translating and simulating take about as long for 10 000 elements
+as for 10; scalarized, an array of 10 000 components becomes 10 000 copies of every
+variable and equation, and the generated code grows with them.
 
 A model the array code generation does not handle (see [What is kept](#What-is-kept))
-is scalarized when the backend receives it and simulates as before, so
-`scalarize = false` is safe to try on any model.
+is flattened again with scalarization (the reason is logged) and simulates through
+ModelingToolkit as before. To scalarize from the start:
+
+```julia
+OM.simulate("Rod", "Rod.mo"; scalarize = true)   # one call
+OM.SCALARIZE[] = true                            # or for all later calls
+```
 
 ## Heat conduction in a rod
 
@@ -62,7 +61,7 @@ end Rod;
 
 ```julia
 using OM, Plots
-sol = OM.simulate("Rod", "Rod.mo"; scalarize = false, stopTime = 0.1)
+sol = OM.simulate("Rod", "Rod.mo"; stopTime = 0.1)
 
 x = ((1:10000) .- 0.5) ./ 10000
 p = plot(; xlabel = "position x", ylabel = "temperature T")
@@ -77,8 +76,8 @@ p
 The model has 10 000 states and 60 000 algebraic variables (the connector
 temperatures and heat flows). The generated code is 11 loops, the same for any
 `n`, and translating and simulating it take under two seconds together. With
-1 000 segments the same model takes 0.4 s with `scalarize = false` and 7.6 s
-scalarized, with the same result. (Times of a second run in a Julia session;
+1 000 segments the same model takes 0.4 s with its arrays kept and 7.6 s
+scalarized (`scalarize = true`), with the same result. (Times of a second run in a Julia session;
 the first run also compiles.)
 
 Variables are read by their Modelica names, states and algebraic variables alike:
@@ -135,8 +134,7 @@ end BouncingBalls;
 ```
 
 ```julia
-sol = OM.simulate("BouncingBalls", "BouncingBalls.mo"; scalarize = false,
-                  stopTime = 1.7, saveat = 0.002)
+sol = OM.simulate("BouncingBalls", "BouncingBalls.mo"; stopTime = 1.7, saveat = 0.002)
 p = plot(; xlabel = "time [s]", ylabel = "height [m]")
 for i in (1, 50, 100)
   plot!(p, sol.t, OM.OMBackend.getVariableValues(sol, "h[$i]"); label = "ball $i")
@@ -154,16 +152,20 @@ This takes under a second; scalarized, the hundred `when`-equations take about
 
 The array code generation takes a model when:
 
-- every equation can be solved for one unknown (a state derivative or an algebraic
-  variable) without an algebraic loop or index reduction; equations from connections,
-  for-loops and array equations (`der(x) = -k .* x`) are all fine;
-- relations on continuous variables (`if x > y then ...`) become events, `when`-equations
-  (also in for-loops) may assign discrete variables and `reinit` states; `pre`, `noEvent`,
-  `smooth` and `homotopy` are understood;
+- every equation can be solved for one unknown (a state derivative, an algebraic or a
+  discrete variable) without an algebraic loop or index reduction; equations from
+  connections, for-loops, array equations (`der(x) = -k .* x`, `der(x) = A * x`),
+  declaration bindings and if-equations whose conditions depend on loop indices and
+  parameters are all fine;
+- relations on continuous variables (`if x > y then ...`) become events; `when`-equations
+  and algorithm sections (also in for-loops) may assign discrete variables and `reinit`
+  states; `pre`, `edge`, `change`, `initial()`, `sample`, `noEvent`, `smooth` and
+  `homotopy` are understood;
+- initial equations form a square system over the states that are not `fixed`;
 - asserts are checked after every step.
 
-Not yet: algebraic loops, index reduction, initial equations, algorithms,
-if-equations, `elsewhen`, `sample`, `initial()`, `edge`/`change` and the
-event-generating functions (`div`, `mod`, `floor`, ...). Such a model is scalarized
-when the backend receives it (the reason is logged) and simulated as with
+Not yet: algebraic loops, index reduction, calls of Modelica functions (other than the
+built-in math functions), initial algorithms, `elsewhen` in when-equations, array
+slices and the event-generating functions (`div`, `mod`, `floor`, `integer`, ...). Such
+a model is flattened again with scalarization and simulated as with
 `scalarize = true`.
