@@ -19,8 +19,8 @@ six-axis `RobotR3` system.
 
 - **[Installation](installation.md)** — how to get OM.jl and its submodules set up.
 - **[Examples](examples.md)** — worked simulations.
-- **[Large array models](arrays.md)** — models with thousands of components,
-  simulated without scalarizing their arrays (`scalarize = false`).
+- **[Large array models](arrays.md)** — models with thousands of components:
+  arrays are kept, the generated code does not grow with them.
 - **[Scripting (`.mos`)](scripting.md)** — run OpenModelica-style `.mos` scripts
   through `OM.runScript`.
 - **[API reference](api.md)** — the public functions (`simulate`, `translate`,

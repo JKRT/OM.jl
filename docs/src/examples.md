@@ -173,8 +173,8 @@ The points are OpenModelica's result for the same model.
 ## Many components: arrays kept
 
 Models with large arrays of components (a rod of 10 000 segments, a hundred
-bouncing balls) simulate with `scalarize = false` without generating code per
-element; see [Large array models](arrays.md).
+bouncing balls) simulate without generating code per element: `simulate` keeps
+their arrays; see [Large array models](arrays.md).
 
 ## Scripts
 
