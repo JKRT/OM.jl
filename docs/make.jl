@@ -16,6 +16,7 @@ makedocs(
         "Home" => "index.md",
         "Installation" => "installation.md",
         "Examples" => "examples.md",
+        "Large array models" => "arrays.md",
         "Scripting (.mos)" => "scripting.md",
         "API reference" => "api.md",
     ],

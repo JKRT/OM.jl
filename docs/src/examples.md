@@ -137,6 +137,45 @@ OM.exportCSV(name, cc; filePath = "CoupledClutches_res.csv")  # opens in OMEdit
 
 ![CoupledClutches angular velocities](assets/examples/coupledclutches.png)
 
+## A chaotic circuit
+
+Chua's circuit from the MSL: a nonlinear resistor and two capacitors produce the
+double-scroll attractor.
+
+```julia
+name = "Modelica.Electrical.Analog.Examples.ChuaCircuit"
+chua = OM.simulate(name; MSL_Version = "MSL:3.2.3", stopTime = 5000.0, saveat = 1.0)
+plot(OM.OMBackend.getVariableValues(chua, "C1.v"), OM.OMBackend.getVariableValues(chua, "C2.v");
+     xlabel = "C1.v [V]", ylabel = "C2.v [V]", label = "")
+```
+
+![Chua's circuit, C2.v against C1.v](assets/examples/chua.png)
+
+## A model from another library: Buildings
+
+Libraries besides the MSL are installed once and passed by their key. The first
+step of the Buildings library's space-cooling tutorial: a room with an air
+volume, a wall to the outside and an air supply.
+
+```julia
+OM.installLibrary("Buildings"; version = "13.0.0")   # once
+key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
+name = "Buildings.Examples.Tutorial.SpaceCooling.System1"
+sol = OM.simulate(name; libraries = [key], stopTime = 10800.0, saveat = 60.0)
+T = OM.OMBackend.getVariableValues(sol, "vol.T")
+plot(sol.t ./ 3600, T .- 273.15; xlabel = "time [h]", ylabel = "room air temperature [°C]")
+```
+
+![Room air temperature, OM.jl and OpenModelica](assets/examples/spacecooling.png)
+
+The points are OpenModelica's result for the same model.
+
+## Many components: arrays kept
+
+Models with large arrays of components (a rod of 10 000 segments, a hundred
+bouncing balls) simulate with `scalarize = false` without generating code per
+element; see [Large array models](arrays.md).
+
 ## Scripts
 
 The same models can be run from an OpenModelica `.mos` script with
