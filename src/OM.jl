@@ -270,6 +270,8 @@ directory. Returns the path written by `CSV.write`.
 To view the result in OMEdit, choose `File > Open Result(s) file`.
 """
 function exportCSV(modelName, sol; filePath = nothing)
+  sol.prob.p isa OMBackend.CodeGeneration.ArrayODEGen.ArrayModelParameters &&
+    return _exportCSVArrayModel(modelName, sol, filePath)
   local df1 = DataFrames.DataFrame(sol)
   local finalDf
   vals = Any[]
@@ -314,6 +316,18 @@ function exportCSV(modelName, sol; filePath = nothing)
     filePath
   end
   CSV.write(finalFileName, finalDf)
+end
+
+#= A solution of the array path (OMBackend.ArrayODEGen): time, then the states, algebraic and
+   discrete variables by their Modelica names. =#
+function _exportCSVArrayModel(modelName, sol, filePath)
+  local m = sol.prob.p.model
+  local df = DataFrames.DataFrame("time" => sol.t)
+  for name in Base.invokelatest(() -> vcat(m.STATE_NAMES, m.ALGEBRAIC_NAMES, m.DISCRETE_NAMES))
+    df[!, name] = OMBackend.getVariableValues(sol, name)
+  end
+  local finalFileName = filePath === nothing ? string(replace(modelName, "." => "_"), "_res.csv") : filePath
+  CSV.write(finalFileName, df)
 end
 
 """
@@ -402,7 +416,7 @@ function _resolveLibraries(libraries::Vector{String})::Vector{String}
 end
 
 """
-    flatten(modelName, modelFile; repr=:FM, scalarize=OM.SCALARIZE[], MSL=false,
+    flatten(modelName, modelFile; repr=:FM, scalarize=true, MSL=false,
             MSL_Version="MSL:3.2.3", libraries=String[])
 
 Flatten a Modelica model from a file. Returns a Tuple of the flattened
@@ -410,7 +424,8 @@ representation and the function cache.
 
 # Keyword arguments
 - `repr`: output representation, `:FM` (FlatModel, default) or `:DAE`
-- `scalarize`: scalarize arrays (default `OM.SCALARIZE[]`, `true`; only applies to `:FM`)
+- `scalarize`: scalarize arrays (default `true`; `false` keeps array variables, array
+  equations and for-equations, as omc's `-d=-nfScalarize`; only applies to `:FM`)
 - `MSL`: load the Modelica Standard Library alongside the model file
 - `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
 - `libraries`: cache keys or file/directory paths for user libraries
@@ -425,7 +440,7 @@ OM.flatten("MyModel", "model.mo"; libraries=["MyLib"])
 """
 function flatten(modelName::String, modelFile::String;
                  repr::Symbol = :FM,
-                 scalarize::Bool = SCALARIZE[],
+                 scalarize::Bool = true,
                  MSL = false,
                  MSL_Version = "MSL:3.2.3",
                  libraries::Vector{String} = String[])::Tuple
@@ -448,7 +463,7 @@ function flatten(modelName::String, modelFile::String;
 end
 
 """
-    flatten(modelName; MSL_Version="MSL:3.2.3", libraries=String[], scalarize=OM.SCALARIZE[])
+    flatten(modelName; MSL_Version="MSL:3.2.3", libraries=String[], scalarize=true)
 
 Flatten a model by name: an MSL model, or one of `libraries`. Returns a Tuple of
 the flattened representation and the function cache.
@@ -467,7 +482,7 @@ OM.flatten("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
 ```
 """
 function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector{String} = String[],
-                 scalarize::Bool = SCALARIZE[])::Tuple
+                 scalarize::Bool = true)::Tuple
   isempty(libraries) || return flatten(modelName, ""; libraries = libraries, scalarize = scalarize)
   return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version, scalarize = scalarize)
 end
@@ -475,20 +490,24 @@ end
 """
     SCALARIZE
 
-Default for the `scalarize` keyword of `flatten`, `translate` and `simulate`. `true` (the
-default): the frontend scalarizes arrays. `false` (experimental): the flat model keeps array
-variables, array equations and for-equations (as omc's `-d=-nfScalarize`), and the backend
+Default for the `scalarize` keyword of `translate` and `simulate`. `false` (the default): the
+flat model keeps its array variables, array equations and for-equations, and the backend
 generates code that keeps the loops (`OMBackend.ARRAY_ODE_GENERATION`): its size does not grow
-with the arrays, every parameter can be changed in `resimulate`. A model outside that code
-generation's scope (algebraic loops, index reduction, if-equations, ...) is scalarized when
-the backend receives it and simulates as with `true`.
+with the arrays, and every parameter can be changed in `resimulate`. A model outside that code
+generation's scope (algebraic loops, index reduction, Modelica functions, ...) is scalarized
+when the backend receives it; the reason is logged. `true`: the frontend scalarizes, as before.
+`flatten` returns the scalarized flat model unless asked otherwise.
 
 ```julia
-OM.SCALARIZE[] = false            # all later calls
-OM.simulate("M", "m.mo"; scalarize = false)   # one call
+OM.SCALARIZE[] = true             # all later calls scalarize
+OM.simulate("M", "m.mo"; scalarize = true)   # one call
 ```
 """
-const SCALARIZE = Ref(true)
+const SCALARIZE = Ref(false)
+
+#= The scalarize setting each model was last translated with (by canonical name): simulate by
+   name translates again when it is asked for the other one. =#
+const SCALARIZED_AT_TRANSLATE = Dict{String, Bool}()
 
 """
     withDirectRHS(f, value)
@@ -539,8 +558,8 @@ to `translate(modelName, modelFile; ...)` followed by
   `eliminatedName` matches at least one pattern are kept.
 - `directRHS`: toggle direct-RHS code generation (default reads
   `OMBackend.DIRECT_RHS_GENERATION[]`).
-- `scalarize`: scalarize arrays in the frontend (default `OM.SCALARIZE[]`, `true`);
-  `false` keeps array variables and for-equations (experimental, see `OM.SCALARIZE`).
+- `scalarize`: scalarize arrays in the frontend (default `OM.SCALARIZE[]`, `false`: arrays are
+  kept and the loops reach the generated code where possible, see `OM.SCALARIZE`).
 - `overwriteCache`: force re-evaluation of generated code even if the
   model is already compiled (default `false`).
 
@@ -667,7 +686,8 @@ function simulate(modelName::String;
                   kwargs...)
   return withDirectRHS(directRHS) do
     internalName = OMBackend.canonicalName(modelName)
-    alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
+    alreadyCompiled = (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) &&
+                      get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize
     local rebuilt = false
     if (!alreadyCompiled || overwriteCache) && (MSL || !isempty(libraries))
       rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
@@ -767,6 +787,7 @@ function translate(modelName::String,
                            libraries = libraries,
                            scalarize = scalarize)
     functionList = OMFrontend.cacheToFunctionList(cache)
+    SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
     OMBackend.translate(dae;
                         functionList = functionList,
                         BackendMode = mode,
@@ -824,6 +845,7 @@ function translate(modelName::String;
     (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
                            scalarize = scalarize)
     functionList = OMFrontend.cacheToFunctionList(cache)
+    SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
     OMBackend.translate(dae;
                         functionList = functionList,
                         BackendMode = mode,
