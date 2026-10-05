@@ -402,7 +402,7 @@ function _resolveLibraries(libraries::Vector{String})::Vector{String}
 end
 
 """
-    flatten(modelName, modelFile; repr=:FM, scalarize=true, MSL=false,
+    flatten(modelName, modelFile; repr=:FM, scalarize=OM.SCALARIZE[], MSL=false,
             MSL_Version="MSL:3.2.3", libraries=String[])
 
 Flatten a Modelica model from a file. Returns a Tuple of the flattened
@@ -410,7 +410,7 @@ representation and the function cache.
 
 # Keyword arguments
 - `repr`: output representation, `:FM` (FlatModel, default) or `:DAE`
-- `scalarize`: enable scalarization (default `true`, only applies to `:FM`)
+- `scalarize`: scalarize arrays (default `OM.SCALARIZE[]`, `true`; only applies to `:FM`)
 - `MSL`: load the Modelica Standard Library alongside the model file
 - `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
 - `libraries`: cache keys or file/directory paths for user libraries
@@ -425,7 +425,7 @@ OM.flatten("MyModel", "model.mo"; libraries=["MyLib"])
 """
 function flatten(modelName::String, modelFile::String;
                  repr::Symbol = :FM,
-                 scalarize = true,
+                 scalarize::Bool = SCALARIZE[],
                  MSL = false,
                  MSL_Version = "MSL:3.2.3",
                  libraries::Vector{String} = String[])::Tuple
@@ -448,7 +448,7 @@ function flatten(modelName::String, modelFile::String;
 end
 
 """
-    flatten(modelName; MSL_Version="MSL:3.2.3", libraries=String[])
+    flatten(modelName; MSL_Version="MSL:3.2.3", libraries=String[], scalarize=OM.SCALARIZE[])
 
 Flatten a model by name: an MSL model, or one of `libraries`. Returns a Tuple of
 the flattened representation and the function cache.
@@ -466,10 +466,29 @@ key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
 OM.flatten("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
 ```
 """
-function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector{String} = String[])::Tuple
-  isempty(libraries) || return flatten(modelName, ""; libraries = libraries)
-  return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version)
+function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector{String} = String[],
+                 scalarize::Bool = SCALARIZE[])::Tuple
+  isempty(libraries) || return flatten(modelName, ""; libraries = libraries, scalarize = scalarize)
+  return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version, scalarize = scalarize)
 end
+
+"""
+    SCALARIZE
+
+Default for the `scalarize` keyword of `flatten`, `translate` and `simulate`. `true` (the
+default): the frontend scalarizes arrays. `false` (experimental): the flat model keeps array
+variables, array equations and for-equations (as omc's `-d=-nfScalarize`), and the backend
+generates code that keeps the loops (`OMBackend.ARRAY_ODE_GENERATION`): its size does not grow
+with the arrays, every parameter can be changed in `resimulate`. A model outside that code
+generation's scope (algebraic loops, index reduction, if-equations, ...) is scalarized when
+the backend receives it and simulates as with `true`.
+
+```julia
+OM.SCALARIZE[] = false            # all later calls
+OM.simulate("M", "m.mo"; scalarize = false)   # one call
+```
+"""
+const SCALARIZE = Ref(true)
 
 """
     withDirectRHS(f, value)
@@ -520,6 +539,8 @@ to `translate(modelName, modelFile; ...)` followed by
   `eliminatedName` matches at least one pattern are kept.
 - `directRHS`: toggle direct-RHS code generation (default reads
   `OMBackend.DIRECT_RHS_GENERATION[]`).
+- `scalarize`: scalarize arrays in the frontend (default `OM.SCALARIZE[]`, `true`);
+  `false` keeps array variables and for-equations (experimental, see `OM.SCALARIZE`).
 - `overwriteCache`: force re-evaluation of generated code even if the
   model is already compiled (default `false`).
 
@@ -539,6 +560,7 @@ function simulate(modelName::String,
                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
+                  scalarize::Bool = SCALARIZE[],
                   kwargs...)
   return withDirectRHS(directRHS) do
     local rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
@@ -549,7 +571,8 @@ function simulate(modelName::String,
               MSL_Version = MSL_Version,
               warnMissingStartValues = warnMissingStartValues,
               eliminateNonDynamic = eliminateNonDynamic,
-              observedFilter = observedFilter)
+              observedFilter = observedFilter,
+              scalarize = scalarize)
     rebuilt = rebuilt && _builtAtTranslate(modelName)
     OMBackend.simulateModel(modelName;
                             MODE = mode, tspan = (startTime, stopTime),
@@ -640,6 +663,7 @@ function simulate(modelName::String;
                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
+                  scalarize::Bool = SCALARIZE[],
                   kwargs...)
   return withDirectRHS(directRHS) do
     internalName = OMBackend.canonicalName(modelName)
@@ -653,7 +677,8 @@ function simulate(modelName::String;
                 mode = mode,
                 warnMissingStartValues = warnMissingStartValues,
                 eliminateNonDynamic = eliminateNonDynamic,
-                observedFilter = observedFilter)
+                observedFilter = observedFilter,
+                scalarize = scalarize)
       rebuilt = rebuilt && _builtAtTranslate(modelName)
     end
     OMBackend.simulateModel(modelName;
@@ -730,7 +755,8 @@ function translate(modelName::String,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
-                   checkSimCode::Bool = true)
+                   checkSimCode::Bool = true,
+                   scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
     #= MTK_MODE and DEMode both consume the FlatModel-derived SIM_CODE. Only the
        deprecated DAE_MODE wants the legacy :DAE representation. =#
@@ -738,7 +764,8 @@ function translate(modelName::String,
     (dae, cache) = flatten(modelName, modelFile;
                            repr = repr,
                            MSL = MSL, MSL_Version = MSL_Version,
-                           libraries = libraries)
+                           libraries = libraries,
+                           scalarize = scalarize)
     functionList = OMFrontend.cacheToFunctionList(cache)
     OMBackend.translate(dae;
                         functionList = functionList,
@@ -746,7 +773,8 @@ function translate(modelName::String,
                         warnMissingStartValues = warnMissingStartValues,
                         eliminateNonDynamic = eliminateNonDynamic,
                         observedFilter = observedFilter,
-                        checkSimCode = checkSimCode)
+                        checkSimCode = checkSimCode,
+                        scalarized = scalarize)
   end
 end
 
@@ -790,9 +818,11 @@ function translate(modelName::String;
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
-                   checkSimCode::Bool = true)
+                   checkSimCode::Bool = true,
+                   scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
-    (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)
+    (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
+                           scalarize = scalarize)
     functionList = OMFrontend.cacheToFunctionList(cache)
     OMBackend.translate(dae;
                         functionList = functionList,
@@ -800,7 +830,8 @@ function translate(modelName::String;
                         warnMissingStartValues = warnMissingStartValues,
                         eliminateNonDynamic = eliminateNonDynamic,
                         observedFilter = observedFilter,
-                        checkSimCode = checkSimCode)
+                        checkSimCode = checkSimCode,
+                        scalarized = scalarize)
   end
 end
 

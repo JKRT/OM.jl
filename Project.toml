@@ -1,6 +1,6 @@
 name = "OM"
 uuid = "2f925a0b-2436-437b-858e-49aee461894b"
-version = "0.5.0"
+version = "0.6.0"
 authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
 
 [deps]
@@ -52,8 +52,8 @@ DoubleEnded = "0.2.3"
 ImmutableList = "0.4.2"
 ListUtil = "0.4.1"
 MetaModelica = "0.4.2"
-OMBackend = "0.5.1"
-OMFrontend = "1.4.0"
+OMBackend = "0.6.0"
+OMFrontend = "1.5.0"
 OMParser = "0.2.1"
 OMRuntimeExternalC = "0.3.3"
 SCode = "1.2.0"

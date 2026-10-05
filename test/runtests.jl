@@ -62,6 +62,7 @@ ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
     ingroup("results") && include("frictionEventTests.jl")
     ingroup("results") && include("stateSelectionTests.jl")
     ingroup("results") && include("deModeTests.jl")
+    ingroup("results") && include("arrayPathTests.jl")
   end
   @info "Testing procedural/algorithmic Modelica..."
   ingroup("core") && @testset "Procedural Modelica:" begin
