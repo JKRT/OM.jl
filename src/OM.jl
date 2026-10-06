@@ -782,14 +782,16 @@ function translate(modelName::String,
     #= MTK_MODE and DEMode both consume the FlatModel-derived SIM_CODE. Only the
        deprecated DAE_MODE wants the legacy :DAE representation. =#
     repr = (mode == OMBackend.MTK_MODE || mode == OMBackend.IMTK_MODE || mode == OMBackend.DEMode) ? :FM : :DAE
+    #= Arrays kept (the default mode): the array-preserving translation, else the
+       scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+    local keep = !scalarize && repr == :FM && mode == OMBackend.IMTK_MODE
     (dae, cache) = flatten(modelName, modelFile;
                            repr = repr,
                            MSL = MSL, MSL_Version = MSL_Version,
                            libraries = libraries,
-                           scalarize = scalarize)
+                           scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
-    if !scalarize && repr == :FM
-      #= Arrays kept: the array-preserving translation, else the scalarizing flatten. =#
+    if keep
       local arrays = OMBackend.translateArrays(dae)
       arrays === nothing || return arrays
       (dae, cache) = flatten(modelName, modelFile; repr = repr, MSL = MSL, MSL_Version = MSL_Version,
@@ -850,11 +852,13 @@ function translate(modelName::String;
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
+    #= Arrays kept (the default mode): the array-preserving translation, else the
+       scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+    local keep = !scalarize && mode == OMBackend.IMTK_MODE
     (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
-                           scalarize = scalarize)
+                           scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
-    if !scalarize
-      #= Arrays kept: the array-preserving translation, else the scalarizing flatten. =#
+    if keep
       local arrays = OMBackend.translateArrays(dae)
       arrays === nothing || return arrays
       (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)

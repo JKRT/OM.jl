@@ -136,13 +136,15 @@ const SII = OMBackend.Runtime.ModelingToolkit.SymbolicIndexingInterface
 
   #= Only what was compiled tunable can be set: k stays a parameter of the
      problem (a start attribute references it) but its value is compiled into
-     the equations, so setting it would silently do nothing. =#
-  OM.translate("TunableParameters.StartParameter", mo)
-  local sp = OM.simulate("TunableParameters.StartParameter"; MSL = false, tspan = (0.0, 1.0))
+     the equations, so setting it would silently do nothing. (The ModelingToolkit
+     path: scalarize = true; the array path, the default for this continuous
+     model, passes every parameter as data and sets any.) =#
+  OM.translate("TunableParameters.StartParameter", mo; scalarize = true)
+  local sp = OM.simulate("TunableParameters.StartParameter"; MSL = false, tspan = (0.0, 1.0), scalarize = true)
   @test SII.is_parameter(sp.prob, :k)
   @test !OMBackend.isTunable("TunableParameters.StartParameter", ["k"])
   @test_throws ArgumentError OM.simulate("TunableParameters.StartParameter"; MSL = false, stopTime = 1.0,
-                                         parameters = Dict("k" => 1.0))
+                                         parameters = Dict("k" => 1.0), scalarize = true)
   #= A translate in MTK mode forgets the IMTK build: no stale parameters. =#
   OMBackend.withTunableParameters(["k"]) do
     OM.translate("TunableParameters.StartParameter", mo)
