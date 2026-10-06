@@ -108,10 +108,13 @@ p
 Parameters that fix the structure, such as `n` here (array sizes, subscripts),
 need a new translation.
 
-## A hundred bouncing balls
+## A hundred bouncing balls (events, experimental)
 
 A `when`-equation inside a for-loop: each ball has its own coefficient of
-restitution and counts its bounces in a discrete variable.
+restitution and counts its bounces in a discrete variable. Models with events go the
+ModelingToolkit path by default, whose event semantics (event iteration, relation
+hysteresis, the times asserts report) are the validated ones; the array path takes
+them too after `OMBackend.ARRAY_PATH_FULL[] = true`.
 
 ```modelica
 model BouncingBalls "n balls, each with its own coefficient of restitution"
@@ -134,6 +137,7 @@ end BouncingBalls;
 ```
 
 ```julia
+OM.OMBackend.ARRAY_PATH_FULL[] = true
 sol = OM.simulate("BouncingBalls", "BouncingBalls.mo"; stopTime = 1.7, saveat = 0.002)
 p = plot(; xlabel = "time [s]", ylabel = "height [m]")
 for i in (1, 50, 100)
@@ -145,27 +149,32 @@ sol(1.7; idxs = Symbol("bounces[1]"))   # 5.0
 
 ![Three of the hundred balls](assets/examples/bouncingballs.png)
 
-This takes under a second; scalarized, the hundred `when`-equations take about
-35 s to translate and simulate.
+This takes under a second; through the ModelingToolkit path (the default for event
+models, or `scalarize = true`) the hundred `when`-equations take about 35 s to
+translate and simulate, with the same heights.
 
 ## What is kept
 
-The array code generation takes a model when:
+The array code generation takes a model when every equation can be solved for one
+unknown (a state derivative, an algebraic or a discrete variable) without an algebraic
+loop or index reduction. Equations from connections, for-loops, array equations
+(`der(x) = -k .* x`, `der(x) = A * x`), declaration bindings, if-equations whose
+conditions depend on loop indices and parameters, algorithm sections without
+`when`, reductions (`sum`, `product`) and the built-in math functions are all fine.
 
-- every equation can be solved for one unknown (a state derivative, an algebraic or a
-  discrete variable) without an algebraic loop or index reduction; equations from
-  connections, for-loops, array equations (`der(x) = -k .* x`, `der(x) = A * x`),
-  declaration bindings and if-equations whose conditions depend on loop indices and
-  parameters are all fine;
-- relations on continuous variables (`if x > y then ...`) become events; `when`-equations
-  and algorithm sections (also in for-loops) may assign discrete variables and `reinit`
+With `OMBackend.ARRAY_PATH_FULL[] = true` it also takes (experimental):
+
+- relations on continuous variables (`if x > y then ...`) as events; `when`-equations
+  and when-statements (also in for-loops) that assign discrete variables and `reinit`
   states; `pre`, `edge`, `change`, `initial()`, `sample`, `noEvent`, `smooth` and
-  `homotopy` are understood;
-- initial equations form a square system over the states that are not `fixed`;
-- asserts are checked after every step.
+  `homotopy`;
+- initial equations (a square system over the states that are not `fixed`) and `fixed`
+  starts of variables that are no states;
+- asserts, checked after every step.
 
 Not yet: algebraic loops, index reduction, calls of Modelica functions (other than the
-built-in math functions), initial algorithms, `elsewhen` in when-equations, array
-slices and the event-generating functions (`div`, `mod`, `floor`, `integer`, ...). Such
-a model is flattened again with scalarization and simulated as with
-`scalarize = true`.
+built-in math functions), initial algorithms, `fixed = false` parameters, `elsewhen` in
+when-equations, array slices and the event-generating functions (`div`, `mod`, `floor`,
+`integer`, ...). Such a model, and every model translated inside
+`OMBackend.withTunableParameters`, is flattened again with scalarization and simulated as
+with `scalarize = true`.

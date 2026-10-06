@@ -28,11 +28,20 @@ const ARRAY_MODELS = joinpath(@__DIR__, "Models", "Arrays")
   end
 
   @testset "BouncingBalls: when-equations in a loop" begin
-    local sol = OM.simulate("BouncingBalls", joinpath(ARRAY_MODELS, "BouncingBalls.mo");
-                            scalarize = false, stopTime = 1.7)
-    @test sol.retcode == ReturnCode.Success
-    @test "BouncingBalls" in OMBackend.ARRAY_ODE_MODELS
-    @test sol(1.7; idxs = Symbol("bounces[1]")) == 5.0
-    @test sol(1.7; idxs = Symbol("bounces[100]")) == 2.0
+    #= events: the ModelingToolkit path by default, the array path with ARRAY_PATH_FULL =#
+    local file = joinpath(ARRAY_MODELS, "BouncingBalls.mo")
+    local mtk = OM.simulate("BouncingBalls", file; stopTime = 1.7)
+    @test !("BouncingBalls" in OMBackend.ARRAY_ODE_MODELS)
+    OMBackend.ARRAY_PATH_FULL[] = true
+    try
+      local sol = OM.simulate("BouncingBalls", file; stopTime = 1.7)
+      @test sol.retcode == ReturnCode.Success
+      @test "BouncingBalls" in OMBackend.ARRAY_ODE_MODELS
+      @test sol(1.7; idxs = Symbol("bounces[1]")) == 5.0
+      @test sol(1.7; idxs = Symbol("bounces[100]")) == 2.0
+      @test isapprox(sol(1.7; idxs = Symbol("h[50]")), mtk(1.7; idxs = Symbol("h[50]")); atol = 1e-4)
+    finally
+      OMBackend.ARRAY_PATH_FULL[] = false
+    end
   end
 end
