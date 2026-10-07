@@ -64,6 +64,16 @@ end
     @test brValue(sol, "x", 1.0) ≈ 6.0 rtol = 1e-6
   end
 
+  @testset "If-equations with connects in an array of components, per element (49 models: three-phase electrical)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("IfConnectInComponentArray"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "leg[1].y", 1.0) ≈ 1.0 atol = 1e-9
+      @test brValue(sol, "leg[2].y", 1.0) ≈ 0.0 atol = 1e-9
+      @test brValue(sol, "leg[3].y", 0.5) ≈ -0.5 atol = 1e-9
+    end
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)

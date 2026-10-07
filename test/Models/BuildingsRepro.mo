@@ -384,4 +384,35 @@ package BuildingsRepro
     der(x) = ys[3];
   end EndOfRecordFieldArray;
 
+  connector RealInput = input Real;
+  connector RealOutput = output Real;
+
+  block Constant
+    parameter Real k;
+    RealOutput y;
+  equation
+    y = k;
+  end Constant;
+
+  model Leg "if grounded then connect(...) else connect(...) (Buildings.Electrical: ground_1, potentialReference)"
+    parameter Boolean grounded = false;
+    Constant zero(k = 0);
+    Constant minusOne(k = -1);
+    Real y;
+  protected
+    RealInput u;
+  equation
+    if grounded then
+      connect(zero.y, u);
+    else
+      connect(minusOne.y, u);
+    end if;
+    y = u + time;
+  end Leg;
+
+  model IfConnectInComponentArray
+    "An array of components whose if-equations with connects take per-element branches (Electrical.AC.ThreePhasesUnbalanced)"
+    Leg leg[3](grounded = {true, false, false});
+  end IfConnectInComponentArray;
+
 end BuildingsRepro;
