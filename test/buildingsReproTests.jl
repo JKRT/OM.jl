@@ -155,6 +155,12 @@ end
     @test brValue(sol, "g2.y", 1.0) ≈ 4.0 rtol = 1e-9
   end
 
+  @testset "An external object's constructor reading a parameter computed by a function (weather data reader)" begin
+    local sol = brSimulate("ComputedParameterOfExternalObject"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y", 0.5) ≈ 1.0 rtol = 1e-6
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)

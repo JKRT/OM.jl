@@ -597,4 +597,20 @@ package BuildingsRepro
     connect(cb, use.controlBus);
   end ExpandableBuses;
 
+  function isCsvFile "A file name's extension (MSL 4.1 CombiTimeTable: Strings.findLast for isCsvExt)"
+    input String fileName;
+    output Boolean isCsv;
+  algorithm
+    isCsv := fileName == "data.csv";
+  end isCsvFile;
+
+  model ComputedParameterOfExternalObject "An external object's constructor reading a parameter computed by a function (the weather data reader's table)"
+    parameter Real table[2, 2] = [0, 0; 1, 2];
+    parameter String fileName = "NoName";
+    final parameter Boolean isCsvExt = isCsvFile(fileName);
+    parameter TimeTable41 tab = TimeTable41("NoName", "NoName", table, 0.0, {2}, 1, 2, 0.0, 3, false,
+      if isCsvExt then ";" else ",", if isCsvExt then 1 else 0);
+    Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+  end ComputedParameterOfExternalObject;
+
 end BuildingsRepro;
