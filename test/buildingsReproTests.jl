@@ -77,6 +77,18 @@ end
     end
   end
 
+  @testset "A time table of MSL 4.1's interface: init3 (33 models: tables, schedules)" begin
+    local sol = brSimulate("TableInit3"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y", 0.5) ≈ 1.0 rtol = 1e-6
+  end
+
+  @testset "An external object declared without parameter (61 models: Spawn, schedules, plotters)" begin
+    local sol = brSimulate("ExternalObjectVariable"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y", 0.5) ≈ 1.0 rtol = 1e-6
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)
