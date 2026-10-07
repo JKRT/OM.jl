@@ -148,6 +148,13 @@ end
     @test brValue(sol, "chiPar.chi[2].y", 1.0) ≈ 7.0 rtol = 1e-6
   end
 
+  @testset "Two connected connectors of one empty expandable connector class (14 models: control buses)" begin
+    local sol = brSimulate("ExpandableBuses"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "use.g.y", 1.0) ≈ 2.0 rtol = 1e-9
+    @test brValue(sol, "g2.y", 1.0) ≈ 4.0 rtol = 1e-9
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)

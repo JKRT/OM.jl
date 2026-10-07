@@ -567,4 +567,34 @@ package BuildingsRepro
     ChillerParallel chiPar(final num = 2, final per = perChi);
   end RecordArrayConstantSize;
 
+  expandable connector Bus "An empty expandable connector (Buildings' VAVReheat ControlBus)"
+  end Bus;
+
+  block Gain
+    RealInput u;
+    RealOutput y;
+  equation
+    y = 2*u;
+  end Gain;
+
+  model BusUser "A component with a bus of its own (VAVReheat's preCooSta.controlBus)"
+    Bus controlBus;
+    Gain g;
+  equation
+    connect(controlBus.s1, g.u);
+  end BusUser;
+
+  model ExpandableBuses "Two connected connectors of one empty expandable connector class (14 models: control buses)"
+    Bus cb;
+    Constant a(k = 1);
+    Constant b(k = 2);
+    BusUser use;
+    Gain g2;
+  equation
+    connect(a.y, cb.s1);
+    connect(b.y, cb.s2);
+    connect(cb.s2, g2.u);
+    connect(cb, use.controlBus);
+  end ExpandableBuses;
+
 end BuildingsRepro;
