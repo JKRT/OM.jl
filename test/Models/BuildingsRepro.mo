@@ -353,4 +353,35 @@ package BuildingsRepro
     end if;
   end MinOfBooleans;
 
+  record Curve "Buildings.Fluid.Movers.BaseClasses.Characteristics.flowParametersInternal: arrays sized by a field"
+    parameter Integer n annotation(Evaluate = true);
+    parameter Real V_flow[n];
+  end Curve;
+
+  record PowerCurve "Buildings.Fluid.Movers.BaseClasses.Euler.powerWithDerivative"
+    parameter Real V_flow[:];
+    parameter Real P[:];
+  end PowerCurve;
+
+  function lastScaled "end in a subscript of a record input's array (Buildings.Fluid.Movers.BaseClasses.Euler.power)"
+    input Curve pressure;
+    output PowerCurve power(V_flow = zeros(3), P = zeros(3));
+  algorithm
+    power.V_flow := {pressure.V_flow[end]*i for i in 1:3};
+    power.P := 2*power.V_flow;
+  end lastScaled;
+
+  model EndOfRecordFieldArray "A function the frontend evaluates: end of a record input's array sized by the record's field"
+    parameter Integer nOri = 2;
+    parameter Integer curve = if nOri == 2 then 1 else 2;
+    final parameter Curve cur1(final n = nOri, final V_flow = if nOri == 2 then {1, 2} else zeros(nOri));
+    final parameter Curve cur2(final n = nOri + 1, final V_flow = if nOri == 2 then zeros(nOri + 1) else {1, 2, 3});
+    final parameter PowerCurve powEu_internal = if curve == 1 then lastScaled(pressure = cur1) else lastScaled(pressure = cur2);
+    final parameter PowerCurve powEu(V_flow = powEu_internal.V_flow, P = powEu_internal.P);
+    final parameter Real ys[:] = powEu.V_flow;
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = ys[3];
+  end EndOfRecordFieldArray;
+
 end BuildingsRepro;

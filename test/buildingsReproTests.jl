@@ -58,6 +58,12 @@ end
     @test brValue(sol, "x", 1.0) ≈ 1.0 rtol = 1e-6
   end
 
+  @testset "end of a function's record input array sized by the record's field (Movers: Euler.power)" begin
+    local sol = brSimulate("EndOfRecordFieldArray"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "x", 1.0) ≈ 6.0 rtol = 1e-6
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)
