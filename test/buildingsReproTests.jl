@@ -133,6 +133,14 @@ end
     @test brValue(sol, "x", 1.0) ≈ 22.0 rtol = 1e-6
   end
 
+  @testset "An if-equation whose branch not taken has other sizes (2 models: CDL MatrixMax, MatrixMin)" begin
+    local sol = brSimulate("IfEquationBranchSizes"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "matMax1.y[2]", 1.0) ≈ 6.0 rtol = 1e-6
+    @test brValue(sol, "matMax2.y[3]", 1.0) ≈ 6.0 rtol = 1e-6
+    @test brValue(sol, "matMax2.y[1]", 0.5) ≈ 2.0 rtol = 1e-6
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)

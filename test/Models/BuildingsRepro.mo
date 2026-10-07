@@ -523,4 +523,23 @@ package BuildingsRepro
     der(x) = c.TSurAmp;
   end RecordConstructorOfLocals;
 
+  block MatrixMaxBlock "CDL Reals.MatrixMax: an if-equation on a parameter, its branches of different sizes"
+    parameter Boolean rowMax = true;
+    parameter Integer nRow;
+    parameter Integer nCol;
+    input Real u[nRow, nCol];
+    output Real y[if rowMax then size(u, 1) else size(u, 2)];
+  equation
+    if rowMax then
+      y = {max(u[i, :]) for i in 1:size(u, 1)};
+    else
+      y = {max(u[:, i]) for i in 1:size(u, 2)};
+    end if;
+  end MatrixMaxBlock;
+
+  model IfEquationBranchSizes "An if-equation whose branch not taken has other sizes (CDL MatrixMax, MatrixMin)"
+    MatrixMaxBlock matMax1(nRow = 2, nCol = 3, u = [1, 2, 3; 4, 5, 6]*time);
+    MatrixMaxBlock matMax2(rowMax = false, nRow = 2, nCol = 3, u = [1, 2, 3; 4, 5, 6]*time);
+  end IfEquationBranchSizes;
+
 end BuildingsRepro;
