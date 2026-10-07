@@ -1,0 +1,317 @@
+package BuildingsRepro
+  "Minimal reproducers of Buildings 13.0.0 failures: one model per characteristic (test/buildingsReproTests.jl)"
+
+  function checkPositive "A function called for its effects: an assert (MSL Fluid's checkBoundary)"
+    input Real x;
+  algorithm
+    assert(x > 0, "x must be positive");
+  end checkPositive;
+
+  model InitialCallForEffects
+    "A call for its effects in an initial equation (Buildings' fluid sources: checkBoundary)"
+    parameter Real p = 2;
+    Real x(start = 1, fixed = true);
+  initial equation
+    checkPositive(p);
+  equation
+    der(x) = -p*x;
+  end InitialCallForEffects;
+
+  model InitialAssert "An assert in an initial equation"
+    parameter Real p = 2;
+    Real x(start = 1, fixed = true);
+  initial equation
+    assert(p > 0, "p must be positive");
+  equation
+    der(x) = -p*x;
+  end InitialAssert;
+
+  model SampleStartFromInitialAlgorithm
+    "sample() starts that are fixed = false parameters of an initial algorithm (CDL Logical.Sources.Pulse)"
+    parameter Real period = 0.4;
+    parameter Real width = 0.5;
+    parameter Real shift = 0.1;
+    Boolean y(start = false, fixed = true);
+  protected
+    parameter Real t0(fixed = false);
+    parameter Real t1(fixed = false);
+  initial algorithm
+    t0 := integer(time/period)*period + mod(shift, period);
+    t1 := t0 + width*period;
+  equation
+    when sample(t0, period) then
+      y = true;
+    elsewhen sample(t1, period) then
+      y = false;
+    end when;
+  end SampleStartFromInitialAlgorithm;
+
+  function nextRandom "A tuple of a Real and an Integer array (MSL Math.Random generators)"
+    input Integer stateIn[2];
+    output Real r;
+    output Integer stateOut[2];
+  algorithm
+    stateOut[1] := mod(stateIn[1]*75 + 74, 65537);
+    stateOut[2] := stateIn[1];
+    r := stateOut[1]/65537;
+  end nextRandom;
+
+  model TupleWithArrayOutputInWhen
+    "(r, state) = f(pre(state)) in a when-equation (Buildings.Occupants: random numbers)"
+    Real r(start = 0, fixed = true);
+    Integer state[2](start = {1, 0}, each fixed = true);
+  equation
+    when sample(0.05, 0.1) then
+      (r, state) = nextRandom(pre(state));
+    end when;
+  end TupleWithArrayOutputInWhen;
+
+  block AssertBlock "CDL Utilities.Assert: a String parameter as the message"
+    parameter String message;
+    input Boolean u;
+  equation
+    assert(u, message);
+  end AssertBlock;
+
+  model StringParameterInAssert "A String parameter as an assert message (CDL Utilities.Assert in the PID blocks)"
+    Real x(start = 1, fixed = true);
+    AssertBlock assMes(message = "x must stay above 0.1", u = x > 0.1);
+  equation
+    der(x) = -x;
+  end StringParameterInAssert;
+
+  model SampleTriggerUnitDelay
+    "CDL Discrete.UnitDelay: sampleTrigger = sample(t0, samplePeriod) outside the when, t0 from an initial equation"
+    parameter Real samplePeriod = 0.2;
+    parameter Real y_start = 0;
+    Real u = time;
+    Real y;
+  protected
+    parameter Real t0(fixed = false);
+    Boolean sampleTrigger;
+    discrete Real u_internal;
+  initial equation
+    t0 = integer(time/samplePeriod)*samplePeriod;
+    y = y_start;
+    u_internal = y_start;
+  equation
+    sampleTrigger = sample(t0, samplePeriod);
+    when sampleTrigger then
+      u_internal = u;
+      y = pre(u_internal);
+    end when;
+  end SampleTriggerUnitDelay;
+
+  function spanC "An external C function from the Include annotation, its output an array argument (Buildings' getTimeSpan)"
+    input Real a;
+    input Real b;
+    output Real span[2];
+  external "C" spanC(a, b, span)
+    annotation(Include = "void spanC(double a, double b, double* span) { span[0] = a; span[1] = b - a; }");
+  end spanC;
+
+  model ExternalCInclude "A model calling an external C function of its Include annotation"
+    parameter Real span[2] = spanC(1, 3);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = span[2];
+  end ExternalCInclude;
+
+  function twoOutputs "A Real and a Real array"
+    input Real u;
+    output Real r;
+    output Real v[2];
+  algorithm
+    r := 2*u;
+    v := {u, u^2};
+  end twoOutputs;
+
+  model TupleWithArrayOutput "(r, v) = f(u) with an array output (Borefields' multipole resistances)"
+    Real r;
+    Real v[2];
+  equation
+    (r, v) = twoOutputs(time);
+  end TupleWithArrayOutput;
+
+  model SampleTriggerInVectorWhen
+    "when {b, sampleTrigger}, sampleTrigger = sample(t0, period), t0 from an initial equation (Buildings.Occupants)"
+    parameter Real period = 0.2;
+    Boolean b = time > 0.5;
+    Integer n(start = 0, fixed = true);
+  protected
+    parameter Real t0(fixed = false);
+    Boolean sampleTrigger;
+  initial equation
+    t0 = time + 0.05;
+  equation
+    sampleTrigger = sample(t0, period);
+    when {b, sampleTrigger} then
+      n = pre(n) + 1;
+    end when;
+  end SampleTriggerInVectorWhen;
+
+  partial function Integrand "A function of one variable"
+    input Real x;
+    output Real y;
+  end Integrand;
+
+  function scaledSquare "An integrand with a bound argument"
+    extends Integrand;
+    input Real k;
+  algorithm
+    y := k*x^2;
+  end scaledSquare;
+
+  function simpson "Simpson's rule of a function argument"
+    input Integrand f;
+    input Real a;
+    input Real b;
+    output Real s;
+  algorithm
+    s := (b - a)/6*(f(a) + 4*f((a + b)/2) + f(b));
+  end simpson;
+
+  model FunctionAsArgument
+    "A function with a bound argument as an argument (Borefields: quadratureLobatto of an integrand)"
+    parameter Real k = 3;
+    parameter Real s = simpson(function scaledSquare(k = k), 0, 1);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = s;
+  end FunctionAsArgument;
+
+  function cube "With a derivative annotation; an algorithm, not one expression (Buildings' equalPercentage)"
+    input Real x;
+    output Real y;
+  algorithm
+    if x < 0 then
+      y := -(-x)^3;
+    else
+      y := x^3;
+    end if;
+    annotation(derivative = cube_der);
+  end cube;
+
+  function cube_der
+    input Real x;
+    input Real dx;
+    output Real dy;
+  algorithm
+    dy := 3*x^2*dx;
+  end cube_der;
+
+  model DerivativeAnnotation
+    "der() of a function call: its derivative annotation (Buildings' DerivativeCheck examples)"
+    Real x;
+    Real y;
+  initial equation
+    y = x;
+  equation
+    x = cube(time);
+    der(y) = der(x);
+  end DerivativeAnnotation;
+
+  record FlowParameters "Buildings.Fluid.Movers.BaseClasses.Characteristics.flowParameters"
+    parameter Real V_flow[:];
+    parameter Real dp[size(V_flow, 1)];
+  end FlowParameters;
+
+  record MoverData "Buildings.Fluid.Movers.Data.Generic"
+    parameter FlowParameters pressure(V_flow = {0, 0}, dp = {0, 0});
+    final parameter Boolean havePressureCurve = sum(pressure.V_flow) > 1e-15 and sum(pressure.dp) > 1e-15;
+  end MoverData;
+
+  model MoverEfficiency "Buildings.Fluid.Movers.BaseClasses.FlowMachineInterface"
+    parameter MoverData per;
+    parameter Integer nOri;
+    final parameter Real V_flow_max = max(per.pressure.V_flow);
+  end MoverEfficiency;
+
+  model RecordConstructorWithArrayConstructors
+    "A record constructor with array constructor arguments in an if-expression, as a record modifier (Buildings.Fluid.Movers)"
+    parameter Integer nOri = 2;
+    parameter Real m_flow_nominal = 2;
+    parameter Real dp_nominal = 100;
+    parameter MoverData per;
+    MoverEfficiency eff(nOri = nOri, per(final pressure = if per.havePressureCurve then per.pressure else
+      FlowParameters(V_flow = {i/(nOri - 1)*2.0*m_flow_nominal for i in 0:(nOri - 1)},
+                     dp = {i/(nOri - 1)*2.0*dp_nominal for i in (nOri - 1):-1:0})));
+    Real x(start = 0, fixed = true);
+  equation
+    /* the frontend evaluates the condition (Movers: computePowerUsingSimilarityLaws = per.havePressureCurve) */
+    if eff.per.havePressureCurve then
+      der(x) = eff.V_flow_max;
+    else
+      der(x) = -eff.V_flow_max;
+    end if;
+  end RecordConstructorWithArrayConstructors;
+
+  function slopes "A local array sized by a local Integer (Buildings.Utilities.Math.Functions.splineDerivatives)"
+    input Real x[:];
+    input Real y[size(x, 1)];
+    output Real d[size(x, 1)];
+  protected
+    Integer n = size(x, 1);
+    Real delta[n - 1];
+  algorithm
+    for i in 1:n - 1 loop
+      delta[i] := (y[i + 1] - y[i])/(x[i + 1] - x[i]);
+    end for;
+    d[1] := delta[1];
+    d[n] := delta[n - 1];
+    for i in 2:n - 1 loop
+      d[i] := (delta[i - 1] + delta[i])/2;
+    end for;
+  end slopes;
+
+  model FunctionLocalArrayInDimension
+    "A function the frontend evaluates for a dimension, its local array sized by a local Integer"
+    parameter Real xs[3] = {0, 1, 2};
+    parameter Real ys[3] = {0, 1, 4};
+    final parameter Real d[3] = slopes(xs, ys);
+    final parameter Integer n = integer(d[3]);
+    Real z[n](each start = 1, each fixed = true);
+  equation
+    der(z) = -z;
+  end FunctionLocalArrayInDimension;
+
+  function sortTwo "Two outputs, like Modelica.Math.Vectors.sort: the sorted vector and its indices"
+    input Real v[:];
+    output Real sorted[size(v, 1)];
+    output Integer indices[size(v, 1)];
+  protected
+    Real tmp;
+    Integer itmp;
+  algorithm
+    sorted := v;
+    indices := {i for i in 1:size(v, 1)};
+    for i in 1:size(v, 1) loop
+      for j in 1:size(v, 1) - i loop
+        if sorted[j] > sorted[j + 1] then
+          tmp := sorted[j];
+          sorted[j] := sorted[j + 1];
+          sorted[j + 1] := tmp;
+          itmp := indices[j];
+          indices[j] := indices[j + 1];
+          indices[j + 1] := itmp;
+        end if;
+      end for;
+    end for;
+  end sortTwo;
+
+  model SortedData
+    parameter Real PLRSup[:];
+    final parameter Real PLRSor[:] = sortTwo(PLRSup);
+    final parameter Real PLR_max = PLRSor[size(PLRSup, 1)];
+  end SortedData;
+
+  model FirstOutputOfPropagatedBinding
+    "The first output of a two-output call as a binding, its argument a propagated binding (heat pumps' TableData2DLoadDep: sort(PLRSup))"
+    parameter Real PLR[3] = {0.5, 1, 0.25};
+    SortedData dat(final PLRSup = PLR);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = dat.PLR_max;
+  end FirstOutputOfPropagatedBinding;
+
+end BuildingsRepro;
