@@ -542,4 +542,29 @@ package BuildingsRepro
     MatrixMaxBlock matMax2(rowMax = false, nRow = 2, nCol = 3, u = [1, 2, 3; 4, 5, 6]*time);
   end IfEquationBranchSizes;
 
+  record ChillerDataBase "Buildings.Fluid.Chillers.Data.BaseClasses.Chiller: a constant gives a size"
+    constant Integer nCapFunT;
+    parameter Real capFunT[nCapFunT];
+  end ChillerDataBase;
+
+  record ChillerData "Buildings.Fluid.Chillers.Data.ElectricEIR.Generic: the size's value"
+    extends ChillerDataBase(final nCapFunT = 2);
+  end ChillerData;
+
+  model Chiller
+    parameter ChillerData per;
+    Real y = sum(per.capFunT)*time;
+  end Chiller;
+
+  model ChillerParallel "Buildings.Applications.BaseClasses.Equipment.ElectricChillerParallel"
+    parameter Integer num = 2;
+    parameter ChillerData per[num];
+    Chiller chi[num](per = per);
+  end ChillerParallel;
+
+  model RecordArrayConstantSize "An array of records whose field's size is a constant of the record type (DataCenters' chillers)"
+    parameter ChillerData perChi[2] = {ChillerData(capFunT = {1, 2}), ChillerData(capFunT = {3, 4})};
+    ChillerParallel chiPar(final num = 2, final per = perChi);
+  end RecordArrayConstantSize;
+
 end BuildingsRepro;

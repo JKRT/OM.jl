@@ -141,6 +141,13 @@ end
     @test brValue(sol, "matMax2.y[1]", 0.5) ≈ 2.0 rtol = 1e-6
   end
 
+  @testset "An array of records whose field's size is a constant of the record type (4 models: chiller plants)" begin
+    local sol = brSimulate("RecordArrayConstantSize"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "chiPar.chi[1].y", 1.0) ≈ 3.0 rtol = 1e-6
+    @test brValue(sol, "chiPar.chi[2].y", 1.0) ≈ 7.0 rtol = 1e-6
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)
