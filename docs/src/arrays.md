@@ -108,13 +108,12 @@ p
 Parameters that fix the structure, such as `n` here (array sizes, subscripts),
 need a new translation.
 
-## A hundred bouncing balls (events, experimental)
+## A hundred bouncing balls (events)
 
 A `when`-equation inside a for-loop: each ball has its own coefficient of
-restitution and counts its bounces in a discrete variable. Models with events go the
-ModelingToolkit path by default, whose event semantics (event iteration, relation
-hysteresis, the times asserts report) are the validated ones; the array path takes
-them too after `OMBackend.ARRAY_PATH_FULL[] = true`.
+restitution and counts its bounces in a discrete variable. The array path handles the
+events as OpenModelica does: relations with a hysteresis, event iteration in sweeps,
+`pre()` of the values before a sweep, `reinit()` after it.
 
 ```modelica
 model BouncingBalls "n balls, each with its own coefficient of restitution"
@@ -137,7 +136,6 @@ end BouncingBalls;
 ```
 
 ```julia
-OM.OMBackend.ARRAY_PATH_FULL[] = true
 sol = OM.simulate("BouncingBalls", "BouncingBalls.mo"; stopTime = 1.7, saveat = 0.002)
 p = plot(; xlabel = "time [s]", ylabel = "height [m]")
 for i in (1, 50, 100)
@@ -149,32 +147,32 @@ sol(1.7; idxs = Symbol("bounces[1]"))   # 5.0
 
 ![Three of the hundred balls](assets/examples/bouncingballs.png)
 
-This takes under a second; through the ModelingToolkit path (the default for event
-models, or `scalarize = true`) the hundred `when`-equations take about 35 s to
-translate and simulate, with the same heights.
+This takes under a second; through the ModelingToolkit path (`scalarize = true`) the
+hundred `when`-equations take about 35 s to translate and simulate, with the same
+heights.
 
 ## What is kept
 
 The array code generation takes a model when every equation can be solved for one
 unknown (a state derivative, an algebraic or a discrete variable) without an algebraic
-loop or index reduction. Equations from connections, for-loops, array equations
-(`der(x) = -k .* x`, `der(x) = A * x`), declaration bindings, if-equations whose
-conditions depend on loop indices and parameters, algorithm sections without
-`when`, reductions (`sum`, `product`) and the built-in math functions are all fine.
+loop or index reduction. That covers:
 
-With `OMBackend.ARRAY_PATH_FULL[] = true` it also takes (experimental):
-
-- relations on continuous variables (`if x > y then ...`) as events; `when`-equations
-  and when-statements (also in for-loops) that assign discrete variables and `reinit`
-  states; `pre`, `edge`, `change`, `initial()`, `sample`, `noEvent`, `smooth` and
-  `homotopy`;
-- initial equations (a square system over the states that are not `fixed`) and `fixed`
-  starts of variables that are no states;
-- asserts, checked after every step.
+- equations from connections, for-loops, array equations (`der(x) = -k .* x`,
+  `der(x) = A * x`), declaration bindings, if-equations whose conditions depend on loop
+  indices and parameters, algorithm sections, reductions (`sum`, `product`), the built-in
+  math functions (also as `Modelica.Math.sin` and the like);
+- events: relations on continuous variables, `when`-equations and when-statements (also
+  in for-loops, with vector conditions `when {a, b}`), `reinit`, `pre`, `edge`, `change`,
+  `initial()`, `sample`, `noEvent`, `smooth`, `homotopy`, and the event-generating
+  functions `integer`, `floor`, `ceil`, `div`, `mod`, `rem`;
+- initialization: initial equations, `fixed` starts of variables that are no states,
+  parameters with `fixed = false`, initial algorithms that set discrete variables;
+- asserts, reported where the condition fails, with messages formatted as OpenModelica
+  (`String(x, significantDigits = 3)`, ...).
 
 Not yet: algebraic loops, index reduction, calls of Modelica functions (other than the
-built-in math functions), initial algorithms, `fixed = false` parameters, `elsewhen` in
-when-equations, array slices and the event-generating functions (`div`, `mod`, `floor`,
-`integer`, ...). Such a model, and every model translated inside
-`OMBackend.withTunableParameters`, is flattened again with scalarization and simulated as
-with `scalarize = true`.
+built-in ones), record variables (`Complex`, MultiBody frames, media states),
+`elsewhen` in when-equations and array slices. Such a model, and every model translated
+inside `OMBackend.withTunableParameters`, is flattened again with scalarization and
+simulated as with `scalarize = true`. `OMBackend.ARRAY_PATH_FULL[] = false` limits the
+array path to models without events and initialization.

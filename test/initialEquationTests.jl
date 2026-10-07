@@ -573,15 +573,21 @@ const IEQ_MSL_MODELS = [
       local s30 = OM.simulate("InitialEquationTests.IEQ30_ScaledInit", file; stopTime = 1.0)
       @test [s30(0.0; idxs = :x), s30(1.0; idxs = :x)] ≈ [2.0, 2 * exp(-1)] rtol = 1e-5
       #= An initial algorithm reading der() was skipped, its targets at their
-         starts (OpenModelica: b = 1), and dropped every other one (a = 0): refused. =#
-      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ31_DerInOneSection", file; stopTime = 1.0)
+         starts (OpenModelica: b = 1), and dropped every other one (a = 0): refused by the MTK
+         path. The array path runs the initial algorithms after the equations: a = 5, b = 1. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ31_DerInOneSection", file;
+                                                             stopTime = 1.0, scalarize = true)
+      local s31 = OM.simulate("InitialEquationTests.IEQ31_DerInOneSection", file; stopTime = 1.0)
+      @test [s31(1.0; idxs = :a), s31(1.0; idxs = :b)] == [5.0, 1.0]
       #= The initial algorithm ran for time 0 at any start time: from 0.1 the
          count is the same (OpenModelica: x(1) = 0.9); a value that differs is
          refused (OpenModelica: t1 = 0.1). =#
       local s32 = OM.simulate("InitialEquationTests.IEQ32_InitialAlgorithmReadsTime", file; startTime = 0.1, stopTime = 1.0)
       @test s32(1.0; idxs = :x) ≈ 0.9 rtol = 1e-6
       @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ33_TimeOfStart", file;
-                                                             startTime = 0.1, stopTime = 1.0)
+                                                             startTime = 0.1, stopTime = 1.0, scalarize = true)
+      #= the array path runs the initial algorithm at the start time =#
+      @test OM.simulate("InitialEquationTests.IEQ33_TimeOfStart", file; startTime = 0.1, stopTime = 1.0)(1.0; idxs = :t1) ≈ 0.1
       #= Neither parameter can be solved alone at the build: the initialization
          solves both (OpenModelica: p = 2, x(1) = 2). =#
       local s34 = OM.simulate("InitialEquationTests.IEQ34_CoupledParameters", file; stopTime = 1.0)
