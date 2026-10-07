@@ -36,7 +36,29 @@ function brValue(sol, name::String, t::Real)
   end
 end
 
+#= A wide model: levels of components, width of each (Buildings' large HVAC systems). =#
+function brWideModel(levels::Int, width::Int)
+  local io = IOBuffer()
+  println(io, "package Wide")
+  println(io, "  model L0\n    parameter Real a = 1, b = 2, c = 3, d = 4, e = 5;\n  end L0;")
+  for l in 1:levels
+    println(io, "  model L$(l)")
+    foreach(k -> println(io, "    L$(l - 1) c$(k);"), 1:width)
+    println(io, "  end L$(l);")
+  end
+  println(io, "  model Top\n    L$(levels) top;\n    Real x(start = 1, fixed = true);\n  equation\n    der(x) = -x;\n  end Top;")
+  println(io, "end Wide;")
+  return String(take!(io))
+end
+
 @testset "Buildings reproducers" begin
+  @testset "A model of many component instances (16 models: VAVReheat, DualFanDualDuct)" begin
+    #= about 290 000 class instantiations: the frontend's backstop was 200 000 =#
+    local f = tempname() * ".mo"
+    write(f, brWideModel(6, 6))
+    @test OM.flatten("Wide.Top", f) !== nothing
+  end
+
   @testset "A record constructor with array constructor arguments as a record modifier (Movers: fans, pumps)" begin
     local sol = brSimulate("RecordConstructorWithArrayConstructors"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success
@@ -103,6 +125,12 @@ end
 
   @testset "An array of components whose dimensions differ per element (rooms, walls: SingleLayer's nSta)" begin
     @test_broken brSucceeds("RaggedComponentArray"; stopTime = 1.0)
+  end
+
+  @testset "A record's constructor called with a function's locals (3 models: ground temperature)" begin
+    local sol = brSimulate("RecordConstructorOfLocals"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "x", 1.0) ≈ 22.0 rtol = 1e-6
   end
 
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin

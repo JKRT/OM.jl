@@ -501,4 +501,26 @@ package BuildingsRepro
     Layer lay[nLay](stateAtSurface_a = {true, false, false}, stateAtSurface_b = {false, false, true});
   end RaggedComponentArray;
 
+  record ClimaticConstants "Buildings.BoundaryConditions.GroundTemperature.ClimaticConstants.Generic: parameter fields"
+    parameter Real TSurMea;
+    parameter Real TSurAmp;
+  end ClimaticConstants;
+
+  function correctedConstants "A record constructed from a function's locals (GroundTemperature.BaseClasses.surfaceTemperature)"
+    input Real T;
+    output ClimaticConstants c;
+  protected
+    Real m;
+  algorithm
+    m := T + 1;
+    c := ClimaticConstants(TSurMea = m, TSurAmp = 2*m);
+  end correctedConstants;
+
+  model RecordConstructorOfLocals "A record's constructor called with a function's locals (Buildings' ground temperature)"
+    parameter ClimaticConstants c = correctedConstants(10);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = c.TSurAmp;
+  end RecordConstructorOfLocals;
+
 end BuildingsRepro;
