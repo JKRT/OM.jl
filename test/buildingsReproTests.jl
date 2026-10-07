@@ -17,13 +17,16 @@ brSimulate(model; kwargs...) = OM.simulate("BuildingsRepro." * model, BR_FILE; k
 brArrayPath(model) = OMBackend.canonicalName("BuildingsRepro." * model) in OMBackend.ARRAY_ODE_MODELS
 
 #= A variable's value at time t (away from events): the solution's interpolation, or for a
-   variable it does not interpolate, the value at the last saved time not after t. =#
+   variable it does not interpolate, linear between the saved values around t. =#
 function brValue(sol, name::String, t::Real)
   try
     return sol(t; idxs = Symbol(name))
   catch
+    local vals = OMBackend.getVariableValues(sol, name)
     local i = searchsortedlast(sol.t, t)
-    return OMBackend.getVariableValues(sol, name)[i]
+    (i == length(sol.t) || sol.t[i] == t) && return vals[i]
+    local w = (t - sol.t[i]) / (sol.t[i + 1] - sol.t[i])
+    return (1 - w) * vals[i] + w * vals[i + 1]
   end
 end
 
