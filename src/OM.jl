@@ -792,7 +792,7 @@ function translate(modelName::String,
                            scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
     if keep
-      local arrays = OMBackend.translateArrays(dae)
+      local arrays = OMBackend.translateArrays(dae; functionList = OMFrontend.cacheToFunctionList(cache))
       arrays === nothing || return arrays
       (dae, cache) = flatten(modelName, modelFile; repr = repr, MSL = MSL, MSL_Version = MSL_Version,
                              libraries = libraries, scalarize = true)
@@ -859,7 +859,7 @@ function translate(modelName::String;
                            scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
     if keep
-      local arrays = OMBackend.translateArrays(dae)
+      local arrays = OMBackend.translateArrays(dae; functionList = OMFrontend.cacheToFunctionList(cache))
       arrays === nothing || return arrays
       (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
     end
