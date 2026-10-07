@@ -487,4 +487,18 @@ package BuildingsRepro
     der(x) = s;
   end IdentityOfLocalSize;
 
+  model Layer "Buildings.HeatTransfer.Conduction.SingleLayer: its number of states from its parameters"
+    parameter Boolean stateAtSurface_a = true;
+    parameter Boolean stateAtSurface_b = true;
+    final parameter Integer nSta = if stateAtSurface_a or stateAtSurface_b then 2 else 1;
+    Real T[nSta](each start = 1, each fixed = true);
+  equation
+    der(T) = -T;
+  end Layer;
+
+  model RaggedComponentArray "An array of components whose dimensions differ per element (MultiLayer's lay[nLay]: rooms, walls)"
+    parameter Integer nLay = 3;
+    Layer lay[nLay](stateAtSurface_a = {true, false, false}, stateAtSurface_b = {false, false, true});
+  end RaggedComponentArray;
+
 end BuildingsRepro;

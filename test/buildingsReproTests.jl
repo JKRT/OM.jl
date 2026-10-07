@@ -13,6 +13,12 @@ using DifferentialEquations: ReturnCode
 const BR_FILE = joinpath(@__DIR__, "Models", "BuildingsRepro.mo")
 
 brSimulate(model; kwargs...) = OM.simulate("BuildingsRepro." * model, BR_FILE; kwargs...)
+#= Whether the model simulates (for the reproducers not fixed yet: @test_broken). =#
+brSucceeds(model; kwargs...) = try
+  brSimulate(model; kwargs...).retcode == ReturnCode.Success
+catch
+  false
+end
 #= Whether the last translation of the model went the array path (arrays kept). =#
 brArrayPath(model) = OMBackend.canonicalName("BuildingsRepro." * model) in OMBackend.ARRAY_ODE_MODELS
 
@@ -93,6 +99,10 @@ end
     local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success
     @test brValue(sol, "x", 1.0) ≈ 2.0 rtol = 1e-6
+  end
+
+  @testset "An array of components whose dimensions differ per element (rooms, walls: SingleLayer's nSta)" begin
+    @test_broken brSucceeds("RaggedComponentArray"; stopTime = 1.0)
   end
 
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
