@@ -89,6 +89,12 @@ end
     @test brValue(sol, "y", 0.5) ≈ 1.0 rtol = 1e-6
   end
 
+  @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
+    local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "x", 1.0) ≈ 2.0 rtol = 1e-6
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)

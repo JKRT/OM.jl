@@ -467,4 +467,24 @@ package BuildingsRepro
     Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
   end ExternalObjectVariable;
 
+  function companionRoots "A matrix of identity() and zeros() sized by a local (Modelica.Math.Polynomials.roots)"
+    input Real p[:];
+    output Real s;
+  protected
+    Integer n = size(p, 1) - 1;
+    Real A[max(size(p, 1) - 1, 0), max(size(p, 1) - 1, 0)];
+  algorithm
+    A[1, :] := -p[2:n + 1]/p[1];
+    A[2:n, :] := [identity(n - 1), zeros(n - 1)];
+    s := sum(A);
+  end companionRoots;
+
+  model IdentityOfLocalSize "A function with [identity(n - 1), zeros(n - 1)], n a local (Polynomials.roots in Buildings' controls)"
+    parameter Real p[3] = {1, -3, 2};
+    Real s = companionRoots(p);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = s;
+  end IdentityOfLocalSize;
+
 end BuildingsRepro;
