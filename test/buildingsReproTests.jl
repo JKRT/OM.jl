@@ -46,6 +46,18 @@ end
     @test brValue(sol, "x", 1.0) ≈ 1.0 rtol = 1e-6
   end
 
+  @testset "A function's local bound with fill(), its elements assigned (Movers: Euler functions)" begin
+    local sol = brSimulate("LocalFillThenElementAssignment"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "z[3]", 1.0) ≈ 0.367879451533977 rtol = 1e-4
+  end
+
+  @testset "min() of a Boolean array as a condition (Movers: allTrue of haveMinimumDecrease)" begin
+    local sol = brSimulate("MinOfBooleans"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "x", 1.0) ≈ 1.0 rtol = 1e-6
+  end
+
   @testset "A call for its effects in an initial equation (503 models: checkBoundary)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialCallForEffects"; stopTime = 1.0, scalarize = scalarize)

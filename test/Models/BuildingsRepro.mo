@@ -314,4 +314,43 @@ package BuildingsRepro
     der(x) = dat.PLR_max;
   end FirstOutputOfPropagatedBinding;
 
+  function fillThenAssign "A local bound with fill(), then its elements assigned (Buildings.Fluid.Movers.BaseClasses.Euler)"
+    input Integer n;
+    output Real s;
+  protected
+    Real a[n] = fill(0.0, n);
+  algorithm
+    for i in 1:n loop
+      a[i] := i*1e-7;
+    end for;
+    s := sum(a)*1e7;
+  end fillThenAssign;
+
+  model LocalFillThenElementAssignment
+    "A function the frontend evaluates for a dimension: a local bound with fill(), its elements assigned"
+    final parameter Integer n = integer(fillThenAssign(3));
+    Real z[n](each start = 1, each fixed = true);
+  equation
+    der(z) = -z;
+  end LocalFillThenElementAssignment;
+
+  function allTrue "Modelica.Math.BooleanVectors.allTrue: an output with a binding, min of Booleans"
+    input Boolean b[:];
+    output Boolean result = size(b, 1) > 0 and min(b);
+  algorithm
+  end allTrue;
+
+  model MinOfBooleans "min() of a Boolean array, as an if-equation's condition (Movers: haveMinimumDecrease)"
+    parameter Real dp[3] = {200, 150, 0};
+    parameter Real V_flow[3] = {0, 1, 2};
+    final parameter Boolean haveMinimumDecrease = allTrue({(dp[i + 1] - dp[i])/(V_flow[i + 1] - V_flow[i]) < 0 for i in 1:2});
+    Real x(start = 0, fixed = true);
+  equation
+    if haveMinimumDecrease then
+      der(x) = 1;
+    else
+      der(x) = -1;
+    end if;
+  end MinOfBooleans;
+
 end BuildingsRepro;
