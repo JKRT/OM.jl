@@ -973,7 +973,7 @@ package BuildingsRepro
   end CurveInterface;
 
   model InitialIfOnParameterCondition
-    "An initial if-equation on a parameter condition that gives free parameters their values (10 models: Buildings' Movers, if curve == 1 then preDer1 = ... with curve from abs(per.pressure.dp[nOri]) < eps)"
+    "An initial if-equation on a parameter condition that gives free parameters their values (10 models: Buildings' Movers, if curve == 1 then preDer1 = ... with curve from abs(per.pressure.dp[nOri]) < eps). A guard: the frontend folds this model's curve, not the Movers'"
     parameter Real dp_nominal = 1;
     CurveInterface eff(per(dp = {4, dp_nominal}));
     Real x(start = 0, fixed = true);

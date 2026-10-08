@@ -526,6 +526,11 @@ function withDirectRHS(f::Function, value::Bool)
   end
 end
 
+#= withDirectRHS, and the iMTK build at the simulation's start time (its initialization is
+   solved there: built at 0, a simulation from another start built twice). =#
+_withSimulationSettings(f::Function, directRHS::Bool, startTime::Real) =
+  withDirectRHS(() -> OMBackend.IMTKGen.withBuildStart(f, startTime), directRHS)
+
 """
     simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false,
              libraries=String[], solver=OMBackend.defaultSolver(), mode=OMBackend.DEFAULT_BACKEND_MODE[], ...)
@@ -582,7 +587,7 @@ function simulate(modelName::String,
                   overwriteCache::Bool = false,
                   scalarize::Bool = SCALARIZE[],
                   kwargs...)
-  return withDirectRHS(directRHS) do
+  return _withSimulationSettings(directRHS, startTime) do
     local rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
     translate(modelName, modelFile;
               MSL = MSL,
@@ -685,7 +690,7 @@ function simulate(modelName::String;
                   overwriteCache::Bool = false,
                   scalarize::Bool = SCALARIZE[],
                   kwargs...)
-  return withDirectRHS(directRHS) do
+  return _withSimulationSettings(directRHS, startTime) do
     internalName = OMBackend.canonicalName(modelName)
     alreadyCompiled = (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) &&
                       get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize
