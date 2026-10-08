@@ -290,4 +290,14 @@ end
       @test_throws OMBackend.CodeGeneration.ModelicaAssertionError brSimulate("InitialAssertOnVariableViolated"; stopTime = 1.0, scalarize = scalarize)
     end
   end
+
+  @testset "inStream across a connection, of a scalar and of an array stream variable (every fluid model)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("StreamConnection"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "hIn", 1.0) ≈ 1.0 rtol = 1e-6
+      @test brValue(sol, "XiIn", 1.0) ≈ 0.01 rtol = 1e-6
+      @test brValue(sol, "hBack", 1.0) ≈ 5.0 rtol = 1e-6
+    end
+  end
 end

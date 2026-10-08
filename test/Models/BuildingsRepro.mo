@@ -747,4 +747,51 @@ package BuildingsRepro
     extends InitialAssertOnVariable(x(start = 0.2));
   end InitialAssertOnVariableViolated;
 
+  connector FluidPort "Modelica.Fluid.Interfaces.FluidPort: a stream variable and a stream array"
+    Real p;
+    flow Real m_flow(min = -1e60, max = 1e60);
+    stream Real h_outflow;
+    stream Real Xi_outflow[1];
+  end FluidPort;
+
+  model StreamPipe "Buildings.Fluid.Interfaces.PartialTwoPortTransport"
+    FluidPort port_a;
+    FluidPort port_b;
+    parameter Boolean allowFlowReversal = true;
+  equation
+    port_a.m_flow + port_b.m_flow = 0;
+    port_a.m_flow = port_a.p - port_b.p;
+    port_a.h_outflow = inStream(port_b.h_outflow);
+    port_b.h_outflow = inStream(port_a.h_outflow);
+    port_a.Xi_outflow = if allowFlowReversal then inStream(port_b.Xi_outflow) else {0.5};
+    port_b.Xi_outflow = inStream(port_a.Xi_outflow);
+  end StreamPipe;
+
+  model StreamBoundary
+    FluidPort port;
+    parameter Real p = 1;
+    parameter Real h = 1;
+    parameter Real Xi = 0.01;
+  equation
+    port.p = p;
+    port.h_outflow = h;
+    port.Xi_outflow = {Xi};
+  end StreamBoundary;
+
+  model StreamConnection
+    "inStream across a connection: the other connector's outflow (every fluid model: Buildings' Airflow.Multizone, MixingVolumes with sensors)"
+    StreamBoundary sou(p = 2, h = 1, Xi = 0.01);
+    StreamPipe pip;
+    StreamBoundary sin(p = 1, h = 5, Xi = 0.02);
+    Real hIn(start = 0, fixed = true) "integral of pip.port_b.h_outflow = inStream(pip.port_a.h_outflow)";
+    Real XiIn(start = 0, fixed = true);
+    Real hBack(start = 0, fixed = true);
+  equation
+    connect(sou.port, pip.port_a);
+    connect(pip.port_b, sin.port);
+    der(hIn) = pip.port_b.h_outflow;
+    der(XiIn) = pip.port_b.Xi_outflow[1];
+    der(hBack) = pip.port_a.h_outflow;
+  end StreamConnection;
+
 end BuildingsRepro;
