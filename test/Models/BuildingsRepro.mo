@@ -936,4 +936,12 @@ package BuildingsRepro
     der(y) = cube(time);
   end CallOfAnnotatedFunction;
 
+  model ThreeDimensionalArrayLiteral "A three-dimensional array literal in the ModelingToolkit path (Buildings' Borefields TemporalSuperposition)"
+    parameter Real a[2, 2, 2] = {{{1, 2}, {3, 4}}, {{5, 6}, {7, 8}}};
+    Real x[2, 2, 2](each start = 0, each fixed = true);
+    Real y = x[2, 1, 2] + 10*x[1, 2, 1];
+  equation
+    der(x) = a;
+  end ThreeDimensionalArrayLiteral;
+
 end BuildingsRepro;

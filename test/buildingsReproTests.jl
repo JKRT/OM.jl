@@ -350,4 +350,12 @@ end
       @test brValue(sol, "y", 1.0) ≈ 0.25 rtol = 1e-6
     end
   end
+
+  @testset "A three-dimensional array literal (Borefields TemporalSuperposition; that model checks the stacking)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("ThreeDimensionalArrayLiteral"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 1.0) ≈ 36.0 rtol = 1e-6
+    end
+  end
 end
