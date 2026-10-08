@@ -1001,4 +1001,108 @@ package BuildingsRepro
     extends ArrayParameterSubscriptedByIterator(dp = {1, 2, 3}*limitSpan[2]);
   end ArrayParameterSubscriptedByIteratorIncreasing;
 
+  function cubeOfAnArgumentWithANameAsLongAsBuildingsOnes "cube with a derivative annotation and a name as long as Buildings' (the derivative error's text wraps after it)"
+    input Real x;
+    output Real y;
+  algorithm
+    if x < 0 then
+      y := -(-x)^3;
+    else
+      y := x^3;
+    end if;
+    annotation(derivative = cubeOfAnArgumentWithANameAsLongAsBuildingsOnes_der);
+  end cubeOfAnArgumentWithANameAsLongAsBuildingsOnes;
+
+  function cubeOfAnArgumentWithANameAsLongAsBuildingsOnes_der "An if-statement: not inlined, its own derivative a call without a rule (Buildings' der_regNonZeroPower)"
+    input Real x;
+    input Real dx;
+    output Real dy;
+  algorithm
+    if x < 0 then
+      dy := 3*x^2*dx;
+    else
+      dy := 3*x*x*dx;
+    end if;
+  end cubeOfAnArgumentWithANameAsLongAsBuildingsOnes_der;
+
+  model SecondDerivativeOfLongNamedFunction
+    "SecondDerivativeOfAnnotatedFunction through a long function name: the retry with the numeric partials matched the error's text, which wraps (Buildings' DerivativeCheck2 examples)"
+    Real x;
+    Real y;
+    Real y_comp;
+    Real der_y;
+    Real der_y_comp;
+  initial equation
+    y = y_comp;
+    der_y = der_y_comp;
+  equation
+    x = 2*time + time^3 - 1;
+    y = cubeOfAnArgumentWithANameAsLongAsBuildingsOnes(x);
+    der_y = der(y);
+    der_y_comp = der(y_comp);
+    der(der_y) = der(der_y_comp);
+  end SecondDerivativeOfLongNamedFunction;
+
+  function powerLawRegularized "A flow from a pressure difference, linear below dpReg (Buildings' powerLaw05): no derivative annotation"
+    input Real dp;
+    input Real dpReg = 0.1;
+    output Real m;
+  algorithm
+    if abs(dp) > dpReg then
+      m := sign(dp)*sqrt(abs(dp));
+    else
+      m := dp/sqrt(dpReg);
+    end if;
+  end powerLawRegularized;
+
+  model CallOfSmallDifferenceOfLargeStates
+    "A call without a derivative annotation reads a small difference of large states (8 models: Buildings' Airflow.Multizone, powerLaw05 at room pressures)"
+    Real p1(start = 101325.05, fixed = true);
+    Real p2(start = 101325, fixed = true);
+    Real m = powerLawRegularized(p1 - p2);
+  equation
+    der(p1) = -1000*m;
+    der(p2) = 1000*m;
+  end CallOfSmallDifferenceOfLargeStates;
+
+  record GasData "Per-gas data (MSL IdealGases' DataRecord)"
+    String name;
+    Real MM;
+    Real a[2];
+  end GasData;
+
+  function enthalpyOfGas "An if-statement: not inlined (MSL IdealGases' h_T)"
+    input GasData d;
+    input Real T;
+    output Real h;
+  algorithm
+    if T > 0 then
+      h := d.a[1]*T + d.a[2]*T^2/d.MM;
+    else
+      h := 0;
+    end if;
+  end enthalpyOfGas;
+
+  package SingleGases "Constant records of single gases (MSL IdealGases.Common.SingleGasesData)"
+    constant GasData A = GasData(name = "A", MM = 2, a = {1, 2});
+    constant GasData B = GasData(name = "B", MM = 4, a = {3, 4});
+  end SingleGases;
+
+  package GasMixture "A medium package with its data a constant array of those records (MSL IdealGases' Medium.data)"
+    constant GasData data[2] = {SingleGases.A, SingleGases.B};
+    constant Integer nX = size(data, 1);
+
+    model BaseProperties "The enthalpy from the data records (MSL PartialMixtureMedium.BaseProperties: h_TX)"
+      Real X[nX] = {0.25, 0.75};
+      Real T = 1 + time;
+      Real h = {X[1], X[2]}*{enthalpyOfGas(data[i], T) for i in 1:nX};
+    end BaseProperties;
+  end GasMixture;
+
+  model RecordArrayElementInReduction
+    "An element of a medium's constant array of records, by an iterator, passed to a function in a reduction: the MSL Media mixtures' h = X*{h_T(data[i], T, ...) for i in 1:nX}, but folded by the frontend into record values (open: the element is passed whole)"
+    package Medium = GasMixture;
+    Medium.BaseProperties medium;
+  end RecordArrayElementInReduction;
+
 end BuildingsRepro;

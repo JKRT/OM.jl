@@ -1014,3 +1014,25 @@ end
     end
   end
 end
+
+@testset verbose=true "MSL Media" begin
+  #= h = X*{h_T(data[i], T, ...) for i in 1:nX}: each record's fields from the data's field
+     arrays (data_MM[i]). With the subscript dropped the whole field arrays were passed; with
+     it kept, Medium_data was undefined. The reference results have T, p and X only: h from
+     omc 1.27.1. =#
+  for (model, refs) in (("Modelica.Media.Examples.TestOnly.MixIdealGasAir",
+                         ("medium_h" => 676644.198598841, "medium2_h" => 280654.11025661)),
+                        ("Modelica.Media.Examples.MixtureGases",
+                         ("medium1_h" => 305441.306731196, "medium2_h" => 330940.983035711)),
+                        ("Modelica.Media.Examples.TestOnly.IdealGasN2Mix", ("medium_h" => 313143.958304714,)),
+                        ("Modelica.Media.Examples.TestOnly.FlueGas", ()))
+    @testset "$(model)" begin
+      local sol = OM.simulate(model; MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+      @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
+      for (name, h) in refs
+        @test sol(0.5; idxs = Symbol(name)) ≈ h rtol = 1e-6
+      end
+    end
+  end
+end
+

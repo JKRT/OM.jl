@@ -376,4 +376,30 @@ end
       @test_throws ErrorException brSimulate("ArrayParameterSubscriptedByIteratorIncreasing"; stopTime = 1.0, scalarize = scalarize)
     end
   end
+
+  @testset "The second derivative through a long function name (2 models: DerivativeCheck2; the retry matched the error's wrapped text)" begin
+    local sol = brSimulate("SecondDerivativeOfLongNamedFunction"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y_comp", 1.0) ≈ 8.0 rtol = 1e-4
+    @test brValue(sol, "der_y_comp", 1.0) ≈ 60.0 rtol = 1e-4
+  end
+
+  @testset "A call without a derivative annotation of a small difference of large states (10 models: Airflow.Multizone, Dampers, CHPs)" begin
+    #= dp decays to 0 (p1 = p2 = 101325.025): the Jacobian differentiates the call in dp, not
+       the states by their magnitude (an FD step of ~0.6 Pa past the 0.1 Pa regularization) =#
+    local sol = brSimulate("CallOfSmallDifferenceOfLargeStates"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test abs(brValue(sol, "p1", 1.0) - brValue(sol, "p2", 1.0)) < 1e-3
+    #= the array path's Jacobian is still finite differences in the states =#
+    local solA = brSimulate("CallOfSmallDifferenceOfLargeStates"; stopTime = 1.0)
+    @test solA.retcode == ReturnCode.Success
+    @test_broken abs(brValue(solA, "p1", 1.0) - brValue(solA, "p2", 1.0)) < 1e-3
+  end
+
+  @testset "A medium's constant array of records the frontend folds, an element by an iterator in a reduction (open)" begin
+    #= the MSL Media mixtures' form, folded into record values: the element is passed whole to
+       the function, which takes the record's fields (MSL Media: mslTests "MSL Media") =#
+    @test_broken brSucceeds("RecordArrayElementInReduction"; stopTime = 1.0, scalarize = true)
+  end
 end
+
