@@ -1237,4 +1237,26 @@ package BuildingsRepro
     end when;
   end SelfScheduledWhen;
 
+  function partialDot "The scalar product of the first n elements (Buildings' temporalSuperposition)"
+    input Real a[:];
+    input Real b[size(a, 1)];
+    input Integer n;
+    output Real y;
+  algorithm
+    y := a[1:n]*b[1:n];
+  end partialDot;
+
+  model SliceOfVaryingSize
+    "x[1:n] in a function of one statement, n a discrete at the call: inlined, an array of varying size (Buildings' GroundTemperatureResponse)"
+    parameter Real a[3] = {1, 2, 3};
+    parameter Real b[3] = {4, 5, 6};
+    Integer n(start = 1, fixed = true);
+    discrete Real y(start = 0, fixed = true);
+  equation
+    when sample(0, 0.3) then
+      n = min(pre(n) + 1, 3);
+      y = partialDot(a, b, pre(n));
+    end when;
+  end SliceOfVaryingSize;
+
 end BuildingsRepro;

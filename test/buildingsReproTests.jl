@@ -146,6 +146,16 @@ end
     end
   end
 
+  @testset "x[1:n] of a one-statement function, n a discrete at the call: not inlined (Buildings borefields)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("SliceOfVaryingSize"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 0.1) ≈ 4.0 rtol = 1e-10
+      @test brValue(sol, "y", 0.5) ≈ 14.0 rtol = 1e-10
+      @test brValue(sol, "y", 1.0) ≈ 32.0 rtol = 1e-10
+    end
+  end
+
   @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
     local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success
