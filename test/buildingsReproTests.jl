@@ -342,4 +342,12 @@ end
     #= the ModelingToolkit path packs the 3-dimensional argument into a matrix (BoundsError) =#
     @test_broken brSucceeds("TransposeOfThreeDimensions"; stopTime = 1.0, scalarize = true)
   end
+
+  @testset "A call of a function with a derivative annotation on the array path (15 models: psychrometrics, splice)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("CallOfAnnotatedFunction"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 1.0) ≈ 0.25 rtol = 1e-6
+    end
+  end
 end

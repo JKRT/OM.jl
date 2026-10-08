@@ -929,4 +929,11 @@ package BuildingsRepro
     der(x) = s;
   end TransposeOfThreeDimensions;
 
+  model CallOfAnnotatedFunction
+    "A call of a function with a derivative annotation on the array path (Buildings' psychrometric functions, spliceFunction, regNonZeroPower)"
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = cube(time);
+  end CallOfAnnotatedFunction;
+
 end BuildingsRepro;
