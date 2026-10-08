@@ -981,4 +981,24 @@ package BuildingsRepro
     der(x) = eff.a[1] + eff.b[1] + 10*eff.b[2];
   end InitialIfOnParameterCondition;
 
+  model ArrayParameterSubscriptedByIterator
+    "An array parameter subscripted by a comprehension's iterator in an initial if's condition (5 models: Buildings' Movers, haveMinimumDecrease)"
+    parameter Real X[2] = {0.5, 0.6} "not summing to 1: the call stops the run if made";
+    parameter Real limitSpan[2] = spanC(0, 1) "not evaluated by the frontend";
+    parameter Real dp[3] = {3, 2, 1}*limitSpan[2];
+    parameter Real V[3] = {0, 1, 2};
+    final parameter Boolean decreasing = allTrue({(dp[i + 1] - dp[i])/(V[i + 1] - V[i]) < 0 for i in 1:2});
+    Real x(start = 0, fixed = true);
+  initial equation
+    if not decreasing then
+      checkMassFractions(X);
+    end if;
+  equation
+    der(x) = 1;
+  end ArrayParameterSubscriptedByIterator;
+
+  model ArrayParameterSubscriptedByIteratorIncreasing "ArrayParameterSubscriptedByIterator with an increasing dp: the call is made and its assert stops it"
+    extends ArrayParameterSubscriptedByIterator(dp = {1, 2, 3}*limitSpan[2]);
+  end ArrayParameterSubscriptedByIteratorIncreasing;
+
 end BuildingsRepro;

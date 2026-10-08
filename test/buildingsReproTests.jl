@@ -367,4 +367,13 @@ end
       @test brValue(sol, "x", 1.0) ≈ 28.0 rtol = 1e-6
     end
   end
+
+  @testset "An array parameter subscripted by a comprehension's iterator (5 models: Movers' haveMinimumDecrease)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("ArrayParameterSubscriptedByIterator"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 1.0 rtol = 1e-6
+      @test_throws ErrorException brSimulate("ArrayParameterSubscriptedByIteratorIncreasing"; stopTime = 1.0, scalarize = scalarize)
+    end
+  end
 end
