@@ -702,4 +702,17 @@ package BuildingsRepro
     T = powerLinearized(T4, 0.25, 243.15^4);
   end LargeUnknownInitialization;
 
+  model ParameterReadByWhenAssert
+    "A parameter read by an assert in a when-equation, its binding reading an evaluated parameter (13 models: Buildings' Airflow.Multizone ZonalFlow_ACS rho_default)"
+    parameter Boolean useDefaultProperties = false;
+    parameter Real p_default = 101325;
+    parameter Real rho_default = p_default*1.2/101325;
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = rho_default;
+    when useDefaultProperties and initial() then
+      assert(abs(1 - rho_default/1.2) < 0.2, "rho_default is off");
+    end when;
+  end ParameterReadByWhenAssert;
+
 end BuildingsRepro;

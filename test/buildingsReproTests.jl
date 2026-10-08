@@ -270,4 +270,12 @@ end
     @test brValue(sol, "T4", 0.0) ≈ -1.04287031784645e10 rtol = 1e-6
     @test brValue(sol, "T4", 0.5) ≈ 3.969126001e9 rtol = 1e-4
   end
+
+  @testset "A parameter read by a when-assert, its binding reading an evaluated parameter (13 models: Airflow.Multizone)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("ParameterReadByWhenAssert"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 1.2 rtol = 1e-6
+    end
+  end
 end
