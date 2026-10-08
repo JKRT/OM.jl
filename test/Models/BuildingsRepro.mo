@@ -680,4 +680,26 @@ package BuildingsRepro
     der(cpCod) = der(cpSym);
   end DerivativeOfParameterBoundVariable;
 
+  function powerLinearized "Buildings.Utilities.Math.Functions.powerLinearized"
+    input Real x;
+    input Real n;
+    input Real x0;
+    output Real y;
+  algorithm
+    if x > x0 then
+      y := x^n;
+    else
+      y := x0^n*(1 - n) + n*x0^(n - 1)*x;
+    end if;
+  end powerLinearized;
+
+  model LargeUnknownInitialization
+    "An unknown of magnitude 1e9 solved at initialization through a function (Buildings' PowerLinearized: T4 = T^4)"
+    Real T4(start = 300^4);
+    Real T;
+  equation
+    T = 1 + 500*time;
+    T = powerLinearized(T4, 0.25, 243.15^4);
+  end LargeUnknownInitialization;
+
 end BuildingsRepro;

@@ -263,4 +263,11 @@ end
     @test brValue(sol, "cpSym", 0.0) ≈ 4184.0
     @test brValue(sol, "cpSym", 1.0) ≈ 4184.0
   end
+
+  @testset "An unknown of magnitude 1e9 solved at initialization (Buildings' PowerLinearized)" begin
+    local sol = brSimulate("LargeUnknownInitialization"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "T4", 0.0) ≈ -1.04287031784645e10 rtol = 1e-6
+    @test brValue(sol, "T4", 0.5) ≈ 3.969126001e9 rtol = 1e-4
+  end
 end
