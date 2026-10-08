@@ -859,4 +859,26 @@ package BuildingsRepro
     der(x) = y[1];
   end FirstOutputInArrayEquation;
 
+  model InitialEffectCallInIf
+    "A call for its effects in a branch of an initial if-equation (30 models: Buildings' Movers, if not haveMinimumDecrease then Streams.print(...))"
+    parameter Real X[2] = {0.01, 0.99};
+    parameter Real limitSpan[2] = spanC(0, 1) "not evaluated by the frontend (Buildings: 0/0 in haveMinimumDecrease)";
+    parameter Real limit = limitSpan[2];
+    Real x(start = 0, fixed = true);
+  initial equation
+    if X[1] < limit then
+      checkMassFractions(X);
+    end if;
+  equation
+    der(x) = 1;
+  end InitialEffectCallInIf;
+
+  model InitialEffectCallInIfViolated "InitialEffectCallInIf with fractions not summing to 1: the call's assert stops it"
+    extends InitialEffectCallInIf(X = {0.5, 0.6});
+  end InitialEffectCallInIfViolated;
+
+  model InitialEffectCallInIfNotTaken "The violated fractions under a false condition: no call"
+    extends InitialEffectCallInIf(X = {0.5, 0.6}, limitSpan = spanC(0, 0.1));
+  end InitialEffectCallInIfNotTaken;
+
 end BuildingsRepro;

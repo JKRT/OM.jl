@@ -316,4 +316,14 @@ end
       @test [brValue(sol, "y[$i]", 0.25) for i in 1:3] ≈ [0.75, 0.5, 0.25] rtol = 1e-6
     end
   end
+
+  @testset "A call for its effects in a branch of an initial if-equation (30 models: Buildings' Movers warnings)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("InitialEffectCallInIf"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 1.0 rtol = 1e-6
+      @test_throws ErrorException brSimulate("InitialEffectCallInIfViolated"; stopTime = 1.0, scalarize = scalarize)
+      @test brSimulate("InitialEffectCallInIfNotTaken"; stopTime = 1.0, scalarize = scalarize).retcode == ReturnCode.Success
+    end
+  end
 end
