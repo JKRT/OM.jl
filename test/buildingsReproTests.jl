@@ -308,4 +308,12 @@ end
       @test brValue(sol, "x", 1.0) ≈ 188.495559225064 rtol = 1e-6
     end
   end
+
+  @testset "The first of two array outputs in an array equation (Buildings' SignalRanker: y = Vectors.sort(u))" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("FirstOutputInArrayEquation"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test [brValue(sol, "y[$i]", 0.25) for i in 1:3] ≈ [0.75, 0.5, 0.25] rtol = 1e-6
+    end
+  end
 end

@@ -827,4 +827,36 @@ package BuildingsRepro
     der(x) = vPhase[2].theta[1];
   end InlinedCallInComponentArray;
 
+  function sortDescending "Modelica.Math.Vectors.sort: two outputs, the second bound to a range and written"
+    input Real v[:];
+    output Real sorted[size(v, 1)] = v;
+    output Integer indices[size(v, 1)] = 1:size(v, 1);
+  protected
+    Real t;
+    Integer k;
+  algorithm
+    for i in 1:size(v, 1) loop
+      for j in 1:size(v, 1) - i loop
+        if sorted[j] < sorted[j + 1] then
+          t := sorted[j];
+          sorted[j] := sorted[j + 1];
+          sorted[j + 1] := t;
+          k := indices[j];
+          indices[j] := indices[j + 1];
+          indices[j + 1] := k;
+        end if;
+      end for;
+    end for;
+  end sortDescending;
+
+  model FirstOutputInArrayEquation
+    "The first of two array outputs in an array equation (Buildings' SignalRanker: y = Modelica.Math.Vectors.sort(u))"
+    Real u[3] = {time, 0.5, 1 - time};
+    Real y[3];
+    Real x(start = 0, fixed = true);
+  equation
+    y = sortDescending(u);
+    der(x) = y[1];
+  end FirstOutputInArrayEquation;
+
 end BuildingsRepro;
