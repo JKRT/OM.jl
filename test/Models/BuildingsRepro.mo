@@ -944,4 +944,41 @@ package BuildingsRepro
     der(x) = a;
   end ThreeDimensionalArrayLiteral;
 
+  record PressureCurve
+    parameter Real dp[:];
+  end PressureCurve;
+
+  function curveDerivatives "Stands in for Buildings.Utilities.Math.Functions.splineDerivatives"
+    input Real x[:];
+    output Real d[size(x, 1)];
+  algorithm
+    d := 2*x;
+  end curveDerivatives;
+
+  model CurveInterface
+    parameter PressureCurve per;
+    parameter Integer nOri = size(per.dp, 1);
+    final parameter Boolean haveVMax = abs(per.dp[nOri]) < 1e-10;
+    parameter Integer curve = if haveVMax then 1 else 2;
+    parameter Real a[nOri](each fixed = false);
+    parameter Real b[nOri + 1](each fixed = false);
+  initial equation
+    if curve == 1 then
+      a = curveDerivatives(per.dp);
+      b = zeros(nOri + 1);
+    else
+      a = zeros(nOri);
+      b = curveDerivatives(cat(1, per.dp, {1}));
+    end if;
+  end CurveInterface;
+
+  model InitialIfOnParameterCondition
+    "An initial if-equation on a parameter condition that gives free parameters their values (10 models: Buildings' Movers, if curve == 1 then preDer1 = ... with curve from abs(per.pressure.dp[nOri]) < eps)"
+    parameter Real dp_nominal = 1;
+    CurveInterface eff(per(dp = {4, dp_nominal}));
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = eff.a[1] + eff.b[1] + 10*eff.b[2];
+  end InitialIfOnParameterCondition;
+
 end BuildingsRepro;

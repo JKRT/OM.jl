@@ -358,4 +358,13 @@ end
       @test brValue(sol, "y", 1.0) ≈ 36.0 rtol = 1e-6
     end
   end
+
+  @testset "An initial if-equation on a parameter condition gives free parameters their values (Buildings' Movers)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("InitialIfOnParameterCondition"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      #= curve = 2: a = 0, b = 2*{4, 1, 1} =#
+      @test brValue(sol, "x", 1.0) ≈ 28.0 rtol = 1e-6
+    end
+  end
 end
