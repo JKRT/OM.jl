@@ -1286,4 +1286,15 @@ package BuildingsRepro
     end when;
   end SampleStartOfInitialAlgorithm;
 
+  model TableStartOfInitialEquation
+    "A table's start time, a free parameter an initial equation gives through a function (CDL TimeTable: t0 = round(integer(time/timeRange)*timeRange, 6), its table's startTime)"
+    parameter Real table[3, 2] = [0, 0; 10, 1; 20, 4];
+    parameter Real period = 20;
+    parameter Real t0(fixed = false);
+    parameter TimeTable41 tab = TimeTable41("NoName", "NoName", table, t0, {2}, 1, 3, t0, 3, false, ",", 0);
+    Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+  initial equation
+    t0 = roundTo(integer(time/period)*period, 6);
+  end TableStartOfInitialEquation;
+
 end BuildingsRepro;

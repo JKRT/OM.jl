@@ -166,6 +166,14 @@ end
     end
   end
 
+  @testset "A table's start time from an initial equation through a function (CDL TimeTable: ~20 models)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("TableStartOfInitialEquation"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 0.5) ≈ 0.05 rtol = 1e-6
+    end
+  end
+
   @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
     local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success
