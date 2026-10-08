@@ -911,4 +911,22 @@ package BuildingsRepro
     der(x) = offsetValue(obj, time);
   end ExternalObjectOfIncludeCode;
 
+  function sumTransposed "transpose of a three-dimensional array (Buildings' Borefields TemporalSuperposition)"
+    input Real a[2, 3, 2];
+    output Real s;
+  protected
+    Real t[3, 2, 2];
+  algorithm
+    t := transpose(a);
+    s := t[3, 1, 2] + 10*t[1, 2, 1];
+  end sumTransposed;
+
+  model TransposeOfThreeDimensions "transpose of a three-dimensional array swaps its first two dimensions (11 models: Borefields)"
+    parameter Real a[2, 3, 2] = {{{1, 2}, {3, 4}, {5, 6}}, {{7, 8}, {9, 10}, {11, 12}}};
+    Real s = sumTransposed(a*time);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = s;
+  end TransposeOfThreeDimensions;
+
 end BuildingsRepro;

@@ -334,4 +334,12 @@ end
       @test brValue(sol, "x", 1.0) ≈ 2.5 rtol = 1e-6
     end
   end
+
+  @testset "transpose of a three-dimensional array (11 models: Borefields TemporalSuperposition)" begin
+    local sol = brSimulate("TransposeOfThreeDimensions"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "x", 1.0) ≈ 38.0 rtol = 1e-6
+    #= the ModelingToolkit path packs the 3-dimensional argument into a matrix (BoundsError) =#
+    @test_broken brSucceeds("TransposeOfThreeDimensions"; stopTime = 1.0, scalarize = true)
+  end
 end
