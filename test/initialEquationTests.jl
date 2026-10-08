@@ -552,11 +552,14 @@ const IEQ_MSL_MODELS = [
       local s25 = OM.simulate("InitialEquationTests.IEQ25_TupleParameters", file; stopTime = 1.0)
       @test s25(1.0; idxs = :x) ≈ 48.0 rtol = 1e-6
       #= t0 = time could not be evaluated at the build and t0 kept its start (0.6)
-         for any start time: computed for 0, another start time is refused. =#
+         for any start time: the ModelingToolkit path computes it for 0 and refuses
+         another start time; the array path solves it at the start time. =#
       local s26 = OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file; stopTime = 1.0)
       @test s26(0.9; idxs = :n) == 3   # samples at 0.25, 0.5, 0.75
+      local s26b = OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file; startTime = 0.1, stopTime = 1.0)
+      @test [s26b(t; idxs = :n) for t in (0.3, 0.5, 0.7, 0.9)] == [0, 1, 2, 3]   # at 0.35, 0.6, 0.85
       @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file;
-                                                             startTime = 0.1, stopTime = 1.0)
+                                                             startTime = 0.1, stopTime = 1.0, scalarize = true)
       #= Parameter targets of the initial algorithm were never set (k stayed 0).
          OpenModelica: k = 20, x(1) = 20. =#
       local s27 = OM.simulate("InitialEquationTests.IEQ27_ParameterFromInitialAlgorithm", file; stopTime = 1.0)
