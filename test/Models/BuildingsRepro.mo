@@ -794,4 +794,37 @@ package BuildingsRepro
     der(hBack) = pip.port_a.h_outflow;
   end StreamConnection;
 
+  partial package PartialPhaseSystem "Buildings.Electrical.PhaseSystems.PartialPhaseSystem"
+    constant Integer m = 1;
+    replaceable partial function thetaRef
+      input Real theta[m];
+      output Real thetaRef;
+    end thetaRef;
+  end PartialPhaseSystem;
+
+  package OnePhase "Buildings.Electrical.PhaseSystems.OnePhase"
+    extends PartialPhaseSystem(m = 1);
+    redeclare function extends thetaRef
+    algorithm
+      thetaRef := theta[1];
+      annotation(Inline = true);
+    end thetaRef;
+  end OnePhase;
+
+  model PhaseSource "Buildings.Electrical.AC.OnePhase.Sources.FixedVoltage"
+    replaceable package PhaseSystem = OnePhase;
+    parameter Real f = 60;
+    Real theta[PhaseSystem.m];
+  equation
+    PhaseSystem.thetaRef(theta) = 6.283185307179586*f*time;
+  end PhaseSource;
+
+  model InlinedCallInComponentArray
+    "An inlined function call with a subscripted input in an array of components (46 models: Buildings' three-phase unbalanced sources)"
+    PhaseSource vPhase[3](f = {50, 60, 70});
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = vPhase[2].theta[1];
+  end InlinedCallInComponentArray;
+
 end BuildingsRepro;

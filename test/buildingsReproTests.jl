@@ -300,4 +300,12 @@ end
       @test brValue(sol, "hBack", 1.0) ≈ 5.0 rtol = 1e-6
     end
   end
+
+  @testset "An inlined call with a subscripted input in an array of components (46 models: three-phase unbalanced)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("InlinedCallInComponentArray"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 188.495559225064 rtol = 1e-6
+    end
+  end
 end
