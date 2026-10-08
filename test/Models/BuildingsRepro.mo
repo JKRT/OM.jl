@@ -715,4 +715,36 @@ package BuildingsRepro
     end when;
   end ParameterReadByWhenAssert;
 
+  function checkMassFractions "Modelica.Fluid.Utilities.checkBoundary: asserts on the mass fractions"
+    input Real X[:];
+  algorithm
+    assert(abs(sum(X) - 1) < 1e-10, "The mass fractions do not sum up to 1");
+  end checkMassFractions;
+
+  model InitialCallOnVariable
+    "An initial equation's call for its effects on a variable bound to a parameter (Modelica.Fluid sources' checkBoundary of X_in_internal: most fluid models)"
+    parameter Real X[2] = {0.01, 0.99};
+    Real X_in_internal[2];
+    Real x(start = 0, fixed = true);
+  initial equation
+    checkMassFractions(X_in_internal);
+  equation
+    X_in_internal = X;
+    der(x) = X_in_internal[2];
+  end InitialCallOnVariable;
+
+  model InitialAssertOnVariable "An initial equation's assert on a variable, checked on the initialization's values"
+    Real x(start = 1, fixed = true);
+    Real y;
+  initial equation
+    assert(y > 0.5, "y is not above 0.5 at the initialization");
+  equation
+    y = x;
+    der(x) = -x;
+  end InitialAssertOnVariable;
+
+  model InitialAssertOnVariableViolated "InitialAssertOnVariable starting below the bound: the assert stops it"
+    extends InitialAssertOnVariable(x(start = 0.2));
+  end InitialAssertOnVariableViolated;
+
 end BuildingsRepro;

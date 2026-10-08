@@ -278,4 +278,16 @@ end
       @test brValue(sol, "x", 1.0) ≈ 1.2 rtol = 1e-6
     end
   end
+
+  @testset "An initial equation's call or assert on a variable (Modelica.Fluid sources' checkBoundary: most fluid models)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("InitialCallOnVariable"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 0.99 rtol = 1e-6
+      sol = brSimulate("InitialAssertOnVariable"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 0.367879451533977 rtol = 1e-5
+      @test_throws OMBackend.CodeGeneration.ModelicaAssertionError brSimulate("InitialAssertOnVariableViolated"; stopTime = 1.0, scalarize = scalarize)
+    end
+  end
 end
