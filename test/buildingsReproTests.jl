@@ -112,9 +112,12 @@ end
   end
 
   @testset "An external object declared without parameter (61 models: Spawn, schedules, plotters)" begin
-    local sol = brSimulate("ExternalObjectVariable"; stopTime = 1.0, scalarize = true)
-    @test sol.retcode == ReturnCode.Success
-    @test brValue(sol, "y", 0.5) ≈ 1.0 rtol = 1e-6
+    #= the array path declines it (its pointer is no Float64: Buildings' borehole ExtendableArray) =#
+    for scalarize in (false, true)
+      local sol = brSimulate("ExternalObjectVariable"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 0.5) ≈ 1.0 rtol = 1e-6
+    end
   end
 
   @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
