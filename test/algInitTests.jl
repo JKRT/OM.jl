@@ -180,7 +180,10 @@ const ALG_INIT_FILE = "./Models/AlgInitTest.mo"
     #= A when initial() body reads the initialized values (the runtime pass);
        one that reads a variable the problem does not have was 0.0 (s = 0, OpenModelica 12). =#
     @test OM.simulate("AlgInitTest.WhenInitialReadsInitialized", ALG_INIT_FILE; stopTime = 1.0)(0.5; idxs = :q) ≈ 6.0
-    @test refusedFor("WhenInitialReads", "not in the solved system: v[1]")
+    #= The ModelingToolkit path as well: the folded v[1] substituted into the body (it was
+       refused, "not in the solved system: v[1]"). =#
+    local wirM = OM.simulate("AlgInitTest.WhenInitialReads", ALG_INIT_FILE; stopTime = 1.0, scalarize = true)
+    @test [wirM(0.5; idxs = :q), wirM(0.5; idxs = :r), wirM(0.5; idxs = :s)] ≈ [6.0, 2.0, 12.0]
     local wir = OM.simulate("AlgInitTest.WhenInitialReads", ALG_INIT_FILE; stopTime = 1.0)
     @test [wir(0.5; idxs = :q), wir(0.5; idxs = :r), wir(0.5; idxs = :s)] ≈ [6.0, 2.0, 12.0]
     #= reinit in when initial(): a MethodError at the build (OpenModelica ignores it). =#
