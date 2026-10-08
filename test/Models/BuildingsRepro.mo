@@ -1315,4 +1315,17 @@ package BuildingsRepro
     end when;
   end InitialIfEquation;
 
+  model OredSamples
+    "when {sample(...), sample(...)}: a clock each, one body, once at an instant both have (CDL Boolean and Integer TimeTable: a sample() per time stamp)"
+    Integer n(start = 0, fixed = true);
+    Integer m(start = 0, fixed = true);
+  equation
+    when {sample(0.1, 0.5), sample(0.35, 0.5)} then
+      n = pre(n) + 1;
+    end when;
+    when {sample(0, 0.5), sample(0, 0.25)} then
+      m = pre(m) + 1;
+    end when;
+  end OredSamples;
+
 end BuildingsRepro;
