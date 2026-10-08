@@ -156,6 +156,16 @@ end
     end
   end
 
+  @testset "A sample() start an initial algorithm assigns (145 models: CDL samplers, pulses)" begin
+    #= ticks at 0.1, 0.35, 0.6, 0.85 =#
+    for scalarize in (false, true)
+      local sol = brSimulate("SampleStartOfInitialAlgorithm"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "n", 0.5) == 2
+      @test brValue(sol, "n", 1.0) == 4
+    end
+  end
+
   @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
     local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success

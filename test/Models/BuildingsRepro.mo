@@ -1259,4 +1259,31 @@ package BuildingsRepro
     end when;
   end SliceOfVaryingSize;
 
+  function roundTo "Buildings.Utilities.Math.Functions.round"
+    input Real x;
+    input Integer n;
+    output Real y;
+  algorithm
+    if x > 0 then
+      y := floor(x*10^n + 0.5)/10^n;
+    else
+      y := ceil(x*10^n - 0.5)/10^n;
+    end if;
+  end roundTo;
+
+  model SampleStartOfInitialAlgorithm
+    "A sample() start that an initial algorithm assigns, a free parameter (CDL's samplers and pulses, t0: 145 models)"
+    parameter Real period = 0.25;
+    parameter Real shift = 0.1;
+    Integer n(start = 0, fixed = true);
+  protected
+    parameter Real t0(fixed = false);
+  initial algorithm
+    t0 := roundTo(integer(time/period)*period + mod(shift, period), 6);
+  equation
+    when sample(t0, period) then
+      n = pre(n) + 1;
+    end when;
+  end SampleStartOfInitialAlgorithm;
+
 end BuildingsRepro;
