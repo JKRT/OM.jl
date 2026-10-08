@@ -129,6 +129,15 @@ end
     end
   end
 
+  @testset "MSL 4.1's pulse over many periods (Buildings borehole boundary conditions)" begin
+    #= one week, 84 periods at 50 %: -50 W on average =#
+    for scalarize in (false, true)
+      local sol = brSimulate("PulseOverManyPeriods"; stopTime = 604800.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "U", 604800.0) ≈ -50 * 604800.0 rtol = 1e-4
+    end
+  end
+
   @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
     local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success

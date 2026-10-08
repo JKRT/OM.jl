@@ -1192,4 +1192,36 @@ package BuildingsRepro
     Real y = time;
   end StringParameterOfFunction;
 
+  block Pulse41 "Modelica.Blocks.Sources.Pulse of MSL 4.1: its period starts are time events"
+    parameter Real amplitude = 1;
+    parameter Real width = 50;
+    parameter Real period = 1;
+    parameter Integer nperiod = -1;
+    parameter Real offset = 0;
+    parameter Real startTime = 0;
+    output Real y;
+  protected
+    Real T_width = period*width/100;
+    Real T_start;
+    Integer count;
+  initial algorithm
+    count := integer((time - startTime)/period);
+    T_start := startTime + count*period;
+  equation
+    when time >= (pre(count) + 1)*period + startTime then
+      count = pre(count) + 1;
+      T_start = time;
+    end when;
+    y = offset + (if (time < startTime or nperiod == 0 or (nperiod > 0 and count >= nperiod)) then 0
+                  else if time < T_start + T_width then amplitude else 0);
+  end Pulse41;
+
+  model PulseOverManyPeriods
+    "MSL 4.1's pulse integrated over 84 periods (Buildings' borehole boundary conditions: it stayed on for most periods, the integral 1.5 times its value)"
+    Pulse41 pulse(amplitude = -100, period = 7200);
+    Real U(start = 0, fixed = true);
+  equation
+    der(U) = pulse.y;
+  end PulseOverManyPeriods;
+
 end BuildingsRepro;
