@@ -174,6 +174,14 @@ end
     end
   end
 
+  @testset "An if-equation among the initial equations (27 models: CDL SunRiseSet, hydronic networks)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("InitialIfEquation"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 3.0 rtol = 1e-6
+    end
+  end
+
   @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
     local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success

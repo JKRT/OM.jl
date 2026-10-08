@@ -1297,4 +1297,22 @@ package BuildingsRepro
     t0 = roundTo(integer(time/period)*period, 6);
   end TableStartOfInitialEquation;
 
+  model InitialIfEquation
+    "An if-equation among the initial equations, its condition on a variable (CDL SunRiseSet: if cosHou < -1 then nextSunSet = ... else ...; 27 models)"
+    Real c = cos(time);
+    discrete Real a;
+    Real x(start = 0, fixed = true);
+  initial equation
+    if c < 0 then
+      a = 2;
+    else
+      a = 3;
+    end if;
+  equation
+    der(x) = a;
+    when time > 10 then
+      a = 0;
+    end when;
+  end InitialIfEquation;
+
 end BuildingsRepro;
