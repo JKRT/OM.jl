@@ -523,6 +523,10 @@ end
     local solA = brSimulate("CallOfSmallDifferenceOfLargeStates"; stopTime = 1.0)
     @test solA.retcode == ReturnCode.Success
     @test_broken abs(brValue(solA, "p1", 1.0) - brValue(solA, "p2", 1.0)) < 1e-3
+    #= and the array path's module does not answer for the next translate with scalarize: the
+       code is the same (no arrays), its build was reused =#
+    local solB = brSimulate("CallOfSmallDifferenceOfLargeStates"; stopTime = 1.0, scalarize = true)
+    @test abs(brValue(solB, "p1", 1.0) - brValue(solB, "p2", 1.0)) < 1e-3
   end
 
   @testset "A medium's constant array of records the frontend folds, an element by an iterator in a reduction (open)" begin
