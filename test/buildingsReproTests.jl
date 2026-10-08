@@ -223,10 +223,11 @@ end
     @test brValue(sol, "x", 1.0) ≈ 2.0 rtol = 1e-6
   end
 
-  @testset "A function with a bound argument as an argument (9 models: Borefields)" begin
-    local sol = brSimulate("FunctionAsArgument"; stopTime = 1.0)
-    @test sol.retcode == ReturnCode.Success
-    @test brValue(sol, "x", 1.0) ≈ 1.0 rtol = 1e-6
+  @testset "A function with a bound argument as an argument (9 models: Borefields; open)" begin
+    #= function scaledSquare(k = k) is a DAE.PARTEVALFUNCTION, which SimCode does not lower
+       (toSimExp MethodError), and the DAE drops the bound arguments' names: x(1) = 1 once a
+       closure over the bound arguments, in the function's input order, is passed =#
+    @test_broken brSucceeds("FunctionAsArgument"; stopTime = 1.0)
   end
 
   @testset "der() of a call of a function with a derivative annotation (13 models: DerivativeCheck)" begin
@@ -400,6 +401,15 @@ end
     #= the MSL Media mixtures' form, folded into record values: the element is passed whole to
        the function, which takes the record's fields (MSL Media: mslTests "MSL Media") =#
     @test_broken brSucceeds("RecordArrayElementInReduction"; stopTime = 1.0, scalarize = true)
+  end
+
+  @testset "A symbolic Jacobian entry that overflows (3 MSL AIMC_Conveyor, 3 Buildings Carnot chillers)" begin
+    #= d/dv 2/(1 + exp(-1000v)) is Inf/Inf at v = -1: that column by finite differences =#
+    for scalarize in (false, true)
+      local sol = brSimulate("SymbolicJacobianOverflow"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "v", 1.0) ≈ -0.85 rtol = 1e-6
+    end
   end
 end
 

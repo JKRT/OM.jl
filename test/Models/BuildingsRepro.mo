@@ -1105,4 +1105,11 @@ package BuildingsRepro
     Medium.BaseProperties medium;
   end RecordArrayElementInReduction;
 
+  model SymbolicJacobianOverflow
+    "The symbolic Jacobian of a smooth sign is Inf/Inf far from 0 (MSL AIMC_Conveyor's conveyor force at v = -0.55, Buildings' Carnot COP): those columns by finite differences"
+    Real v(start = -1, fixed = true);
+  equation
+    der(v) = -0.1*(2/(1 + exp(-1000*v)) - 1) + 0.05;
+  end SymbolicJacobianOverflow;
+
 end BuildingsRepro;
