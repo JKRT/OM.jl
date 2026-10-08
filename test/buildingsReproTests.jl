@@ -120,6 +120,15 @@ end
     end
   end
 
+  @testset "An external object read in a sampled when (Buildings borehole boundary conditions)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("ExternalObjectInSampledWhen"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 0.6) ≈ 1.0 rtol = 1e-6
+      @test brValue(sol, "y", 0.9) ≈ 1.5 rtol = 1e-6
+    end
+  end
+
   @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
     local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success

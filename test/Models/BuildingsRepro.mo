@@ -467,6 +467,17 @@ package BuildingsRepro
     Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
   end ExternalObjectVariable;
 
+  model ExternalObjectInSampledWhen
+    "An external object read in a sampled when (Buildings' borehole SingleUTubeBoundaryCondition: an ExtendableArray)"
+    parameter Real table[2, 2] = [0, 0; 1, 2];
+    TimeTable41 tab = TimeTable41("NoName", "NoName", table, 0.0, {2}, 1, 2, 0.0, 3, false, ",", 0);
+    discrete Real y(start = 0, fixed = true);
+  equation
+    when sample(0, 0.25) then
+      y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+    end when;
+  end ExternalObjectInSampledWhen;
+
   function companionRoots "A matrix of identity() and zeros() sized by a local (Modelica.Math.Polynomials.roots)"
     input Real p[:];
     output Real s;
