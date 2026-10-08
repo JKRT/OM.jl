@@ -235,4 +235,32 @@ end
     @test brValue(sol, "y", 0.5) ≈ 0.125 rtol = 1e-4
     @test brValue(sol, "y", 1.0) ≈ 1.0 rtol = 1e-4
   end
+
+  @testset "der() of a call of a function without a derivative annotation (Buildings' smoothExponential, Media)" begin
+    local sol = brSimulate("DerivativeWithoutAnnotation"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y", 0.25) ≈ -0.0625 rtol = 1e-4
+    @test brValue(sol, "y", 1.0) ≈ 0.25 rtol = 1e-4
+  end
+
+  @testset "The second derivative of a call: its derivative function's (DerivativeCheck2 examples)" begin
+    local sol = brSimulate("SecondDerivativeOfAnnotatedFunction"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y_comp", 1.0) ≈ 8.0 rtol = 1e-4
+    @test brValue(sol, "der_y_comp", 1.0) ≈ 60.0 rtol = 1e-4
+  end
+
+  @testset "Initial equations at a start time other than 0 (DerivativeCheck examples from -1)" begin
+    local sol = brSimulate("InitialEquationAtStartTime"; startTime = -1.0, stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y_comp", -1.0) ≈ 1.0 rtol = 1e-6
+    @test brValue(sol, "y_comp", 1.0) ≈ 25.0 rtol = 1e-4
+  end
+
+  @testset "der() of a variable bound to a parameter (Buildings' Water/PropyleneGlycolWater DerivativeCheck)" begin
+    local sol = brSimulate("DerivativeOfParameterBoundVariable"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "cpSym", 0.0) ≈ 4184.0
+    @test brValue(sol, "cpSym", 1.0) ≈ 4184.0
+  end
 end

@@ -613,4 +613,71 @@ package BuildingsRepro
     Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
   end ComputedParameterOfExternalObject;
 
+  function smoothAbs "An if-statement on its input, no derivative annotation (Buildings' smoothExponential, Media property functions)"
+    input Real x;
+    output Real y;
+  algorithm
+    if x < 0 then
+      y := -x*x;
+    else
+      y := x*x;
+    end if;
+  end smoothAbs;
+
+  model DerivativeWithoutAnnotation
+    "der() of a call of a function without a derivative annotation (index reduction: Buildings' SmoothExponentialDerivativeCheck)"
+    Real x;
+    Real y;
+  initial equation
+    y = x;
+  equation
+    x = smoothAbs(time - 0.5);
+    der(y) = der(x);
+  end DerivativeWithoutAnnotation;
+
+  model SecondDerivativeOfAnnotatedFunction
+    "The second derivative of a call: the derivative function's own derivative (Buildings' DerivativeCheck2 examples)"
+    Real x;
+    Real y;
+    Real y_comp;
+    Real der_y;
+    Real der_y_comp;
+  initial equation
+    y = y_comp;
+    der_y = der_y_comp;
+  equation
+    x = 2*time + time^3 - 1;
+    y = cube(x);
+    der_y = der(y);
+    der_y_comp = der(y_comp);
+    der(der_y) = der(der_y_comp);
+  end SecondDerivativeOfAnnotatedFunction;
+
+  model InitialEquationAtStartTime
+    "Initial equations solved at the start time, not at 0 (Buildings' RegNonZeroPowerDerivative_2_Check from -1)"
+    Real x;
+    Real y;
+    Real y_comp;
+  initial equation
+    y_comp = y;
+  equation
+    x = 2*time + 3;
+    y = x*x;
+    der(y_comp) = der(y);
+  end InitialEquationAtStartTime;
+
+  model DerivativeOfParameterBoundVariable
+    "der() of a variable bound to a parameter: the other state has zero derivative and its initial equation (Buildings' WaterDerivativeCheck: cpCod = Medium.cp_const)"
+    parameter Real cp_const = 4184;
+    Real T;
+    Real cpCod;
+    Real cpSym;
+  initial equation
+    cpSym = cpCod;
+  equation
+    T = 273.15 + 270*time^3;
+    cpCod = cp_const;
+    der(cpCod) = der(cpSym);
+  end DerivativeOfParameterBoundVariable;
+
 end BuildingsRepro;
