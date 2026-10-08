@@ -223,11 +223,51 @@ end
     @test brValue(sol, "x", 1.0) ≈ 2.0 rtol = 1e-6
   end
 
-  @testset "A function with a bound argument as an argument (9 models: Borefields; open)" begin
-    #= function scaledSquare(k = k) is a DAE.PARTEVALFUNCTION, which SimCode does not lower
-       (toSimExp MethodError), and the DAE drops the bound arguments' names: x(1) = 1 once a
-       closure over the bound arguments, in the function's input order, is passed =#
-    @test_broken brSucceeds("FunctionAsArgument"; stopTime = 1.0)
+  @testset "A function with a bound argument as an argument (9 models: Borefields)" begin
+    #= function scaledSquare(k = k) is a closure over k; simpson's f(a) calls the input f
+       (a function pointer), not its partial class Integrand =#
+    for scalarize in (false, true)
+      local sol = brSimulate("FunctionAsArgument"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 1.0 rtol = 1e-6
+    end
+  end
+
+  @testset "-x of an array of unknown size in a function (Borefields TemperatureResponseMatrix)" begin
+    #= sum over k = 1:3 of exp(-(0.5(1 + t)k)^2) + 2exp(-((1 + t)k)^2); without the sign, exp(+...) =#
+    for scalarize in (false, true)
+      local sol = brSimulate("NegatedArrayInFunction"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 0.0) ≈ 2.024716428533238 rtol = 1e-6
+      @test brValue(sol, "y", 1.0) ≈ 0.42294999271208145 rtol = 1e-6
+    end
+  end
+
+  @testset "An external C function of OMRuntimeExternalC's libraries without a Julia function (Borefields TemperatureResponseMatrix)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("ExternalCOfShippedLibrary"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "p", 0.5) == getpid()
+    end
+  end
+
+  @testset "An array parameter bound to an impure call, called once (Borefields TemperatureResponseMatrix)" begin
+    local logFile = "brArrayParameterOfImpureCall.log"
+    for scalarize in (false, true)
+      rm(logFile; force = true)
+      local sol = brSimulate("ArrayParameterOfImpureCall"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 1.0) ≈ 3.0 rtol = 1e-6
+      @test countlines(logFile) == 1
+    end
+    rm(logFile; force = true)
+  end
+
+  @testset "A String parameter bound to a function call (Buildings ShaGFunction)" begin
+    local sol = brSimulate("StringParameterOfFunction"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    local mod = getfield(OMBackend, Symbol(OMBackend.canonicalName("BuildingsRepro.StringParameterOfFunction")))
+    @test Base.invokelatest(getglobal, mod, :s) == "n = 3"
   end
 
   @testset "der() of a call of a function with a derivative annotation (13 models: DerivativeCheck)" begin

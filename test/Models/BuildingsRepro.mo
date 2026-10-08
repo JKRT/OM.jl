@@ -1112,4 +1112,73 @@ package BuildingsRepro
     der(v) = -0.1*(2/(1 + exp(-1000*v)) - 1) + 0.05;
   end SymbolicJacobianOverflow;
 
+  function gaussSum "w*exp(-dis.*dis*u^2): an array negated in a function, its size an input (Borefields' finiteLineSource integrand)"
+    input Real u;
+    input Real dis[n];
+    input Integer w[n];
+    input Integer n;
+    output Real y;
+  algorithm
+    y := w*exp(-dis.*dis*u^2);
+  end gaussSum;
+
+  function sumOfGaussSums "Calls gaussSum from an algorithm, so it is not inlined into the model"
+    input Real dis[2];
+    output Real s = 0;
+  algorithm
+    for k in 1:3 loop
+      s := s + gaussSum(k, dis, {1, 2}, 2);
+    end for;
+  end sumOfGaussSums;
+
+  model NegatedArrayInFunction
+    "-x of an array of unknown size in a function lost its sign (Borefields' TemperatureResponseMatrix: the integrand grew, the quadrature never ended)"
+    parameter Real d[2] = {0.5, 1.0};
+    Real y = sumOfGaussSums(d*(1 + time));
+  end NegatedArrayInFunction;
+
+  impure function processId "MSL's System.getPid: a C function of OMRuntimeExternalC's libraries without a Julia function"
+    output Integer pid;
+  external "C" pid = ModelicaInternal_getpid() annotation(Library = "ModelicaExternalC");
+  end processId;
+
+  model ExternalCOfShippedLibrary
+    "An external C function that OMRuntimeExternalC's libModelicaExternalC defines, no Julia function for it (Borefields' TemperatureResponseMatrix: ModelicaInternal_mkdir)"
+    parameter Integer pid = processId();
+    Real p = pid;
+  end ExternalCOfShippedLibrary;
+
+  impure function logLine "MSL's Streams.print to a file"
+    input String line;
+    input String fileName;
+  external "C" ModelicaInternal_print(line, fileName) annotation(Library = "ModelicaExternalC");
+  end logLine;
+
+  impure function loggedPair "{1, 2}, and a line in fileName for each call"
+    input String fileName;
+    output Real y[2];
+  algorithm
+    logLine("called", fileName);
+    y := {1, 2};
+  end loggedPair;
+
+  model ArrayParameterOfImpureCall
+    "An array parameter bound to an impure call: called once, not once per element (Borefields' TemperatureResponseMatrix: 152 g-function computations)"
+    parameter Real p[2] = loggedPair("brArrayParameterOfImpureCall.log");
+    Real y = p[1] + p[2]*time;
+  end ArrayParameterOfImpureCall;
+
+  impure function label "A String from a function (impure: the translation does not evaluate it)"
+    input Integer n;
+    output String s;
+  algorithm
+    s := "n = " + String(n);
+  end label;
+
+  model StringParameterOfFunction
+    "A String parameter bound to a call of a Modelica function (Buildings' ShaGFunction: the SHA-1 of a g-function's inputs)"
+    parameter String s = label(3);
+    Real y = time;
+  end StringParameterOfFunction;
+
 end BuildingsRepro;
