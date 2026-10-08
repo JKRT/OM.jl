@@ -326,4 +326,12 @@ end
       @test brSimulate("InitialEffectCallInIfNotTaken"; stopTime = 1.0, scalarize = scalarize).retcode == ReturnCode.Success
     end
   end
+
+  @testset "An external object of Include C code (7 models: weekly schedules, file writers, borehole tables)" begin
+    for scalarize in (false, true)
+      local sol = brSimulate("ExternalObjectOfIncludeCode"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 2.5 rtol = 1e-6
+    end
+  end
 end

@@ -881,4 +881,34 @@ package BuildingsRepro
     extends InitialEffectCallInIf(X = {0.5, 0.6}, limitSpan = spanC(0, 0.1));
   end InitialEffectCallInIfNotTaken;
 
+  class OffsetObject "An external object of Include C code (Buildings' weeklyScheduleInit, initArray, fileWriterInit)"
+    extends ExternalObject;
+    function constructor
+      input Real s;
+      output OffsetObject obj;
+    external "C" obj = offsetInit(s)
+      annotation(Include = "#include <stdlib.h>\nvoid* offsetInit(double s) { double* p = (double*) malloc(sizeof(double)); *p = s; return p; }\nvoid offsetFree(void* p) { free(p); }\ndouble offsetValue(void* p, double x) { return *(double*) p + x; }");
+    end constructor;
+    function destructor
+      input OffsetObject obj;
+    external "C" offsetFree(obj)
+      annotation(Include = "#include <stdlib.h>\nvoid* offsetInit(double s) { double* p = (double*) malloc(sizeof(double)); *p = s; return p; }\nvoid offsetFree(void* p) { free(p); }\ndouble offsetValue(void* p, double x) { return *(double*) p + x; }");
+    end destructor;
+  end OffsetObject;
+
+  function offsetValue
+    input OffsetObject obj;
+    input Real x;
+    output Real y;
+  external "C" y = offsetValue(obj, x)
+    annotation(Include = "#include <stdlib.h>\nvoid* offsetInit(double s) { double* p = (double*) malloc(sizeof(double)); *p = s; return p; }\nvoid offsetFree(void* p) { free(p); }\ndouble offsetValue(void* p, double x) { return *(double*) p + x; }");
+  end offsetValue;
+
+  model ExternalObjectOfIncludeCode "An external object whose constructor and functions are Include C code"
+    parameter OffsetObject obj = OffsetObject(2.0);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = offsetValue(obj, time);
+  end ExternalObjectOfIncludeCode;
+
 end BuildingsRepro;
