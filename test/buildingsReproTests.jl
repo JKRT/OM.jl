@@ -411,5 +411,16 @@ end
       @test brValue(sol, "v", 1.0) ≈ -0.85 rtol = 1e-6
     end
   end
+
+  @testset "An external object in the equations: two builds are the same (CHPs ElectricalFollowing)" begin
+    #= its pointer was a constant in the terms reading it, hashed by its address: the order of
+       the terms, and the rounding of the generated code, changed from build to build =#
+    local MTK = OMBackend.ModelingToolkit
+    local observed = () -> string.(MTK.observed(brSimulate("TableInit3"; stopTime = 1.0, scalarize = true,
+                                                           overwriteCache = true).prob.f.sys))
+    local (a, b) = (observed(), observed())
+    @test a == b
+    @test !any(s -> occursin("Ptr{", s), a)
+  end
 end
 
