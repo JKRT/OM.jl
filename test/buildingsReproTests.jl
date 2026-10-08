@@ -193,6 +193,18 @@ end
     end
   end
 
+  @testset "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable)" begin
+    #= idx: 1, 2 at 0.3, 3 at 0.6, 1 at 0.9; y = val[idx, :] =#
+    for scalarize in (false, true)
+      local sol = brSimulate("ParameterArrayByDiscreteIndex"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y[2]", 0.1) == 4
+      @test brValue(sol, "y[2]", 0.5) == 2
+      @test brValue(sol, "y[2]", 0.7) == 7
+      @test brValue(sol, "y[1]", 1.0) == 1
+    end
+  end
+
   @testset "[identity(n - 1), zeros(n - 1)] in a function, n a local (Modelica.Math.Polynomials.roots)" begin
     local sol = brSimulate("IdentityOfLocalSize"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success

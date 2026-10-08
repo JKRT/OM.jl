@@ -1328,4 +1328,19 @@ package BuildingsRepro
     end when;
   end OredSamples;
 
+  model ParameterArrayByDiscreteIndex
+    "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable: y[:] = val[idx, :]): its elements dropped as unused, then no table at the build; a discrete named idx was the when body's state index"
+    parameter Real table[3, 2] = {{1, 4}, {2, 2}, {3, 7}};
+    final parameter Integer val[3, 2] = integer(table + fill(1, 3, 2)*1e-37);
+    Integer idx(start = 1, fixed = true);
+    discrete Integer y[2];
+  initial equation
+    y[:] = val[idx, :];
+  equation
+    when sample(0.3, 0.3) then
+      idx = if pre(idx) < 3 then pre(idx) + 1 else 1;
+      y[:] = val[idx, :];
+    end when;
+  end ParameterArrayByDiscreteIndex;
+
 end BuildingsRepro;
