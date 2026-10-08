@@ -1224,4 +1224,17 @@ package BuildingsRepro
     der(U) = pulse.y;
   end PulseOverManyPeriods;
 
+  model SelfScheduledWhen
+    "when time >= pre(tNext), tNext moved on by its body: events it schedules itself (no period count, as the MSL 4.1 pulse's)"
+    discrete Real tNext(start = 0.3, fixed = true);
+    Integer n(start = 0, fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when time >= pre(tNext) then
+      tNext = pre(tNext) + 0.3;
+      n = pre(n) + 1;
+    end when;
+  end SelfScheduledWhen;
+
 end BuildingsRepro;
