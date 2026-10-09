@@ -702,5 +702,18 @@ end
       @test brValue(sol, "x", 1.0) ≈ 7 rtol = 1e-9
     end
   end
+
+  @testset "A record array's field read with a discrete index in an equation (Buildings DX coils)" begin
+    #= the ModelingToolkit path: `uacp[stage]_UAcp` unresolved (its elements folded away; for y
+       not known at the build). Stage 1, 2, 3 from 0, 0.25, 0.5. omc: x and y 7.5 at 0.5, 27.5 at 1 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("RecordArrayFieldByDiscreteIndex"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      for v in ("x", "y")
+        @test brValue(sol, v, 0.5) ≈ 7.5 rtol = 1e-9
+        @test brValue(sol, v, 1.0) ≈ 27.5 rtol = 1e-9
+      end
+    end
+  end
 end
 

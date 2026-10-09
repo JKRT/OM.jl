@@ -1628,4 +1628,27 @@ package BuildingsRepro
     der(x) = total;
   end InitialAlgorithmByLoopIndex;
 
+  record UAcpData "A stage's coefficient (Buildings' DX coils' apparatus dew point: uacp[stage].UAcp)"
+    parameter Real UAcp;
+  end UAcpData;
+
+  model RecordArrayFieldByDiscreteIndex
+    "A record array's field read with a discrete index in an equation (Buildings' DX coils: UAcp = uacp[stage].UAcp)"
+    parameter UAcpData uacp[3](UAcp = {10, 20, 40});
+    parameter UAcpData uacpInit[3](each UAcp(fixed = false)) "computed by the initialization (the DX coils' UAcp)";
+    discrete Integer stage(start = 1, fixed = true);
+    Real x(start = 0, fixed = true);
+    Real y(start = 0, fixed = true);
+  initial equation
+    uacpInit[1].UAcp = 10;
+    uacpInit[2].UAcp = 20;
+    uacpInit[3].UAcp = 40;
+  equation
+    when sample(0.25, 0.25) then
+      stage = min(3, pre(stage) + 1);
+    end when;
+    der(x) = uacp[stage].UAcp;
+    der(y) = uacpInit[stage].UAcp;
+  end RecordArrayFieldByDiscreteIndex;
+
 end BuildingsRepro;
