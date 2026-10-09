@@ -715,5 +715,24 @@ end
       end
     end
   end
+
+  @testset "A when on Booleans and-ed: the zero-crossing function linear in them (4 MSL Digital registers)" begin
+    #= each operand was held twice per level of and/or: 2^24 terms here (68 s to build), MSL
+       Digital's DFFREGSRH, DFFREGSRL, DLATREGSRH, DLATREGSRL never built. omc: n 1, tAll 1.2 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("NestedLogicalCondition"; stopTime = 1.5, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "n", 1.5) == 1
+      @test brValue(sol, "tAll", 1.5) ≈ 1.2 atol = 1e-9
+    end
+    #= the function of 60 and-ed Booleans: its terms, counted up to 10000 =#
+    local D = OMBackend.DAE
+    local bools = [D.CREF(D.CREF_IDENT("b$i", D.T_BOOL_DEFAULT, OMBackend.MetaModelica.nil), D.T_BOOL_DEFAULT) for i in 1:60]
+    local cond = foldl((a, b) -> D.LBINARY(a, D.AND(D.T_BOOL_DEFAULT), b), bools)
+    local f = OMBackend.CodeGeneration.transformToZeroCrossingCondition(cond)
+    local terms = Ref(0)
+    OMBackend.FrontendUtil.Util.traverseExpTopDown(f, (e, c) -> (c[] += 1; (e, c[] < 10_000, c)), terms)
+    @test terms[] < 1000
+  end
 end
 

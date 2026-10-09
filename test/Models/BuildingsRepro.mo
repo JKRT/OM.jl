@@ -1651,4 +1651,16 @@ package BuildingsRepro
     der(y) = uacpInit[stage].UAcp;
   end RecordArrayFieldByDiscreteIndex;
 
+  model NestedLogicalCondition
+    "A when on 24 Booleans and-ed (MSL Digital's registers nest and/or deeply): its zero-crossing function held each operand twice per level, 2^24 terms, and the build did not end"
+    Boolean b[24] = {time > 0.05*i for i in 1:24};
+    Integer n(start = 0, fixed = true);
+    discrete Real tAll(start = -1, fixed = true);
+  equation
+    when b[1] and b[2] and b[3] and b[4] and b[5] and b[6] and b[7] and b[8] and b[9] and b[10] and b[11] and b[12] and b[13] and b[14] and b[15] and b[16] and b[17] and b[18] and b[19] and b[20] and b[21] and b[22] and b[23] and b[24] then
+      n = pre(n) + 1;
+      tAll = time;
+    end when;
+  end NestedLogicalCondition;
+
 end BuildingsRepro;
