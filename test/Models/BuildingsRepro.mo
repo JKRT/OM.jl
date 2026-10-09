@@ -1929,4 +1929,35 @@ package BuildingsRepro
     der(w) = sum(z);
   end LapackInDimension;
 
+  partial package PartialCpMedium "A medium whose constant has no value (Modelica.Media.Interfaces.PartialMedium)"
+    constant Real cp;
+  end PartialCpMedium;
+
+  package CpWater
+    extends PartialCpMedium(cp = 4184);
+  end CpWater;
+
+  model CpPipe
+    replaceable package Medium = PartialCpMedium;
+    parameter Real k = 1;
+    Real e(start = 0, fixed = true);
+  equation
+    der(e) = Medium.cp*k;
+  end CpPipe;
+
+  partial model ConstrainedConnection "A replaceable model whose constraining clause gives the medium (Buildings DHC: PartialConnection2Pipe2Medium's Model_pipDisRet)"
+    replaceable package MediumRet = PartialCpMedium;
+    parameter Real kk = 2;
+    replaceable model Model_pip = CpPipe constrainedby CpPipe(redeclare final package Medium = MediumRet, final k = kk);
+    Model_pip pip;
+  end ConstrainedConnection;
+
+  model ConstrainingModifierOfRedeclaredClass
+    "A replaceable model redeclared without the constraining clause's modifiers (Buildings DHC: ConnectionCondensatePipe's redeclare final model Model_pipDisRet = PressureDrop(...)): they were not applied, the pipe kept the partial medium"
+    model Connection
+      extends ConstrainedConnection(redeclare final model Model_pip = CpPipe);
+    end Connection;
+    Connection c(redeclare package MediumRet = CpWater);
+  end ConstrainingModifierOfRedeclaredClass;
+
 end BuildingsRepro;

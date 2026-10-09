@@ -806,5 +806,15 @@ end
       @test brValue(sol, "w", 1.0) ≈ 4.0 rtol = 1e-9
     end
   end
+
+  @testset "The constraining clause's modifiers on a redeclared class (Buildings DHC: connection pipes)" begin
+    #= the redeclared class did not get them: the pipe's medium stayed partial (Medium.cp without
+       a value) and k its default. omc: c.pip.e 8368 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("ConstrainingModifierOfRedeclaredClass"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "c.pip.e", 1.0) ≈ 8368 rtol = 1e-9
+    end
+  end
 end
 
