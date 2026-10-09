@@ -826,5 +826,15 @@ end
       @test brValue(sol, "c.pip.e", 1.0) ≈ 8368 rtol = 1e-9
     end
   end
+
+  @testset "A record's field through a field set by a record constructor, in a dimension (Buildings Obsolete DHC: borefields)" begin
+    #= the field read through a record without a binding of its own was not evaluated
+       (0.3*size({...}, 1)): abs() of it failed. omc: sub.y 2.4 (x of 2 elements) =#
+    for scalarize in (true, false)
+      local sol = brSimulate("RecordFieldOfConstructedField"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "sub.y", 1.0) ≈ 2.4 rtol = 1e-9
+    end
+  end
 end
 

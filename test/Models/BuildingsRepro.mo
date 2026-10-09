@@ -1968,4 +1968,38 @@ package BuildingsRepro
     Connection c(redeclare package MediumRet = CpWater);
   end ConstrainingModifierOfReplaceableClass;
 
+  record BorConfTemplate "A borefield configuration: a flow from the number of boreholes, the size of its coordinates (Fluid.Geothermal.Borefields.Data.Configuration.Template)"
+    parameter Real mBor_flow_nominal;
+    parameter Real mBorFie_flow_nominal = mBor_flow_nominal*nBor;
+    parameter Integer nBor = size(cooBor, 1);
+    parameter Real cooBor[:, 2];
+  end BorConfTemplate;
+
+  record BorConfExample
+    extends BorConfTemplate(mBor_flow_nominal = 0.3, cooBor = {{0, 0}, {0, 6}, {6, 0}, {6, 6}});
+  end BorConfExample;
+
+  record BorFieldTemplate
+    parameter BorConfTemplate conDat;
+  end BorFieldTemplate;
+
+  record BorFieldExample
+    extends BorFieldTemplate(conDat = BorConfExample());
+  end BorFieldExample;
+
+  model BorFieldUser
+    parameter BorFieldExample datBorFie;
+    parameter Real m_flow_nominal = datBorFie.conDat.mBorFie_flow_nominal;
+    parameter Real x[if abs(m_flow_nominal) > 1 then 2 else 1] = fill(m_flow_nominal, size(x, 1));
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = sum(x);
+  end BorFieldUser;
+
+  model RecordFieldOfConstructedField
+    "A record's field read through a record without a binding of its own, set by a record constructor (Buildings Obsolete DHC borefields: datBorFie.conDat.mBorFie_flow_nominal): the field was not evaluated (0.3*size({...}, 1)), abs of it failed"
+    parameter BorFieldExample datBorFie(conDat = BorConfExample());
+    BorFieldUser sub(datBorFie = datBorFie);
+  end RecordFieldOfConstructedField;
+
 end BuildingsRepro;
