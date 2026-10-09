@@ -182,6 +182,10 @@ end
   @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
   #= y' = x[1] + x[2] = 0.8 + 1.4 =#
   @test isapprox(sol(1.0; idxs = :y), 3.2; atol = 1e-6)
+  #= The array path takes the parameter evaluated (the frontend evaluates LAPACK calls, as
+     omc's); the ModelingToolkit path generates the function: dgesv_vec from there. =#
+  local solM = OM.simulate("LapackExternal.Solve", "./Models/LapackExternal.mo"; MSL = true, stopTime = 1.0, scalarize = true)
+  @test isapprox(solM(1.0; idxs = :y), 3.2; atol = 1e-6)
   #= dgesv_vec: x = A \ b and info; A and b left as they were (Awork and x are copies). =#
   local dgesv = OMBackend.CodeGeneration.MODELICA_FUNCTION_IMPLS[:Modelica_Math_Matrices_LAPACK_dgesv_vec]
   local A = [2.0 1.0; 1.0 3.0]; local b = [3.0, 5.0]
