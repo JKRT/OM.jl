@@ -2002,4 +2002,23 @@ package BuildingsRepro
     BorFieldUser sub(datBorFie = datBorFie);
   end RecordFieldOfConstructedField;
 
+  function mixedLiteralMatrix "A matrix constructor mixing a Real input and Integer literals, summed"
+    input Real a;
+    output Real r;
+  protected
+    Real M[2, 2];
+  algorithm
+    M := [a, 2; 3, 4];
+    r := sum(M);
+  end mixedLiteralMatrix;
+
+  model MatrixOfMixedLiterals
+    "A function's matrix constructor [a, 2; 3, 4] evaluated by the frontend, its sum read by a dimension: the 2 stayed Integer (typeMatrixComma paired each element with another element's type), sum() failed"
+    parameter Real r = mixedLiteralMatrix(1.5);
+    parameter Real z[if r > 10 then 2 else 1] = fill(r, size(z, 1));
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = sum(z);
+  end MatrixOfMixedLiterals;
+
 end BuildingsRepro;

@@ -1,0 +1,157 @@
+<?xml version = "1.0" encoding="UTF-8"?>
+
+<!-- description of the model interface using an extention of the FMI standard -->
+<fmiModelDescription
+  fmiVersion                          = "1.0"
+
+  modelName                           = "LapackExternal.SolveInTime"
+  modelIdentifier                     = "LapackExternal_SolveInTime"
+
+  OPENMODELICAHOME                    = "/Users/jtinnerholm/Projects/External/OpenModelica/build_cmake/install_cmake"
+
+  guid                                = "{d9a73ad5-9f57-4b27-ab20-32dc8ec827ac}"
+
+  description                         = "Matrices.solve (LAPACK dgesv) of a time-varying right-hand side: called in the simulation"
+  generationTool                      = "OpenModelica Compiler v1.27.1-cmake"
+  generationDateAndTime               = "2026-10-09T14:55:13Z"
+
+  variableNamingConvention            = "structured"
+
+  numberOfEventIndicators             = "0"  cmt_numberOfEventIndicators             = "NG:       number of zero crossings,                           FMI"
+  numberOfTimeEvents                  = "0"  cmt_numberOfTimeEvents                  = "NG_SAM:   number of zero crossings that are samples,          OMC"
+
+  numberOfInputVariables              = "0"  cmt_numberOfInputVariables              = "NI:       number of inputvar on topmodel,                     OMC"
+  numberOfOutputVariables             = "0"  cmt_numberOfOutputVariables             = "NO:       number of outputvar on topmodel,                    OMC"
+
+  numberOfExternalObjects             = "0"  cmt_numberOfExternalObjects             = "NEXT:     number of external objects,                         OMC"
+  numberOfFunctions                   = "2"  cmt_numberOfFunctions                   = "NFUNC:    number of functions used by the simulation,         OMC"
+
+  numberOfContinuousStates            = "1"  cmt_numberOfContinuousStates            = "NX:       number of states,                                   FMI"
+  numberOfRealAlgebraicVariables      = "2"  cmt_numberOfRealAlgebraicVariables      = "NY:       number of real variables,                           OMC"
+  numberOfRealAlgebraicAliasVariables = "0"  cmt_numberOfRealAlgebraicAliasVariables = "NA:       number of alias variables,                          OMC"
+  numberOfRealParameters              = "4"  cmt_numberOfRealParameters              = "NP:       number of parameters,                               OMC"
+
+  numberOfIntegerAlgebraicVariables   = "0"  cmt_numberOfIntegerAlgebraicVariables   = "NYINT:    number of alg. int variables,                       OMC"
+  numberOfIntegerAliasVariables       = "0"  cmt_numberOfIntegerAliasVariables       = "NAINT:    number of alias int variables,                      OMC"
+  numberOfIntegerParameters           = "0"  cmt_numberOfIntegerParameters           = "NPINT:    number of int parameters,                           OMC"
+
+  numberOfStringAlgebraicVariables    = "0"  cmt_numberOfStringAlgebraicVariables    = "NYSTR:    number of alg. string variables,                    OMC"
+  numberOfStringAliasVariables        = "0"  cmt_numberOfStringAliasVariables        = "NASTR:    number of alias string variables,                   OMC"
+  numberOfStringParameters            = "0"  cmt_numberOfStringParameters            = "NPSTR:    number of string parameters,                        OMC"
+
+  numberOfBooleanAlgebraicVariables   = "0"  cmt_numberOfBooleanAlgebraicVariables   = "NYBOOL:   number of alg. bool variables,                      OMC"
+  numberOfBooleanAliasVariables       = "0"  cmt_numberOfBooleanAliasVariables       = "NABOOL:   number of alias bool variables,                     OMC"
+  numberOfBooleanParameters           = "0"  cmt_numberOfBooleanParameters           = "NPBOOL:   number of bool parameters,                          OMC" >
+
+
+  <!-- startTime, stopTime, tolerance are FMI specific, all others are OMC specific -->
+  <DefaultExperiment
+    startTime      = "0"
+    stopTime       = "1"
+    stepSize       = "0.002"
+    tolerance      = "1e-06"
+    solver         = "dassl"
+    outputFormat   = "mat"
+    variableFilter = ".*" />
+
+  <!-- variables in the model -->
+  <ModelVariables>
+
+  <ScalarVariable
+    name = "y"
+    valueReference = "1000"
+    variability = "continuous" isDiscrete = "false"
+    causality = "local" isValueChangeable = "true"
+    alias = "noAlias"
+    classIndex = "0" classType = "rSta"
+    isProtected = "false" hideResult = "" isEncrypted = "false" initNonlinear = "false"
+    fileName = "/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo" startLine = "14" startColumn = "5" endLine = "14" endColumn = "36" fileWritable = "true">
+    <Real start="1.0" fixed="true" useNominal="false" />
+  </ScalarVariable>
+  <ScalarVariable
+    name = "der(y)"
+    valueReference = "1001"
+    variability = "continuous" isDiscrete = "false"
+    causality = "local" isValueChangeable = "false"
+    alias = "noAlias"
+    classIndex = "0" classType = "rDer"
+    isProtected = "false" hideResult = "" isEncrypted = "false" initNonlinear = "false"
+    fileName = "/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo" startLine = "14" startColumn = "5" endLine = "14" endColumn = "36" fileWritable = "true">
+    <Real fixed="false" useNominal="false" />
+  </ScalarVariable>
+  <ScalarVariable
+    name = "x[1]"
+    valueReference = "1002"
+    description = "{0.8, 1.4}*time"
+    variability = "continuous" isDiscrete = "false"
+    causality = "local" isValueChangeable = "false"
+    alias = "noAlias"
+    classIndex = "0" classType = "rAlg"
+    isProtected = "false" hideResult = "" isEncrypted = "false" initNonlinear = "false"
+    fileName = "/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo" startLine = "13" startColumn = "5" endLine = "13" endColumn = "79" fileWritable = "true">
+    <Real fixed="false" useNominal="false" />
+  </ScalarVariable>
+  <ScalarVariable
+    name = "x[2]"
+    valueReference = "1003"
+    description = "{0.8, 1.4}*time"
+    variability = "continuous" isDiscrete = "false"
+    causality = "local" isValueChangeable = "false"
+    alias = "noAlias"
+    classIndex = "1" classType = "rAlg"
+    isProtected = "false" hideResult = "" isEncrypted = "false" initNonlinear = "false"
+    fileName = "/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo" startLine = "13" startColumn = "5" endLine = "13" endColumn = "79" fileWritable = "true">
+    <Real fixed="false" useNominal="false" />
+  </ScalarVariable>
+  <ScalarVariable
+    name = "A[1,1]"
+    valueReference = "1004"
+    variability = "parameter" isDiscrete = "true"
+    causality = "parameter" isValueChangeable = "true"
+    alias = "noAlias"
+    classIndex = "0" classType = "rPar"
+    isProtected = "false" hideResult = "" isEncrypted = "false" initNonlinear = "false"
+    fileName = "/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo" startLine = "12" startColumn = "5" endLine = "12" endColumn = "42" fileWritable = "true">
+    <Real start="2.0" fixed="true" useNominal="false" />
+  </ScalarVariable>
+  <ScalarVariable
+    name = "A[1,2]"
+    valueReference = "1005"
+    variability = "parameter" isDiscrete = "true"
+    causality = "parameter" isValueChangeable = "true"
+    alias = "noAlias"
+    classIndex = "1" classType = "rPar"
+    isProtected = "false" hideResult = "" isEncrypted = "false" initNonlinear = "false"
+    fileName = "/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo" startLine = "12" startColumn = "5" endLine = "12" endColumn = "42" fileWritable = "true">
+    <Real start="1.0" fixed="true" useNominal="false" />
+  </ScalarVariable>
+  <ScalarVariable
+    name = "A[2,1]"
+    valueReference = "1006"
+    variability = "parameter" isDiscrete = "true"
+    causality = "parameter" isValueChangeable = "true"
+    alias = "noAlias"
+    classIndex = "2" classType = "rPar"
+    isProtected = "false" hideResult = "" isEncrypted = "false" initNonlinear = "false"
+    fileName = "/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo" startLine = "12" startColumn = "5" endLine = "12" endColumn = "42" fileWritable = "true">
+    <Real start="1.0" fixed="true" useNominal="false" />
+  </ScalarVariable>
+  <ScalarVariable
+    name = "A[2,2]"
+    valueReference = "1007"
+    variability = "parameter" isDiscrete = "true"
+    causality = "parameter" isValueChangeable = "true"
+    alias = "noAlias"
+    classIndex = "3" classType = "rPar"
+    isProtected = "false" hideResult = "" isEncrypted = "false" initNonlinear = "false"
+    fileName = "/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo" startLine = "12" startColumn = "5" endLine = "12" endColumn = "42" fileWritable = "true">
+    <Real start="3.0" fixed="true" useNominal="false" />
+  </ScalarVariable>
+
+
+
+  </ModelVariables>
+
+
+</fmiModelDescription>
+

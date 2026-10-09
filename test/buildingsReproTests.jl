@@ -836,5 +836,15 @@ end
       @test brValue(sol, "sub.y", 1.0) ≈ 2.4 rtol = 1e-9
     end
   end
+
+  @testset "A function's matrix constructor of a Real and Integer literals, in a dimension" begin
+    #= [a, 2; 3, 4]: the 2 stayed Integer in the Real matrix (each element was matched with
+       another's type), the frontend's sum() of it failed. omc: y 21 (z of 2 elements) =#
+    for scalarize in (true, false)
+      local sol = brSimulate("MatrixOfMixedLiterals"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 1.0) ≈ 21 rtol = 1e-9
+    end
+  end
 end
 
