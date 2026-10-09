@@ -246,6 +246,21 @@ end
     end
   end
 
+  @testset "Discretes set by initial equations that read a signal (Buildings' weather data: PartialConvertTime)" begin
+    #= k = integer(modTimAux/lenWea) + 1 = 1, tNext = k*lenWea = 1, 2 after t = 1; the calendar
+       time wraps: 0.5 at 0.5 and 1.5, 0.4 at 2.4. The MTK path left k and tNext at 0. =#
+    for scalarize in (false, true)
+      local sol = brSimulate("DiscretesOfInitialEquations"; stopTime = 2.5, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "k", 0.5) == 1
+      @test brValue(sol, "tNext", 0.5) == 1
+      @test brValue(sol, "tNext", 1.5) == 2
+      @test brValue(sol, "calTimAux", 0.5) ≈ 0.5 atol = 1e-8
+      @test brValue(sol, "calTimAux", 1.5) ≈ 0.5 atol = 1e-8
+      @test brValue(sol, "calTimAux", 2.4) ≈ 0.4 atol = 1e-8
+    end
+  end
+
   @testset "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable)" begin
     #= idx: 1, 2 at 0.3, 3 at 0.6, 1 at 0.9; y = val[idx, :] =#
     for scalarize in (false, true)

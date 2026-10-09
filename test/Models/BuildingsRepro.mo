@@ -1482,4 +1482,24 @@ package BuildingsRepro
     end when;
   end ParameterInZeroCrossing;
 
+  model DiscretesOfInitialEquations
+    "Discretes set by initial equations from a continuous variable (Buildings' PartialConvertTime: k and tNext; tNext stayed 0, the weather file's time a year ahead)"
+    parameter Real lenWea = fileLength(1.0);
+    final parameter Boolean canRepeat = abs(mod(lenWea, 1.0)) < 1e-2;
+    Real modTimAux;
+    Real calTimAux;
+    discrete Real tNext;
+    Integer k;
+  initial equation
+    k = integer(modTimAux/lenWea) + 1;
+    tNext = if canRepeat then k*lenWea else time;
+  equation
+    modTimAux = time;
+    when (canRepeat and modTimAux > pre(tNext)) then
+      k = pre(k) + 1;
+      tNext = k*lenWea;
+    end when;
+    calTimAux = if canRepeat then modTimAux - tNext + lenWea else modTimAux;
+  end DiscretesOfInitialEquations;
+
 end BuildingsRepro;
