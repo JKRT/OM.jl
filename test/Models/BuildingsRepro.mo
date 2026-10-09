@@ -2159,4 +2159,22 @@ package BuildingsRepro
     ShrPlant pla(perPum = perPum);
   end SharedElementDataOfComponentArray;
 
+  record MaxPower "Power curve"
+    parameter Real P[:] "Powers";
+  end MaxPower;
+
+  record MaxData "Data with a one-element power curve (Buildings Movers.Data.Generic)"
+    parameter MaxPower power(P = {0});
+    parameter Real V[:] = {0, 1};
+    parameter Real W = if max(power.P) > 1e-15 then max(power.P) else sum(V);
+  end MaxData;
+
+  model MaxOfOneElementFieldInRecordArray
+    "max() of a record's one-element field in an array of records (Buildings DataCenters: Generic[numChi] perPum): max(power.P) is power.P[1], its subscript went on the record array (dat[1].power.P), {0.0} > eps"
+    parameter MaxData[2] dat(each V = {1, 2}, power(P = {{0}, {5}}));
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = dat[2].W;
+  end MaxOfOneElementFieldInRecordArray;
+
 end BuildingsRepro;

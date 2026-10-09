@@ -896,5 +896,20 @@ end
       @test brValue(sol, "pla.pumps.pum[2].eff.y", 1.0) ≈ 4.5 rtol = 1e-9
     end
   end
+
+  @testset "max() of a one-element record field in an array of records (Buildings DataCenters)" begin
+    #= max(power.P) of a one-element P is power.P[1]; the subscript went on the reference's
+       scope part, the record array (dat[2].power.P > eps on a vector, {0.0} > eps in a
+       dimension). Only the reference's own parts take it (omc: mergeSubscripts). omc: y 5 =#
+    local sol = brSimulate("MaxOfOneElementFieldInRecordArray"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y", 1.0) ≈ 5 rtol = 1e-9
+    #= Arrays kept: dat.W (Real[2]) keeps one binding for its elements (dat.power.P[1],
+       sum(dat.V) per element); the backend does not evaluate it per element (dat[2].W
+       uninitialized). Open. =#
+    local solA = brSimulate("MaxOfOneElementFieldInRecordArray"; stopTime = 1.0, scalarize = false)
+    @test solA.retcode == ReturnCode.Success
+    @test_broken brValue(solA, "y", 1.0) ≈ 5 rtol = 1e-9
+  end
 end
 
