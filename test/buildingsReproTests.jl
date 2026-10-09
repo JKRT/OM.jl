@@ -771,5 +771,17 @@ end
       @test brValue(sol, "pum[2].P", 1.0) ≈ 1 rtol = 1e-9
     end
   end
+
+  @testset "A partial function reached from a redeclared component's original declaration (Buildings DHC)" begin
+    #= the original declaration's lookup instantiated the partial default medium, whose constant
+       calls a partial function: that function's own class got the expressions (got
+       non-instantiated function). omc: pip.T 0.3679, pip.e 586.3 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("PartialFunctionOfRedeclaredOriginal"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "pip.T", 1.0) ≈ exp(-1) rtol = 1e-4
+      @test brValue(sol, "pip.e", 1.0) ≈ 586.3 rtol = 1e-9
+    end
+  end
 end
 

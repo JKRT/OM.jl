@@ -1773,4 +1773,63 @@ package BuildingsRepro
     CurvePump pum[nPum](per = dat.per);
   end PumpsOfGroupData;
 
+  partial function FunctionIcon "An empty partial function each function extends (Modelica.Icons.Function)"
+  end FunctionIcon;
+
+  partial package PartialStateMedium "A medium with partial state functions and a constant from them (Modelica.Media.Interfaces.PartialMedium: h_default)"
+    type Temp = Real(unit = "K");
+    replaceable partial function setState
+      extends FunctionIcon;
+      input Real T;
+      output Real st;
+    end setState;
+    replaceable partial function enthalpy
+      extends FunctionIcon;
+      input Real st;
+      output Real h;
+    end enthalpy;
+    function enthalpy_T
+      extends FunctionIcon;
+      input Real T;
+      output Real h;
+    algorithm
+      h := enthalpy(setState(T));
+    end enthalpy_T;
+    constant Real h_default = enthalpy_T(293.15);
+  end PartialStateMedium;
+
+  package StateMedium
+    extends PartialStateMedium;
+    redeclare function extends setState
+    algorithm
+      st := T;
+    end setState;
+    redeclare function extends enthalpy
+    algorithm
+      h := 2*st;
+    end enthalpy;
+  end StateMedium;
+
+  model PartialStatePipe "A component typed by its partial default medium"
+    replaceable package Medium = PartialStateMedium;
+    Medium.Temp T(start = 1);
+  end PartialStatePipe;
+
+  model StatePipe
+    extends PartialStatePipe(redeclare package Medium = StateMedium);
+    Real e(start = 0, fixed = true);
+  equation
+    der(T) = -T;
+    der(e) = Medium.h_default;
+  end StatePipe;
+
+  model StatePlantBase
+    replaceable PartialStatePipe pip;
+  end StatePlantBase;
+
+  model PartialFunctionOfRedeclaredOriginal
+    "A redeclared component's original declaration looks up its partial default medium (allowed there); the medium's constant calls a function calling a partial one (Buildings DHC: PartialMedium's specificEnthalpy_pTX): got non-instantiated function"
+    extends StatePlantBase(redeclare StatePipe pip);
+  end PartialFunctionOfRedeclaredOriginal;
+
 end BuildingsRepro;
