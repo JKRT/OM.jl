@@ -1663,4 +1663,23 @@ package BuildingsRepro
     end when;
   end NestedLogicalCondition;
 
+  function pressureLossOf "A default that reads another input (MSL WallFriction.Detailed.pressureLoss_m_flow: crossArea = pi*diameter^2/4)"
+    input Real m_flow;
+    input Real diameter;
+    input Real crossArea = 3.14159*diameter^2/4;
+    output Real dp;
+  algorithm
+    dp := m_flow^2/crossArea;
+  end pressureLossOf;
+
+  model DefaultArgumentOfInput
+    "A parameter bound to a call that leaves an input to its default, the default reading another input (Buildings' FixedResistances: dpStraightPipe_nominal = WallFriction.Detailed.pressureLoss_m_flow(..., diameter = dh, ...)): the default kept the function's own input, a continuous binding of a parameter"
+    parameter Real dh = 2;
+    parameter Real m_flow_nominal = 1;
+    parameter Real dp_nominal = pressureLossOf(m_flow = m_flow_nominal, diameter = dh);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = dp_nominal;
+  end DefaultArgumentOfInput;
+
 end BuildingsRepro;

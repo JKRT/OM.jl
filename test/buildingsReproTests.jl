@@ -729,5 +729,15 @@ end
     OMBackend.FrontendUtil.Util.traverseExpTopDown(f, (e, c) -> (c[] += 1; (e, c[] < 10_000, c)), terms)
     @test terms[] < 1000
   end
+
+  @testset "A call's default argument reading another input (15 Buildings FixedResistances, pipes)" begin
+    #= the frontend failed: the default `3.14159*diameter^2/4` kept the function's input `diameter`
+       (continuous), not the argument dh. dp_nominal = 1/3.14159 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("DefaultArgumentOfInput"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 1/3.14159 rtol = 1e-9
+    end
+  end
 end
 
