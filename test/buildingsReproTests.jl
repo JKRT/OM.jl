@@ -680,5 +680,17 @@ end
       end
     end
   end
+
+  @testset "A Boolean defined by a guard and-ed with a sample, a when on it (7 Buildings plotters)" begin
+    #= the ModelingToolkit path: refused (sample() in a discrete cluster's body), then the lifted
+       equation, recomputed at the guard's relation only, never fired. Ticks at 0, 0.25, ..., 1;
+       active on [0.3, 0.6) and from 0.8. omc: n 0, 1, 1, 2 at 0.45, 0.7, 0.9, 1.2; tLast 1. =#
+    for scalarize in (true, false)
+      local sol = brSimulate("GuardedSampleTrigger"; stopTime = 1.2, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test [brValue(sol, "n", t) for t in (0.45, 0.7, 0.9, 1.2)] == [0, 1, 1, 2]
+      @test brValue(sol, "tLast", 1.2) == 1.0
+    end
+  end
 end
 

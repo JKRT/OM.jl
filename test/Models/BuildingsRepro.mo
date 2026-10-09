@@ -1583,4 +1583,25 @@ package BuildingsRepro
     end when;
   end EdgeOrSample;
 
+  model GuardedSampleTrigger
+    "A Boolean defined by a guard and-ed with a sample, a when on it (Buildings' plotters: sampleTrigger = active and sample(t0, samplePeriod); when sampleTrigger then ...)"
+    parameter Real t0(fixed = false);
+    discrete Real tOn(start = 0.3, fixed = true);
+    Boolean active = time >= tOn;
+    Boolean sampleTrigger;
+    Integer n(start = 0, fixed = true);
+    discrete Real tLast(start = -1, fixed = true);
+  initial equation
+    t0 = time;
+  equation
+    when time >= 0.6 then
+      tOn = 0.8;
+    end when;
+    sampleTrigger = active and sample(t0, 0.25);
+    when sampleTrigger then
+      n = pre(n) + 1;
+      tLast = time;
+    end when;
+  end GuardedSampleTrigger;
+
 end BuildingsRepro;
