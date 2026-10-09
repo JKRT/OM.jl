@@ -783,5 +783,17 @@ end
       @test brValue(sol, "pip.e", 1.0) ≈ 586.3 rtol = 1e-9
     end
   end
+
+  @testset "A sum over an array of components' parameter, read by a dimension (Buildings DHC)" begin
+    #= sum(bld.m_flow_nominal) was given each element's value: the elements' shared binding
+       (one scalar) and a modifier's per-element values (the builtin call mapped over them).
+       omc: y 0.0331797 (x of 1 element), w 0.0774194 (z of 2) =#
+    for scalarize in (true, false)
+      local sol = brSimulate("SumOverComponentArray"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 1.0) ≈ 0.033179723502304144 rtol = 1e-6
+      @test brValue(sol, "w", 1.0) ≈ 0.07741935483870968 rtol = 1e-6
+    end
+  end
 end
 

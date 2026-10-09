@@ -1832,4 +1832,25 @@ package BuildingsRepro
     extends StatePlantBase(redeclare StatePipe pip);
   end PartialFunctionOfRedeclaredOriginal;
 
+  model BuildingLoad "A building's nominal flow from its load"
+    parameter Real Q = 20000;
+    parameter Real m_flow_nominal = Q / 2.17e6;
+  end BuildingLoad;
+
+  model SumOverComponentArray
+    "Parameters summing a parameter over an array of components, read by dimensions (Buildings DHC: mDis_flow_nominal = sum(bld.m_flow_nominal)*1.2): sum was given each element's value, from the elements' shared binding and from a modifier on the array"
+    parameter Integer N = 3;
+    BuildingLoad bld[N];
+    BuildingLoad bldEach[N](Q = {10000, 20000, 40000});
+    parameter Real mDis = sum(bld.m_flow_nominal)*1.2;
+    parameter Real mEach = sum(bldEach.m_flow_nominal)*1.2;
+    parameter Real x[if mDis > 0.05 then 2 else 1] = fill(mDis, size(x, 1));
+    parameter Real z[if mEach > 0.03 then 2 else 1] = fill(mEach, size(z, 1));
+    Real y(start = 0, fixed = true);
+    Real w(start = 0, fixed = true);
+  equation
+    der(y) = sum(x);
+    der(w) = sum(z);
+  end SumOverComponentArray;
+
 end BuildingsRepro;
