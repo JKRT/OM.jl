@@ -261,6 +261,16 @@ end
     end
   end
 
+  @testset "A component array's array modifier read through a binding (14 models: Fluid.Examples.Performance.PressureDrop)" begin
+    #= dp_nominal_pos = abs(dp_nominal), evaluated in the elements' shared class for an if-equation
+       on an Evaluate=true parameter: every element's was the whole array {2, 3, 1}; y = sqrt(dp_nominal_pos)*t =#
+    for scalarize in (false, true)
+      local sol = brSimulate("ArrayModifierThroughBinding"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test [brValue(sol, "res[$k].y", 1.0) for k in 1:3] ≈ [sqrt(2), sqrt(3), 1.0] rtol = 1e-10
+    end
+  end
+
   @testset "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable)" begin
     #= idx: 1, 2 at 0.3, 3 at 0.6, 1 at 0.9; y = val[idx, :] =#
     for scalarize in (false, true)

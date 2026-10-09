@@ -1502,4 +1502,25 @@ package BuildingsRepro
     calTimAux = if canRepeat then modTimAux - tNext + lenWea else modTimAux;
   end DiscretesOfInitialEquations;
 
+  model NominalResistance "A parameter whose binding reads another parameter (Buildings' PartialResistance)"
+    parameter Real dp_nominal;
+    final parameter Real dp_nominal_pos = abs(dp_nominal);
+    final parameter Boolean computeFlowResistance = dp_nominal_pos > 1e-10 annotation(Evaluate = true);
+    Real dp = dp_nominal_pos*time;
+    Real y;
+  equation
+    if computeFlowResistance then
+      y = dp/sqrt(dp_nominal_pos);
+    else
+      y = 0;
+    end if;
+  end NominalResistance;
+
+  model ArrayModifierThroughBinding
+    "A component array's array modifier read through another parameter's binding (Buildings' PressureDrop[nRes] resSeries(dp_nominal = {dp_nominal*(1 + mod(i, 3)) for i in 1:nRes})): every element's dp_nominal_pos the whole array"
+    parameter Integer n = 3;
+    parameter Real dp_nominal = 1;
+    NominalResistance res[n](dp_nominal = {dp_nominal*(1 + mod(i, 3)) for i in 1:n});
+  end ArrayModifierThroughBinding;
+
 end BuildingsRepro;
