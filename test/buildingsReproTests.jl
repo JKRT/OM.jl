@@ -739,5 +739,15 @@ end
       @test brValue(sol, "x", 1.0) ≈ 1/3.14159 rtol = 1e-9
     end
   end
+
+  @testset "Whole record bindings reading each other, in a dimension (Buildings Templates)" begin
+    #= a stack overflow (the process died): pla.cfg.rho -> pla.rho -> pla.T_nominal -> datAll
+       -> pla.cfg -> ... omc: cfg.rho = 1300, two elements, pla.v[2](1) = 2 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("CyclicRecordBindings"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "pla.v[2]", 1.0) ≈ 2 rtol = 1e-9
+    end
+  end
 end
 

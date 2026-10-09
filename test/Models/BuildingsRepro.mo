@@ -1682,4 +1682,36 @@ package BuildingsRepro
     der(x) = dp_nominal;
   end DefaultArgumentOfInput;
 
+  record PlantConfig "A plant's configuration (Buildings' Templates: pla.cfg)"
+    parameter Real rho;
+  end PlantConfig;
+
+  record ControlData "Control data holding the configuration (Buildings' Templates: dat.ctl, ctl.cfg)"
+    parameter PlantConfig cfg;
+    parameter Real T_nominal = 300;
+  end ControlData;
+
+  record PlantData "A plant's data (Buildings' Templates: datAll.pla)"
+    parameter PlantConfig cfg;
+    parameter ControlData ctl(cfg = cfg);
+  end PlantData;
+
+  model TemplatePlant "A plant reading its data, its configuration made of its parameters (Buildings' Templates: pla)"
+    parameter PlantData dat;
+    parameter Real T_nominal = dat.ctl.T_nominal;
+    parameter Real rho = 1000 + T_nominal;
+    parameter PlantConfig cfg(rho = rho);
+    Real v[if cfg.rho > 1200 then 2 else 1](each start = 0, each fixed = true);
+  equation
+    for i in 1:size(v, 1) loop
+      der(v[i]) = i;
+    end for;
+  end TemplatePlant;
+
+  model CyclicRecordBindings
+    "Records bound to other records by reference, reading each other, field by field acyclic, in a dimension (Buildings' Templates: pla.cfg, through THeaWatSup_nominal and datAll.pla.ctl.cfg, back to pla.cfg): the evaluation went round without end, a stack overflow"
+    parameter PlantData datAll(cfg = pla.cfg);
+    TemplatePlant pla(dat = datAll);
+  end CyclicRecordBindings;
+
 end BuildingsRepro;
