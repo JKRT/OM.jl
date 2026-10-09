@@ -1548,4 +1548,15 @@ package BuildingsRepro
     end when;
   end TupleOfDiscretes;
 
+  model ResistanceElement "An element whose sub-component's parameter is bound to the element's (Buildings' HexElement: preDro2(dp_nominal = dp2_nominal))"
+    parameter Real dp2_nominal;
+    NominalResistance preDro2(dp_nominal = dp2_nominal);
+  end ResistanceElement;
+
+  model ElementConditionsOfArrayModifier
+    "Elements' if-equation conditions that differ, from a component array's array modifier through a sub-component (Buildings' counter-flow coils: only the last element has a pressure drop): each element's condition was the array"
+    parameter Integer n = 3;
+    ResistanceElement ele[n](dp2_nominal = {if i == n then 2 else 0 for i in 1:n});
+  end ElementConditionsOfArrayModifier;
+
 end BuildingsRepro;

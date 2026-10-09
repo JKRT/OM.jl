@@ -286,6 +286,16 @@ end
     end
   end
 
+  @testset "Elements' if-equation conditions from an array modifier through a sub-component (8 models: counter-flow coils)" begin
+    #= only ele[3] has a pressure drop: its y = sqrt(2)*t, the others' 0; each element's condition was
+       the array {false, false, true} (UnsupportedLowering: condition expression) =#
+    for scalarize in (false, true)
+      local sol = brSimulate("ElementConditionsOfArrayModifier"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "ele[3].preDro2.y", 1.0) ≈ sqrt(2) rtol = 1e-10
+    end
+  end
+
   @testset "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable)" begin
     #= idx: 1, 2 at 0.3, 3 at 0.6, 1 at 0.9; y = val[idx, :] =#
     for scalarize in (false, true)
