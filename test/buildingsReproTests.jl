@@ -271,6 +271,21 @@ end
     end
   end
 
+  @testset "A discrete and a discrete array assigned together, then read (13 models: occupant windows)" begin
+    #= (r, s) = nextPair(...): r 0.1, then 0.2 at 0.25, 0.5 at 0.75; on = r > 0.15 after it: false,
+       then true. The tuple initial equation was not lowered; in the when, on read the previous r. =#
+    for scalarize in (false, true)
+      local sol = brSimulate("TupleOfDiscretes"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "r", 0.1) ≈ 0.1
+      @test brValue(sol, "on", 0.1) == 0
+      @test brValue(sol, "r", 0.3) ≈ 0.2
+      @test brValue(sol, "s[2]", 0.3) == 3
+      @test brValue(sol, "on", 0.3) == 1
+      @test brValue(sol, "r", 0.9) ≈ 0.5
+    end
+  end
+
   @testset "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable)" begin
     #= idx: 1, 2 at 0.3, 3 at 0.6, 1 at 0.9; y = val[idx, :] =#
     for scalarize in (false, true)

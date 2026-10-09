@@ -1523,4 +1523,29 @@ package BuildingsRepro
     NominalResistance res[n](dp_nominal = {dp_nominal*(1 + mod(i, 3)) for i in 1:n});
   end ArrayModifierThroughBinding;
 
+  function nextPair "Two outputs, one an array (Modelica.Math.Random.Generators.Xorshift1024star.random)"
+    input Integer stateIn[2];
+    output Real r;
+    output Integer stateOut[2];
+  algorithm
+    stateOut := {stateIn[2], stateIn[1] + stateIn[2]};
+    r := stateOut[1]/10;
+  end nextPair;
+
+  model TupleOfDiscretes
+    "A discrete and a discrete array assigned together, in an initial equation and in a when, then read (Buildings' occupant windows: (ran, state) = random(...); on = ran < p)"
+    parameter Integer seed = 1;
+    discrete Real r;
+    Integer s[2];
+    Boolean on;
+  initial equation
+    (r, s) = nextPair({seed, seed});
+    on = r > 0.15;
+  equation
+    when sample(0.25, 0.25) then
+      (r, s) = nextPair(pre(s));
+      on = r > 0.15;
+    end when;
+  end TupleOfDiscretes;
+
 end BuildingsRepro;
