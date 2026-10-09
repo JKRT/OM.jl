@@ -208,6 +208,32 @@ end
     end
   end
 
+  @testset "An array assignment in a function is a copy (6 models: borehole resistances)" begin
+    #= a := b, then b[1] := 0: y = 2x + 9; bound to one array, x + 6 =#
+    for scalarize in (false, true)
+      local sol = brSimulate("ArrayAssignmentCopies"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "y", 1.0) ≈ 11.0 rtol = 1e-10
+    end
+  end
+
+  @testset "A record-valued call as an argument, evaluated once (Buildings' multipoleFmk)" begin
+    local expected = function (x)
+      local (a, b) = (x, 1.0)
+      for _ in 1:16
+        (a, b) = (a*0.5 + b, b*0.5 - a)
+      end
+      return a + b
+    end
+    local sol = brSimulate("NestedRecordCalls"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test brValue(sol, "y", 1.0) ≈ expected(1.0) rtol = 1e-10
+    #= once per field: 2^16 calls of turn, 30 MB; once: 16 =#
+    local f = OMBackend.CodeGeneration.MODELICA_FUNCTION_IMPLS[:BuildingsRepro_turned16]
+    Base.invokelatest(f, 1.0)
+    @test (@allocated Base.invokelatest(f, 1.0)) < 1_000_000
+  end
+
   @testset "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable)" begin
     #= idx: 1, 2 at 0.3, 3 at 0.6, 1 at 0.9; y = val[idx, :] =#
     for scalarize in (false, true)

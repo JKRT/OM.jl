@@ -1407,4 +1407,59 @@ package BuildingsRepro
     (x, Rgb, Rgg) = resistances(false, r, k, getInstanceName());
   end TupleOfFreeParametersWithoutStates;
 
+  function copyThenWrite
+    "An array assigned from another, the other written after (Buildings' multipoleFluidTemperature: PRea := PRea_new)"
+    input Real x;
+    output Real y;
+  protected
+    Real a[2];
+    Real b[2];
+    Integer i;
+  algorithm
+    a := {x, x};
+    i := 0;
+    while i < 3 loop
+      i := i + 1;
+      b[1] := a[1] + 1;
+      b[2] := a[2] + 2;
+      a := b;
+      b[1] := 0;
+    end while;
+    y := a[1] + a[2];
+  end copyThenWrite;
+
+  model ArrayAssignmentCopies
+    "An array assignment in a function is a copy (Buildings' borehole resistances: the multipole iteration stopped after its second step)"
+    Real y = copyThenWrite(time);
+  end ArrayAssignmentCopies;
+
+  record TurnPair
+    Real a;
+    Real b;
+  end TurnPair;
+
+  function turn "A record from a record, two statements (a Complex operator's form)"
+    input TurnPair p;
+    input Real c;
+    output TurnPair q;
+  algorithm
+    q.a := p.a*c + p.b;
+    q.b := p.b*c - p.a;
+  end turn;
+
+  function turned16 "A record-valued call nested 16 deep (Buildings' multipoleFmk: Complex operators ten deep)"
+    input Real x;
+    output Real y;
+  protected
+    TurnPair p;
+  algorithm
+    p := turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(TurnPair(x, 1), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5);
+    y := p.a + p.b;
+  end turned16;
+
+  model NestedRecordCalls
+    "A record-valued call as an argument is evaluated once, not once per field: 2^16 calls of turn"
+    Real y = turned16(time);
+  end NestedRecordCalls;
+
 end BuildingsRepro;
