@@ -1737,4 +1737,40 @@ package BuildingsRepro
     RecordPump pum[nPum](per = per);
   end RecordArrayToComponentArray;
 
+  record CurveData "A mover's pressure curve (Fluid.Movers.BaseClasses.Characteristics.flowParameters)"
+    parameter Real V_flow[:];
+    parameter Real dp[size(V_flow, 1)];
+  end CurveData;
+
+  record MoverCurveData "A mover's data with a flag from both curves (Fluid.Movers.Data.Generic: havePressureCurve)"
+    parameter CurveData pressure(V_flow = {0}, dp = {0});
+    final parameter Boolean havePressureCurve = sum(pressure.V_flow) > 1e-10 and sum(pressure.dp) > 1e-10;
+  end MoverCurveData;
+
+  record PumpGroupData "Pumps' data with each pump's curve by a nested array modifier (Templates.Components.Data.PumpMultiple)"
+    parameter Integer nPum;
+    parameter Real m_flow_nominal[nPum];
+    parameter MoverCurveData per[max(nPum, 1)](pressure(
+      V_flow = if nPum > 0 then {{0, 1, 2}*m_flow_nominal[i] for i in 1:nPum} else [0],
+      dp = if nPum > 0 then {{1.14, 1, 0.42}*100 for i in 1:nPum} else [0]));
+  end PumpGroupData;
+
+  model CurvePump "A pump choosing its equation by its data's flag"
+    parameter MoverCurveData per;
+    Real P(start = 0, fixed = true);
+  equation
+    if per.havePressureCurve then
+      der(P) = 1;
+    else
+      der(P) = 2;
+    end if;
+  end CurvePump;
+
+  model PumpsOfGroupData
+    "An array of components given an array of records from a nested array modifier, their if-equations on a flag that and-s two of its fields' relations (Buildings' Templates pumps: pum[nPum](per = dat.per)): every element's condition was {{true, true}, {true, true}}"
+    parameter Integer nPum = 2;
+    parameter PumpGroupData dat(nPum = nPum, m_flow_nominal = fill(1, nPum));
+    CurvePump pum[nPum](per = dat.per);
+  end PumpsOfGroupData;
+
 end BuildingsRepro;

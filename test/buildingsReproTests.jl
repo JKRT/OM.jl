@@ -760,5 +760,16 @@ end
       @test brValue(sol, "pum[2].P", 1.0) ≈ 5 rtol = 1e-9
     end
   end
+
+  @testset "A flag and-ing two relations of records over an array of components (Buildings Templates pumps)" begin
+    #= `a and b` over the elements: b was evaluated whole within each element's pass, a cross
+       product ({{true, true}, {true, true}} as each element's condition). omc: both P 1 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("PumpsOfGroupData"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "pum[1].P", 1.0) ≈ 1 rtol = 1e-9
+      @test brValue(sol, "pum[2].P", 1.0) ≈ 1 rtol = 1e-9
+    end
+  end
 end
 
