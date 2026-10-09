@@ -670,14 +670,9 @@ end
       @test brValue(sol, "nOccAtTick", 0.99) == 2
       @test brValue(sol, "nTick", 1.2) == 5
       #= the array path: the relation that reaches its crossing at the tick (zc = 0 there)
-         stays false by the hysteresis, its edge an instant after the tick =#
-      if scalarize
-        @test brValue(sol, "nEdge", 1.2) == 2
-        @test brValue(sol, "nOccAtTick", 1.2) == 3
-      else
-        @test_broken brValue(sol, "nEdge", 1.2) == 2
-        @test_broken brValue(sol, "nOccAtTick", 1.2) == 3
-      end
+         stayed false by the hysteresis, its edge an instant after the tick =#
+      @test brValue(sol, "nEdge", 1.2) == 2
+      @test brValue(sol, "nOccAtTick", 1.2) == 3
     end
   end
 
