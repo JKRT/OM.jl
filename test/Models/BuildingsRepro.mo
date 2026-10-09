@@ -2114,4 +2114,49 @@ package BuildingsRepro
     parameter RdrMyCoil datCoi;
   end RecordFieldsTypedInParallel;
 
+  record ShrPowerData "Power curve"
+    parameter Real P[:] "Powers";
+  end ShrPowerData;
+
+  record ShrPressureData "Pressure curve"
+    parameter Real V_flow[:] "Flow rates";
+  end ShrPressureData;
+
+  record ShrPumpData "A pump's data, its motor power from the curves (Buildings Movers.Data.Generic)"
+    parameter ShrPowerData power(P = {0});
+    parameter ShrPressureData pressure(V_flow = {0, 1});
+    parameter Real WMot_nominal = if max(power.P) > 1e-15 then max(power.P) else sum(pressure.V_flow);
+  end ShrPumpData;
+
+  model ShrEfficiency "Sizes an array by the motor power"
+    parameter ShrPumpData per;
+    parameter Real x[if per.WMot_nominal > 1 then 2 else 1] = fill(per.WMot_nominal, size(x, 1));
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = sum(x);
+  end ShrEfficiency;
+
+  model ShrPump "Passes its data field by field (PartialFlowMachine's eff(per(...)))"
+    parameter ShrPumpData per;
+    ShrEfficiency eff(per(power = per.power, pressure = per.pressure));
+  end ShrPump;
+
+  model ShrPumps
+    parameter Integer num = 2;
+    parameter ShrPumpData per[num];
+    ShrPump pum[num](per = per);
+  end ShrPumps;
+
+  model ShrPlant
+    parameter ShrPumpData perPum;
+    ShrPumps pumps(per = fill(perPum, 2));
+  end ShrPlant;
+
+  model SharedElementDataOfComponentArray
+    "A dimension in an array of components from each element's data, the elements' data the same (Buildings ElectricChillerParallel: pum[num](per = per), per = fill(perCHWPum, numChi)): evaluated once for all elements, max(power.P) read every element's P ({0.0} > eps)"
+    parameter Real m_flow = 3;
+    parameter ShrPumpData perPum(pressure(V_flow = m_flow/2*{0.5, 1}));
+    ShrPlant pla(perPum = perPum);
+  end SharedElementDataOfComponentArray;
+
 end BuildingsRepro;

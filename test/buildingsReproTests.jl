@@ -884,5 +884,17 @@ end
       @test brValue(sol, "d.p4.y", 1.0) ≈ 27 rtol = 1e-9
     end
   end
+
+  @testset "A dimension in an array of components from the elements' equal data (Buildings ElectricChillerParallel)" begin
+    #= eff's x[...] is typed once for all pumps; WMot_nominal's max(power.P) read power.P through
+       pum's binding split over the pumps, every pump's ({0.0} > eps). The elements' data being
+       the same, one element's. omc: pla.pumps.pum[1].eff.y 4.5 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("SharedElementDataOfComponentArray"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "pla.pumps.pum[1].eff.y", 1.0) ≈ 4.5 rtol = 1e-9
+      @test brValue(sol, "pla.pumps.pum[2].eff.y", 1.0) ≈ 4.5 rtol = 1e-9
+    end
+  end
 end
 
