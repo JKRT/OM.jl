@@ -1343,4 +1343,68 @@ package BuildingsRepro
     end when;
   end ParameterArrayByDiscreteIndex;
 
+  function deltaCircuit "Matrix outputs (Buildings' multipoleThermalResistances)"
+    input Real r;
+    output Real D[2, 2];
+    output Real R[2, 2];
+  algorithm
+    D := [r, 0; 0, r];
+    R := 2*D;
+  end deltaCircuit;
+
+  function resistances
+    "Several outputs, a branch on an input and a Boolean input, a String input, a while loop: not interpreted at the build nor evaluated symbolically (Buildings' internalResistancesOneUTube)"
+    input Boolean useR;
+    input Real r;
+    input Real k;
+    input String instanceName;
+    output Real x;
+    output Real Rgb;
+    output Real Rgg;
+  protected
+    Real D[2, 2];
+    Real R[2, 2];
+    Integer n;
+  algorithm
+    (D, R) := deltaCircuit(r);
+    x := 0;
+    n := 0;
+    while n < 5 loop
+      n := n + 1;
+      x := x + r/5;
+    end while;
+    if r > 0 and not useR then
+      Rgb := 1/(2*k);
+    else
+      Rgb := R[1, 1];
+    end if;
+    Rgg := Rgb/4 + D[1, 2];
+  end resistances;
+
+  model TupleOfFreeParameters
+    "Free parameters assigned together by a call in an initial equation (Buildings' HexInternalElement): the constraint was dropped, the resistances 0"
+    parameter Real r = 0.5;
+    parameter Real k = 2;
+    parameter Real x(fixed = false);
+    parameter Real Rgb(fixed = false);
+    parameter Real Rgg(fixed = false);
+    Real T(start = 1, fixed = true);
+  initial equation
+    (x, Rgb, Rgg) = resistances(false, r, k, getInstanceName());
+  equation
+    der(T) = -T/Rgb;
+  end TupleOfFreeParameters;
+
+  model TupleOfFreeParametersWithoutStates
+    "The same in a system without states (the validations of Buildings' borehole resistance functions): refused as free parameters"
+    parameter Real r = 0.5;
+    parameter Real k = 2;
+    parameter Real x(fixed = false);
+    parameter Real Rgb(fixed = false);
+    parameter Real Rgg(fixed = false);
+    Real y = Rgb + Rgg;
+  initial equation
+    (x, Rgb, Rgg) = resistances(false, r, k, getInstanceName());
+  end TupleOfFreeParametersWithoutStates;
+
 end BuildingsRepro;

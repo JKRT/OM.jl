@@ -193,6 +193,21 @@ end
     end
   end
 
+  @testset "Free parameters assigned together by a call in an initial equation (6 models: borehole resistances)" begin
+    #= x = 0.5, Rgb = 1/(2k) = 0.25, Rgg = 0.0625: the constraint was dropped (the resistances 0),
+       without states refused; then the symbolic resolution did not evaluate a call with a
+       Boolean and a String argument =#
+    for scalarize in (false, true)
+      local sol = brSimulate("TupleOfFreeParameters"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test [sol.ps[:x], sol.ps[:Rgb], sol.ps[:Rgg]] ≈ [0.5, 0.25, 0.0625] rtol = 1e-12
+      @test brValue(sol, "T", 1.0) ≈ exp(-4) rtol = 1e-4
+      local solW = brSimulate("TupleOfFreeParametersWithoutStates"; stopTime = 1.0, scalarize = scalarize)
+      @test solW.retcode == ReturnCode.Success
+      @test brValue(solW, "y", 1.0) ≈ 0.3125 rtol = 1e-12
+    end
+  end
+
   @testset "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable)" begin
     #= idx: 1, 2 at 0.3, 3 at 0.6, 1 at 0.9; y = val[idx, :] =#
     for scalarize in (false, true)
