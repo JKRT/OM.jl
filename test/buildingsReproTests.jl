@@ -692,5 +692,15 @@ end
       @test brValue(sol, "tLast", 1.2) == 1.0
     end
   end
+
+  @testset "An initial algorithm reading a record array's field by its loop index (11 Buildings DX coils)" begin
+    #= the ModelingToolkit path: refused, `sta[i]_nomVal_Q_flow_nominal` not a variable (its
+       elements are). omc: total 7, x(1) 7 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("InitialAlgorithmByLoopIndex"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 7 rtol = 1e-9
+    end
+  end
 end
 

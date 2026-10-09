@@ -1604,4 +1604,28 @@ package BuildingsRepro
     end when;
   end GuardedSampleTrigger;
 
+  record StageNominalValues "A stage's nominal values (Buildings' DX coil data: datCoi.sta[i].nomVal)"
+    parameter Real Q_flow_nominal;
+  end StageNominalValues;
+
+  record CoilStage
+    parameter StageNominalValues nomVal;
+  end CoilStage;
+
+  model InitialAlgorithmByLoopIndex
+    "An initial algorithm reading a record array's field by its loop index (Buildings' DX coils: for i in 1:nSta-1 loop assert(datCoi.sta[i].nomVal.Q_flow_nominal >= ...))"
+    parameter Integer n = 3;
+    parameter CoilStage sta[n](nomVal(Q_flow_nominal = {1, 2, 4}));
+    parameter Real total(fixed = false);
+    Real x(start = 0, fixed = true);
+  initial algorithm
+    total := 0;
+    for i in 1:n loop
+      assert(sta[i].nomVal.Q_flow_nominal <= sta[n].nomVal.Q_flow_nominal, "the last stage the largest");
+      total := total + sta[i].nomVal.Q_flow_nominal;
+    end for;
+  equation
+    der(x) = total;
+  end InitialAlgorithmByLoopIndex;
+
 end BuildingsRepro;
