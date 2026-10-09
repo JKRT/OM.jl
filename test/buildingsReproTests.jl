@@ -816,5 +816,15 @@ end
       @test brValue(sol, "c.pip.e", 1.0) ≈ 8368 rtol = 1e-9
     end
   end
+
+  @testset "The constraining clause's modifiers on a replaceable class not redeclared (Buildings Obsolete DHC: borefields)" begin
+    #= its constrainedby modifier was not applied (the medium partial, k its default). omc:
+       c.pip.e 8368 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("ConstrainingModifierOfReplaceableClass"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "c.pip.e", 1.0) ≈ 8368 rtol = 1e-9
+    end
+  end
 end
 

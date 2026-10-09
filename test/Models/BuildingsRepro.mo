@@ -1960,4 +1960,12 @@ package BuildingsRepro
     Connection c(redeclare package MediumRet = CpWater);
   end ConstrainingModifierOfRedeclaredClass;
 
+  model ConstrainingModifierOfReplaceableClass
+    "A replaceable model not redeclared: its constraining clause's modifiers apply too (Buildings Obsolete DHC: replaceable model BorefieldType = OneUTube constrainedby PartialBorefield(borFieDat = datBorFie, ...)): the pipe kept the partial medium"
+    model Connection
+      extends ConstrainedConnection;
+    end Connection;
+    Connection c(redeclare package MediumRet = CpWater);
+  end ConstrainingModifierOfReplaceableClass;
+
 end BuildingsRepro;
