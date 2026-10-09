@@ -795,5 +795,16 @@ end
       @test brValue(sol, "w", 1.0) ≈ 0.07741935483870968 rtol = 1e-6
     end
   end
+
+  @testset "A dimension from a function calling LAPACK (Buildings Movers: power curves)" begin
+    #= the frontend did not evaluate external LAPACK calls (and cat of a matrix and a vector):
+       Euler.getPeak's leastSquares and roots, for WMot_nominal and its curve's dimension. omc:
+       xPeak 2, z of 2 elements, w 4 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("LapackInDimension"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "w", 1.0) ≈ 4.0 rtol = 1e-9
+    end
+  end
 end
 

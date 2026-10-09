@@ -1853,4 +1853,80 @@ package BuildingsRepro
     der(w) = sum(z);
   end SumOverComponentArray;
 
+  function lapackLeastSquares "Modelica.Math.Matrices.LAPACK.dgelsy_vec (MSL 4.1)"
+    input Real A[:, :];
+    input Real b[size(A, 1)];
+    input Real rcond = 0.0;
+    output Real x[max(size(A, 1), size(A, 2))] = cat(1, b, zeros(max(nrow, ncol) - nrow));
+    output Integer info;
+    output Integer rank;
+  protected
+    Integer nrow = size(A, 1);
+    Integer ncol = size(A, 2);
+    Integer nrhs = 1;
+    Integer nx = max(nrow, ncol);
+    Integer lwork = max(min(nrow, ncol) + 3*ncol + 1, 2*min(nrow, ncol) + 1);
+    Real work[max(min(size(A, 1), size(A, 2)) + 3*size(A, 2) + 1, 2*min(size(A, 1), size(A, 2)) + 1)];
+    Real Awork[size(A, 1), size(A, 2)] = A;
+    Integer jpvt[size(A, 2)] = zeros(ncol);
+  external "FORTRAN 77" dgelsy(nrow, ncol, nrhs, Awork, nrow, x, nx, jpvt, rcond, rank, work, lwork, info)
+    annotation(Library = "lapack");
+  end lapackLeastSquares;
+
+  function lapackHessenbergEigenvalues "Modelica.Math.Matrices.LAPACK.dhseqr (MSL 4.1), eigenvalues only"
+    input Real H[:, size(H, 1)];
+    output Real alphaReal[size(H, 1)];
+    output Real alphaImag[size(H, 1)];
+    output Integer info;
+    output Real Ho[:, :] = H;
+    output Real Zo[:, :] = H;
+    output Real work[3*max(1, size(H, 1))];
+  protected
+    Integer n = size(H, 1);
+    String job = "E";
+    String compz = "N";
+    Integer ilo = 1;
+    Integer ihi = n;
+    Integer ldh = max(n, 1);
+    Integer lwork = 3*max(1, size(H, 1));
+  external "FORTRAN 77" dhseqr(job, compz, n, ilo, ihi, Ho, ldh, alphaReal, alphaImag, Zo, ldh, work, lwork, info)
+    annotation(Library = "lapack");
+  end lapackHessenbergEigenvalues;
+
+  function cubicPeak "A curve's maximum: a cubic least-squares fit, the roots of its derivative as a companion matrix's eigenvalues (Buildings' Movers Euler.getPeak, MSL Polynomials.roots)"
+    input Real x[:];
+    input Real y[size(x, 1)];
+    output Real xPeak;
+  protected
+    Real A[size(x, 1), 4];
+    Real c[max(size(x, 1), 4)];
+    Real p[3];
+    Real C[2, 2];
+    Real re[2];
+    Real im[2];
+    Integer info;
+    Integer rank;
+  algorithm
+    for i in 1:size(x, 1) loop
+      A[i, :] := {1, x[i], x[i]^2, x[i]^3};
+    end for;
+    (c, info, rank) := lapackLeastSquares(A, y);
+    p := {3*c[4], 2*c[3], c[2]};
+    C[1, :] := -p[2:3]/p[1];
+    C[2:2, :] := [identity(1), zeros(1)];
+    (re, im, info) := lapackHessenbergEigenvalues(C);
+    xPeak := if 6*c[4]*re[1] + 2*c[3] < 0 then re[1] else re[2];
+  end cubicPeak;
+
+  model LapackInDimension
+    "A dimension from a function calling LAPACK (dgelsy, dhseqr) and a matrix concatenation with a vector (Buildings Movers: Euler.getPeak, leastSquares and Polynomials.roots, through WMot_nominal): the frontend did not evaluate external LAPACK calls"
+    parameter Real x[5] = {0, 1, 2, 3, 4};
+    parameter Real y[5] = {2, 4, 6, 2, -14};
+    parameter Real xPeak = cubicPeak(x, y);
+    parameter Real z[if xPeak > 1.5 then 2 else 1] = fill(xPeak, size(z, 1));
+    Real w(start = 0, fixed = true);
+  equation
+    der(w) = sum(z);
+  end LapackInDimension;
+
 end BuildingsRepro;
