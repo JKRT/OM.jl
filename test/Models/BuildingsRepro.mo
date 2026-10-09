@@ -1714,4 +1714,27 @@ package BuildingsRepro
     TemplatePlant pla(dat = datAll);
   end CyclicRecordBindings;
 
+  record MoverRecord "A mover's data with a flag from its own field (Buildings' Fluid.Movers.Data.Generic: haveWMot_nominal = WMot_nominal > eps)"
+    parameter Real WMot_nominal = 0;
+    final parameter Boolean haveWMot_nominal = WMot_nominal > 1e-10;
+  end MoverRecord;
+
+  model RecordPump "A pump choosing its equation by its data's flag"
+    parameter MoverRecord per;
+    Real P(start = 0, fixed = true);
+  equation
+    if per.haveWMot_nominal then
+      der(P) = per.WMot_nominal;
+    else
+      der(P) = 2;
+    end if;
+  end RecordPump;
+
+  model RecordArrayToComponentArray
+    "An array of records passed to an array of components, each element's if-equation on its record's flag (Buildings' Templates pumps: pum[nPum](per = per)): every element's condition was the array {false, true}"
+    parameter Integer nPum = 2;
+    parameter MoverRecord per[nPum](WMot_nominal = {0, 5});
+    RecordPump pum[nPum](per = per);
+  end RecordArrayToComponentArray;
+
 end BuildingsRepro;

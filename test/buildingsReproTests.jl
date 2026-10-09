@@ -749,5 +749,16 @@ end
       @test brValue(sol, "pla.v[2]", 1.0) ≈ 2 rtol = 1e-9
     end
   end
+
+  @testset "An array of records passed to an array of components, if-equations on its fields (Buildings Templates pumps)" begin
+    #= each element's condition was the array {false, true} (UnsupportedLowering: condition
+       expression). omc: pum[1].P 2, pum[2].P 5 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("RecordArrayToComponentArray"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "pum[1].P", 1.0) ≈ 2 rtol = 1e-9
+      @test brValue(sol, "pum[2].P", 1.0) ≈ 5 rtol = 1e-9
+    end
+  end
 end
 
