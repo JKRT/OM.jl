@@ -2021,4 +2021,97 @@ package BuildingsRepro
     der(y) = sum(z);
   end MatrixOfMixedLiterals;
 
+  record CoilData "A coil's data"
+    parameter Real k = 1;
+  end CoilData;
+
+  record WaterCoilData "A water-source coil's data"
+    extends CoilData(k = 3);
+  end WaterCoilData;
+
+  model DataCoil
+    replaceable parameter CoilData dat;
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = dat.k;
+  end DataCoil;
+
+  model DataCoilUser
+    parameter CoilData dat;
+    DataCoil coi(dat = dat);
+  end DataCoilUser;
+
+  model RedeclareOverInnerModifier
+    "A final redeclare over a declaration's own modifier of the replaced element (Buildings DX coils: wetCoi(redeclare final ... datCoi = datCoi) over DXCooling's wetCoi(datCoi = datCoi)): the inner modifier was applied to the redeclared element, a final override"
+    parameter WaterCoilData d;
+    DataCoilUser u(coi(redeclare final WaterCoilData dat = d));
+  end RedeclareOverInnerModifier;
+
+  record StageData "A stage's data"
+    parameter Real q = 1;
+  end StageData;
+
+  record WaterStageData "A water-source stage's data"
+    extends StageData(q = 5);
+  end WaterStageData;
+
+  model Stage
+    replaceable parameter StageData per;
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = per.q;
+  end Stage;
+
+  model Stages
+    parameter StageData sta[2] = {StageData(q = 1), StageData(q = 2)};
+    Stage stg[2](per = sta);
+  end Stages;
+
+  model RedeclareInArrayOfComponents
+    "A redeclare in an array of components whose declaration binds the element (Buildings DX coils: uacp[nSta](per = datCoi.sta.nomVal) under uacp(redeclare final ... per)): the binding was not split over the array"
+    Stages s(stg(redeclare final WaterStageData per));
+  end RedeclareInArrayOfComponents;
+
+  record RdrCurve "A performance curve"
+    parameter Real f[:] "Coefficients";
+  end RdrCurve;
+
+  record RdrStage "A stage"
+    parameter RdrCurve cur;
+  end RdrStage;
+
+  record RdrCoil "Coil data"
+    parameter Integer nSta = 1;
+    parameter RdrStage sta[nSta];
+  end RdrCoil;
+
+  record RdrMyCoil "A coil's data"
+    extends RdrCoil(nSta = 1, sta = {RdrStage(cur = RdrCurve(f = {1, 2, 3, 4, 5, 6}))});
+  end RdrMyCoil;
+
+  model RdrPart "Reads the curve's size through its own record, bound to the parent's"
+    parameter RdrCoil datCoi;
+    parameter Integer n = size(datCoi.sta[1].cur.f, 1);
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = n + sum(datCoi.sta[1].cur.f);
+  end RdrPart;
+
+  model RdrMid
+    RdrPart p1(datCoi = datCoi);
+    RdrPart p2(datCoi = datCoi);
+    RdrPart p3(datCoi = datCoi);
+    RdrPart p4(datCoi = datCoi);
+    parameter RdrCoil datCoi;
+  end RdrMid;
+
+  model RecordFieldsTypedInParallel
+    "A record array's field sized through records' bindings, the records declared after their readers (Buildings DX coils: datCoi.sta.perCur.EIRFunFF): the field's type was lifted by sta's dimensions on the wrong side (f[1] for f[6]); with threads, fields read before another task typed them had their element type"
+    RdrMid a(datCoi = datCoi);
+    RdrMid b(datCoi = datCoi);
+    RdrMid c(datCoi = datCoi);
+    RdrMid d(datCoi = datCoi);
+    parameter RdrMyCoil datCoi;
+  end RecordFieldsTypedInParallel;
+
 end BuildingsRepro;

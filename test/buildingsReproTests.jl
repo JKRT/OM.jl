@@ -846,5 +846,43 @@ end
       @test brValue(sol, "y", 1.0) ≈ 21 rtol = 1e-9
     end
   end
+
+  @testset "A final redeclare over the replaced element's declaration modifier (Buildings DX WaterSource coils)" begin
+    #= coi(dat = dat) inside u was applied to the redeclared dat as well: "Trying to override
+       final element dat". It is for the original declaration only. omc: u.coi.dat.k = d.k (3) =#
+    for scalarize in (true, false)
+      local sol = brSimulate("RedeclareOverInnerModifier"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "u.coi.y", 1.0) ≈ 3 rtol = 1e-9
+    end
+  end
+
+  @testset "A redeclare in an array of components binding the element in its declaration (Buildings DX WaterSource coils)" begin
+    #= stg[2](per = sta) under stg(redeclare final ... per): the binding was not split over
+       stg, "expected array dimensions , got [2]". omc: s.stg[1].y 1, s.stg[2].y 2 =#
+    for scalarize in (true, false)
+      local sol = brSimulate("RedeclareInArrayOfComponents"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "s.stg[1].y", 1.0) ≈ 1 rtol = 1e-9
+      @test brValue(sol, "s.stg[2].y", 1.0) ≈ 2 rtol = 1e-9
+    end
+  end
+
+  @testset "A record array's field sized through records' bindings, typed in parallel (Buildings DX WaterSource coils)" begin
+    #= f[:] of sta[1] read through two records' bindings had sta's size (the field's type lifted
+       on the wrong side: Real[6, 1]). With threads the frontend types siblings in parallel: a
+       record field read before another task typed it had its element type (Real for Real[6],
+       Stage for Stage[1]), an unknown dimension or a binding type mismatch in some runs.
+       omc: a.p1.y 27, d.p4.y 27 =#
+    @test all(1:10) do _
+      OM.flatten("BuildingsRepro.RecordFieldsTypedInParallel", BR_FILE) !== nothing
+    end
+    for scalarize in (true, false)
+      local sol = brSimulate("RecordFieldsTypedInParallel"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "a.p1.y", 1.0) ≈ 27 rtol = 1e-9
+      @test brValue(sol, "d.p4.y", 1.0) ≈ 27 rtol = 1e-9
+    end
+  end
 end
 
