@@ -1462,4 +1462,24 @@ package BuildingsRepro
     Real y = turned16(time);
   end NestedRecordCalls;
 
+  impure function fileLength "A length the translation does not evaluate (Buildings' getTimeSpanTMY3 reads the weather file)"
+    input Real x;
+    output Real y;
+  algorithm
+    y := x;
+  end fileLength;
+
+  model ParameterInZeroCrossing
+    "Parameters the build does not fold in a state event's condition and body (Buildings' weather data readers: canRepeatWeatherFile and modTimAux > tNext): read as symbols"
+    parameter Real lenWea = fileLength(0.25);
+    final parameter Boolean canRepeat = lenWea > 0;
+    Real tim(start = 0, fixed = true);
+    discrete Real tNext(start = 0.25, fixed = true);
+  equation
+    der(tim) = 1;
+    when canRepeat and tim > pre(tNext) then
+      tNext = pre(tNext) + lenWea;
+    end when;
+  end ParameterInZeroCrossing;
+
 end BuildingsRepro;

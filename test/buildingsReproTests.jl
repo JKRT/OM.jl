@@ -234,6 +234,18 @@ end
     @test (@allocated Base.invokelatest(f, 1.0)) < 1_000_000
   end
 
+  @testset "A Boolean parameter and a relation in a state event's condition (Buildings' weather data readers)" begin
+    #= `canRepeat and tim > pre(tNext)`: tNext 0.25, 0.5 at 0.25, 0.75 at 0.5, 1.0 at 0.75; the
+       zero-crossing function was `canRepeat - (tim > tNext)`, 1 then 0, no event =#
+    for scalarize in (false, true)
+      local sol = brSimulate("ParameterInZeroCrossing"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "tNext", 0.1) == 0.25
+      @test brValue(sol, "tNext", 0.6) == 0.75
+      @test brValue(sol, "tNext", 0.9) == 1.0
+    end
+  end
+
   @testset "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable)" begin
     #= idx: 1, 2 at 0.3, 3 at 0.6, 1 at 0.9; y = val[idx, :] =#
     for scalarize in (false, true)
