@@ -657,5 +657,28 @@ end
     @test a == b
     @test !any(s -> occursin("Ptr{", s), a)
   end
+
+  @testset "A when on a Boolean's edge or a sample, the body reading the trigger (5 Buildings occupant lighting models)" begin
+    #= edge(occ) or sample(t0, period): refused by the ModelingToolkit path. Ticks at 0, 0.25,
+       ..., 1; occ rises at 0.2, 0.4 and, with the tick, at 1 (pulseStart = 0.8): there the body
+       runs once, as a tick. omc: nTick 5, nEdge 2, nOccAtTick 3 (2 at 0.99). =#
+    for scalarize in (true, false)
+      local sol = brSimulate("EdgeOrSample"; stopTime = 1.2, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "nTick", 0.45) == 2
+      @test brValue(sol, "nEdge", 0.45) == 2
+      @test brValue(sol, "nOccAtTick", 0.99) == 2
+      @test brValue(sol, "nTick", 1.2) == 5
+      #= the array path: the relation that reaches its crossing at the tick (zc = 0 there)
+         stays false by the hysteresis, its edge an instant after the tick =#
+      if scalarize
+        @test brValue(sol, "nEdge", 1.2) == 2
+        @test brValue(sol, "nOccAtTick", 1.2) == 3
+      else
+        @test_broken brValue(sol, "nEdge", 1.2) == 2
+        @test_broken brValue(sol, "nOccAtTick", 1.2) == 3
+      end
+    end
+  end
 end
 

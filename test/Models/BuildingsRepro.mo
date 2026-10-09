@@ -1559,4 +1559,28 @@ package BuildingsRepro
     ResistanceElement ele[n](dp2_nominal = {if i == n then 2 else 0 for i in 1:n});
   end ElementConditionsOfArrayModifier;
 
+  model EdgeOrSample
+    "A when on a Boolean's edge or a sample, the body reading the sample's trigger (Buildings' occupant lighting: when {occ, sampleTrigger} then ... if sampleTrigger then ...): occ rises between the ticks and with one"
+    parameter Real period = 0.25;
+    parameter Real t0(fixed = false);
+    discrete Real pulseStart(start = 0, fixed = true);
+    Boolean occ = time >= 0.4 and time < 0.6 or time >= pulseStart + 0.2 and time < pulseStart + 0.3;
+    Boolean sampleTrigger;
+    Integer nTick(start = 0, fixed = true);
+    Integer nEdge(start = 0, fixed = true);
+    Integer nOccAtTick(start = 0, fixed = true);
+  initial equation
+    t0 = time;
+  equation
+    when sample(0.3, 0.5) then
+      pulseStart = time;
+    end when;
+    sampleTrigger = sample(t0, period);
+    when {occ, sampleTrigger} then
+      nTick = if sampleTrigger then pre(nTick) + 1 else pre(nTick);
+      nEdge = if sampleTrigger then pre(nEdge) else pre(nEdge) + 1;
+      nOccAtTick = if sampleTrigger and occ then pre(nOccAtTick) + 1 else pre(nOccAtTick);
+    end when;
+  end EdgeOrSample;
+
 end BuildingsRepro;
