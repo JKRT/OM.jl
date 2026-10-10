@@ -71,6 +71,10 @@ registry add https://github.com/OpenModelica/OpenModelicaRegistry.git
 ```
 This will add this additional registry.
 
+On Julia 1.13.0 and 1.13.1 the package manager cannot update a registry it added
+by URL, so new versions are not seen. Remove and add it again to update it:
+`registry rm OpenModelica`, then the `registry add` above.
+
 ## TL;DR
 ```julia
 julia> include("install.jl")

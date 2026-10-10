@@ -40,6 +40,18 @@ JULIA_PKG_PRECOMPILE_AUTO=0 julia --project -e '
   Pkg.precompile()'
 ```
 
+!!! note "Julia 1.13.0 and 1.13.1: the OpenModelica registry does not update"
+    Their package manager cannot update a registry it added by URL (a shallow
+    clone), so new versions of the OM.jl packages stay invisible. Re-add the
+    registry to get them (fixed in JuliaLang/Pkg.jl#4823, in later 1.13 releases):
+
+    ```julia
+    import Pkg
+    Pkg.Registry.rm("OpenModelica")
+    Pkg.Registry.add(url = "https://github.com/OpenModelica/OpenModelicaRegistry.git")
+    Pkg.update()
+    ```
+
 ## First run
 
 ```julia
