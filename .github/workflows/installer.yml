@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '17 4 * * 1'
   workflow_dispatch:
+  pull_request:
+    paths:
+      - install.sh
+      - install.jl
+      - .github/workflows/installer.yml
 
 permissions:
   contents: read
@@ -12,7 +17,7 @@ jobs:
   curl-installer:
     name: Curl installer
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90  # a clean depot precompiles ModelingToolkit and its dependencies
 
     steps:
       - uses: actions/checkout@v4
@@ -23,10 +28,14 @@ jobs:
 
       - name: Run curl installer
         shell: bash
+        # Install the commit under test (a PR's head), not the default branch.
+        env:
+          OM_JL_REPO: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          OM_JL_REF: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
-          install_url="https://raw.githubusercontent.com/${GITHUB_REPOSITORY}/${GITHUB_SHA}/install.sh"
-          curl -fsSL "${install_url}" | sh
+          export OM_JL_URL="https://github.com/${OM_JL_REPO}.git"
+          curl -fsSL "https://raw.githubusercontent.com/${OM_JL_REPO}/${OM_JL_REF}/install.sh" | sh
 
       - name: Verify OM is importable
         shell: bash
