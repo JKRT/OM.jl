@@ -1,5 +1,7 @@
-# OpenModelicaJL (OM.jl) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
+# OpenModelicaJL (OM.jl) [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://jkrt.github.io/OM.jl/dev/) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
 A Modelica Environment in Julia.
+
+Documentation: <https://jkrt.github.io/OM.jl/dev/> (installation, examples, large array models, scripting, API).
 
 Please leave a star or make an issue to support the repository!
 * Note that this package is still under development

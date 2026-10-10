@@ -7,8 +7,8 @@
 =#
 const EVENT_FILE = "./Models/EventSemantics.mo"
 
-_eventSim(model; stopTime = 3.0) =
-  OM.simulate("EventSemantics." * model, EVENT_FILE; stopTime = stopTime, reltol = 1e-8, abstol = 1e-10)
+_eventSim(model; stopTime = 3.0, kwargs...) =
+  OM.simulate("EventSemantics." * model, EVENT_FILE; stopTime = stopTime, reltol = 1e-8, abstol = 1e-10, kwargs...)
 _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c === nothing ? 0 : length(c.continuous_callbacks))
 
 @testset "Event semantics" begin
@@ -436,9 +436,12 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test [s(t; idxs = :k) for t in (0.05, 0.2, 0.5, 0.9)] == [10, 11, 12, 14]
   end
   @testset "a self-scheduling time when with another trigger" begin
-    #= The time-relation lowering took the whole when and dropped `x > 0.6`;
-       the general path cannot evaluate it either: refused. =#
-    @test_throws OMBackend.UnsupportedLowering _eventSim("SelfSchedOr"; stopTime = 1.0)
+    #= The MTK path's time-relation lowering took the whole when and dropped `x > 0.6`;
+       its general path cannot evaluate it either: refused there. The array path gives
+       OpenModelica's n = 1, 2, 3 at 0.25, 0.5, 0.6 (the or stays true after). =#
+    @test_throws OMBackend.UnsupportedLowering _eventSim("SelfSchedOr"; stopTime = 1.0, scalarize = true)
+    local selfSched = _eventSim("SelfSchedOr"; stopTime = 1.0)
+    @test [selfSched(t; idxs = :n) for t in (0.2, 0.3, 0.55, 0.65, 1.0)] == [0, 1, 2, 3, 3]
   end
   @testset "an elsewhen of a when on change()" begin
     local s = _eventSim("ChangeElsewhen"; stopTime = 1.0)
@@ -476,8 +479,11 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     local negativeStart = _eventSim("SampleNegativeStart"; stopTime = 1.0)
     @test [negativeStart(t; idxs = :n) for t in (0.2, 0.9)] ≈ [1, 4]
     @test negativeStart(0.2; idxs = :tf) ≈ 0.1 atol = 1e-9
-    #= sample() read false under or, terminal() undefined: refused. =#
-    @test_throws OMBackend.UnsupportedLowering _eventSim("SampleOr"; stopTime = 1.0)
+    #= sample() read false under or, terminal() undefined: refused by the MTK path. The array
+       path: OpenModelica's n = 1, 2, 3, 4 at 0, 0.25, 0.5, 0.6. =#
+    @test_throws OMBackend.UnsupportedLowering _eventSim("SampleOr"; stopTime = 1.0, scalarize = true)
+    local sampleOr = _eventSim("SampleOr"; stopTime = 1.0)
+    @test [sampleOr(t; idxs = :n) for t in (0.1, 0.3, 0.55, 0.65, 1.0)] == [1, 2, 3, 4, 4]
     @test_throws OMBackend.UnsupportedLowering _eventSim("TerminalOr"; stopTime = 1.0)
   end
   @testset "vectors of triggers, initial() bodies, sample starts (B3 review)" begin
@@ -503,10 +509,12 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     #= sample(-0.9, 0.3): the first tick rounded to -1.1e-16, a negative phase
        (an ArgumentError). MLS: 0, 0.3, 0.6, 0.9 (OpenModelica fires none). =#
     @test _eventSim("SampleNegativeRounding"; stopTime = 1.0)(0.95; idxs = :n) ≈ 4
-    #= Ticks count from the start time (sample(0, 0.25) from 0.1 ticked at 0.1,
-       0.35): refused. =#
+    #= The MTK path counted the ticks from the start time (sample(0, 0.25) from 0.1 ticked
+       at 0.1, 0.35): refused there. The array path: OpenModelica's 0.25, 0.5, 0.75, 1. =#
     @test_throws OMBackend.UnsupportedLowering OM.simulate("EventSemantics.StartTimeSample", EVENT_FILE;
-                                                           startTime = 0.1, stopTime = 1.0)
+                                                           startTime = 0.1, stopTime = 1.0, scalarize = true)
+    local fromStart = OM.simulate("EventSemantics.StartTimeSample", EVENT_FILE; startTime = 0.1, stopTime = 1.0)
+    @test [fromStart(t; idxs = :n) for t in (0.3, 0.55, 0.8)] == [1, 2, 3] && last(fromStart[:n]) == 4
     #= The tick at the stop time (PeriodicCallback skips the final time). =#
     @test last(_eventSim("SampleAtStopTime"; stopTime = 1.0)[:n]) == 5
     #= pre() in a periodic body read the value an earlier statement set (k = 20). =#

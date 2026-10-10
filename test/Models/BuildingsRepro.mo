@@ -1,0 +1,2180 @@
+package BuildingsRepro
+  "Minimal reproducers of Buildings 13.0.0 failures: one model per characteristic (test/buildingsReproTests.jl)"
+
+  function checkPositive "A function called for its effects: an assert (MSL Fluid's checkBoundary)"
+    input Real x;
+  algorithm
+    assert(x > 0, "x must be positive");
+  end checkPositive;
+
+  model InitialCallForEffects
+    "A call for its effects in an initial equation (Buildings' fluid sources: checkBoundary)"
+    parameter Real p = 2;
+    Real x(start = 1, fixed = true);
+  initial equation
+    checkPositive(p);
+  equation
+    der(x) = -p*x;
+  end InitialCallForEffects;
+
+  model InitialAssert "An assert in an initial equation"
+    parameter Real p = 2;
+    Real x(start = 1, fixed = true);
+  initial equation
+    assert(p > 0, "p must be positive");
+  equation
+    der(x) = -p*x;
+  end InitialAssert;
+
+  model SampleStartFromInitialAlgorithm
+    "sample() starts that are fixed = false parameters of an initial algorithm (CDL Logical.Sources.Pulse)"
+    parameter Real period = 0.4;
+    parameter Real width = 0.5;
+    parameter Real shift = 0.1;
+    Boolean y(start = false, fixed = true);
+  protected
+    parameter Real t0(fixed = false);
+    parameter Real t1(fixed = false);
+  initial algorithm
+    t0 := integer(time/period)*period + mod(shift, period);
+    t1 := t0 + width*period;
+  equation
+    when sample(t0, period) then
+      y = true;
+    elsewhen sample(t1, period) then
+      y = false;
+    end when;
+  end SampleStartFromInitialAlgorithm;
+
+  function nextRandom "A tuple of a Real and an Integer array (MSL Math.Random generators)"
+    input Integer stateIn[2];
+    output Real r;
+    output Integer stateOut[2];
+  algorithm
+    stateOut[1] := mod(stateIn[1]*75 + 74, 65537);
+    stateOut[2] := stateIn[1];
+    r := stateOut[1]/65537;
+  end nextRandom;
+
+  model TupleWithArrayOutputInWhen
+    "(r, state) = f(pre(state)) in a when-equation (Buildings.Occupants: random numbers)"
+    Real r(start = 0, fixed = true);
+    Integer state[2](start = {1, 0}, each fixed = true);
+  equation
+    when sample(0.05, 0.1) then
+      (r, state) = nextRandom(pre(state));
+    end when;
+  end TupleWithArrayOutputInWhen;
+
+  block AssertBlock "CDL Utilities.Assert: a String parameter as the message"
+    parameter String message;
+    input Boolean u;
+  equation
+    assert(u, message);
+  end AssertBlock;
+
+  model StringParameterInAssert "A String parameter as an assert message (CDL Utilities.Assert in the PID blocks)"
+    Real x(start = 1, fixed = true);
+    AssertBlock assMes(message = "x must stay above 0.1", u = x > 0.1);
+  equation
+    der(x) = -x;
+  end StringParameterInAssert;
+
+  model SampleTriggerUnitDelay
+    "CDL Discrete.UnitDelay: sampleTrigger = sample(t0, samplePeriod) outside the when, t0 from an initial equation"
+    parameter Real samplePeriod = 0.2;
+    parameter Real y_start = 0;
+    Real u = time;
+    Real y;
+  protected
+    parameter Real t0(fixed = false);
+    Boolean sampleTrigger;
+    discrete Real u_internal;
+  initial equation
+    t0 = integer(time/samplePeriod)*samplePeriod;
+    y = y_start;
+    u_internal = y_start;
+  equation
+    sampleTrigger = sample(t0, samplePeriod);
+    when sampleTrigger then
+      u_internal = u;
+      y = pre(u_internal);
+    end when;
+  end SampleTriggerUnitDelay;
+
+  function spanC "An external C function from the Include annotation, its output an array argument (Buildings' getTimeSpan)"
+    input Real a;
+    input Real b;
+    output Real span[2];
+  external "C" spanC(a, b, span)
+    annotation(Include = "void spanC(double a, double b, double* span) { span[0] = a; span[1] = b - a; }");
+  end spanC;
+
+  model ExternalCInclude "A model calling an external C function of its Include annotation"
+    parameter Real span[2] = spanC(1, 3);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = span[2];
+  end ExternalCInclude;
+
+  function twoOutputs "A Real and a Real array"
+    input Real u;
+    output Real r;
+    output Real v[2];
+  algorithm
+    r := 2*u;
+    v := {u, u^2};
+  end twoOutputs;
+
+  model TupleWithArrayOutput "(r, v) = f(u) with an array output (Borefields' multipole resistances)"
+    Real r;
+    Real v[2];
+  equation
+    (r, v) = twoOutputs(time);
+  end TupleWithArrayOutput;
+
+  model SampleTriggerInVectorWhen
+    "when {b, sampleTrigger}, sampleTrigger = sample(t0, period), t0 from an initial equation (Buildings.Occupants)"
+    parameter Real period = 0.2;
+    Boolean b = time > 0.5;
+    Integer n(start = 0, fixed = true);
+  protected
+    parameter Real t0(fixed = false);
+    Boolean sampleTrigger;
+  initial equation
+    t0 = time + 0.05;
+  equation
+    sampleTrigger = sample(t0, period);
+    when {b, sampleTrigger} then
+      n = pre(n) + 1;
+    end when;
+  end SampleTriggerInVectorWhen;
+
+  partial function Integrand "A function of one variable"
+    input Real x;
+    output Real y;
+  end Integrand;
+
+  function scaledSquare "An integrand with a bound argument"
+    extends Integrand;
+    input Real k;
+  algorithm
+    y := k*x^2;
+  end scaledSquare;
+
+  function simpson "Simpson's rule of a function argument"
+    input Integrand f;
+    input Real a;
+    input Real b;
+    output Real s;
+  algorithm
+    s := (b - a)/6*(f(a) + 4*f((a + b)/2) + f(b));
+  end simpson;
+
+  model FunctionAsArgument
+    "A function with a bound argument as an argument (Borefields: quadratureLobatto of an integrand)"
+    parameter Real k = 3;
+    parameter Real s = simpson(function scaledSquare(k = k), 0, 1);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = s;
+  end FunctionAsArgument;
+
+  function cube "With a derivative annotation; an algorithm, not one expression (Buildings' equalPercentage)"
+    input Real x;
+    output Real y;
+  algorithm
+    if x < 0 then
+      y := -(-x)^3;
+    else
+      y := x^3;
+    end if;
+    annotation(derivative = cube_der);
+  end cube;
+
+  function cube_der
+    input Real x;
+    input Real dx;
+    output Real dy;
+  algorithm
+    dy := 3*x^2*dx;
+  end cube_der;
+
+  model DerivativeAnnotation
+    "der() of a function call: its derivative annotation (Buildings' DerivativeCheck examples)"
+    Real x;
+    Real y;
+  initial equation
+    y = x;
+  equation
+    x = cube(time);
+    der(y) = der(x);
+  end DerivativeAnnotation;
+
+  record FlowParameters "Buildings.Fluid.Movers.BaseClasses.Characteristics.flowParameters"
+    parameter Real V_flow[:];
+    parameter Real dp[size(V_flow, 1)];
+  end FlowParameters;
+
+  record MoverData "Buildings.Fluid.Movers.Data.Generic"
+    parameter FlowParameters pressure(V_flow = {0, 0}, dp = {0, 0});
+    final parameter Boolean havePressureCurve = sum(pressure.V_flow) > 1e-15 and sum(pressure.dp) > 1e-15;
+  end MoverData;
+
+  model MoverEfficiency "Buildings.Fluid.Movers.BaseClasses.FlowMachineInterface"
+    parameter MoverData per;
+    parameter Integer nOri;
+    final parameter Real V_flow_max = max(per.pressure.V_flow);
+  end MoverEfficiency;
+
+  model RecordConstructorWithArrayConstructors
+    "A record constructor with array constructor arguments in an if-expression, as a record modifier (Buildings.Fluid.Movers)"
+    parameter Integer nOri = 2;
+    parameter Real m_flow_nominal = 2;
+    parameter Real dp_nominal = 100;
+    parameter MoverData per;
+    MoverEfficiency eff(nOri = nOri, per(final pressure = if per.havePressureCurve then per.pressure else
+      FlowParameters(V_flow = {i/(nOri - 1)*2.0*m_flow_nominal for i in 0:(nOri - 1)},
+                     dp = {i/(nOri - 1)*2.0*dp_nominal for i in (nOri - 1):-1:0})));
+    Real x(start = 0, fixed = true);
+  equation
+    /* the frontend evaluates the condition (Movers: computePowerUsingSimilarityLaws = per.havePressureCurve) */
+    if eff.per.havePressureCurve then
+      der(x) = eff.V_flow_max;
+    else
+      der(x) = -eff.V_flow_max;
+    end if;
+  end RecordConstructorWithArrayConstructors;
+
+  function slopes "A local array sized by a local Integer (Buildings.Utilities.Math.Functions.splineDerivatives)"
+    input Real x[:];
+    input Real y[size(x, 1)];
+    output Real d[size(x, 1)];
+  protected
+    Integer n = size(x, 1);
+    Real delta[n - 1];
+  algorithm
+    for i in 1:n - 1 loop
+      delta[i] := (y[i + 1] - y[i])/(x[i + 1] - x[i]);
+    end for;
+    d[1] := delta[1];
+    d[n] := delta[n - 1];
+    for i in 2:n - 1 loop
+      d[i] := (delta[i - 1] + delta[i])/2;
+    end for;
+  end slopes;
+
+  model FunctionLocalArrayInDimension
+    "A function the frontend evaluates for a dimension, its local array sized by a local Integer"
+    parameter Real xs[3] = {0, 1, 2};
+    parameter Real ys[3] = {0, 1, 4};
+    final parameter Real d[3] = slopes(xs, ys);
+    final parameter Integer n = integer(d[3]);
+    Real z[n](each start = 1, each fixed = true);
+  equation
+    der(z) = -z;
+  end FunctionLocalArrayInDimension;
+
+  function sortTwo "Two outputs, like Modelica.Math.Vectors.sort: the sorted vector and its indices"
+    input Real v[:];
+    output Real sorted[size(v, 1)];
+    output Integer indices[size(v, 1)];
+  protected
+    Real tmp;
+    Integer itmp;
+  algorithm
+    sorted := v;
+    indices := {i for i in 1:size(v, 1)};
+    for i in 1:size(v, 1) loop
+      for j in 1:size(v, 1) - i loop
+        if sorted[j] > sorted[j + 1] then
+          tmp := sorted[j];
+          sorted[j] := sorted[j + 1];
+          sorted[j + 1] := tmp;
+          itmp := indices[j];
+          indices[j] := indices[j + 1];
+          indices[j + 1] := itmp;
+        end if;
+      end for;
+    end for;
+  end sortTwo;
+
+  model SortedData
+    parameter Real PLRSup[:];
+    final parameter Real PLRSor[:] = sortTwo(PLRSup);
+    final parameter Real PLR_max = PLRSor[size(PLRSup, 1)];
+  end SortedData;
+
+  model FirstOutputOfPropagatedBinding
+    "The first output of a two-output call as a binding, its argument a propagated binding (heat pumps' TableData2DLoadDep: sort(PLRSup))"
+    parameter Real PLR[3] = {0.5, 1, 0.25};
+    SortedData dat(final PLRSup = PLR);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = dat.PLR_max;
+  end FirstOutputOfPropagatedBinding;
+
+  function fillThenAssign "A local bound with fill(), then its elements assigned (Buildings.Fluid.Movers.BaseClasses.Euler)"
+    input Integer n;
+    output Real s;
+  protected
+    Real a[n] = fill(0.0, n);
+  algorithm
+    for i in 1:n loop
+      a[i] := i*1e-7;
+    end for;
+    s := sum(a)*1e7;
+  end fillThenAssign;
+
+  model LocalFillThenElementAssignment
+    "A function the frontend evaluates for a dimension: a local bound with fill(), its elements assigned"
+    final parameter Integer n = integer(fillThenAssign(3));
+    Real z[n](each start = 1, each fixed = true);
+  equation
+    der(z) = -z;
+  end LocalFillThenElementAssignment;
+
+  function allTrue "Modelica.Math.BooleanVectors.allTrue: an output with a binding, min of Booleans"
+    input Boolean b[:];
+    output Boolean result = size(b, 1) > 0 and min(b);
+  algorithm
+  end allTrue;
+
+  model MinOfBooleans "min() of a Boolean array, as an if-equation's condition (Movers: haveMinimumDecrease)"
+    parameter Real dp[3] = {200, 150, 0};
+    parameter Real V_flow[3] = {0, 1, 2};
+    final parameter Boolean haveMinimumDecrease = allTrue({(dp[i + 1] - dp[i])/(V_flow[i + 1] - V_flow[i]) < 0 for i in 1:2});
+    Real x(start = 0, fixed = true);
+  equation
+    if haveMinimumDecrease then
+      der(x) = 1;
+    else
+      der(x) = -1;
+    end if;
+  end MinOfBooleans;
+
+  record Curve "Buildings.Fluid.Movers.BaseClasses.Characteristics.flowParametersInternal: arrays sized by a field"
+    parameter Integer n annotation(Evaluate = true);
+    parameter Real V_flow[n];
+  end Curve;
+
+  record PowerCurve "Buildings.Fluid.Movers.BaseClasses.Euler.powerWithDerivative"
+    parameter Real V_flow[:];
+    parameter Real P[:];
+  end PowerCurve;
+
+  function lastScaled "end in a subscript of a record input's array (Buildings.Fluid.Movers.BaseClasses.Euler.power)"
+    input Curve pressure;
+    output PowerCurve power(V_flow = zeros(3), P = zeros(3));
+  algorithm
+    power.V_flow := {pressure.V_flow[end]*i for i in 1:3};
+    power.P := 2*power.V_flow;
+  end lastScaled;
+
+  model EndOfRecordFieldArray "A function the frontend evaluates: end of a record input's array sized by the record's field"
+    parameter Integer nOri = 2;
+    parameter Integer curve = if nOri == 2 then 1 else 2;
+    final parameter Curve cur1(final n = nOri, final V_flow = if nOri == 2 then {1, 2} else zeros(nOri));
+    final parameter Curve cur2(final n = nOri + 1, final V_flow = if nOri == 2 then zeros(nOri + 1) else {1, 2, 3});
+    final parameter PowerCurve powEu_internal = if curve == 1 then lastScaled(pressure = cur1) else lastScaled(pressure = cur2);
+    final parameter PowerCurve powEu(V_flow = powEu_internal.V_flow, P = powEu_internal.P);
+    final parameter Real ys[:] = powEu.V_flow;
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = ys[3];
+  end EndOfRecordFieldArray;
+
+  connector RealInput = input Real;
+  connector RealOutput = output Real;
+
+  block Constant
+    parameter Real k;
+    RealOutput y;
+  equation
+    y = k;
+  end Constant;
+
+  model Leg "if grounded then connect(...) else connect(...) (Buildings.Electrical: ground_1, potentialReference)"
+    parameter Boolean grounded = false;
+    Constant zero(k = 0);
+    Constant minusOne(k = -1);
+    Real y;
+  protected
+    RealInput u;
+  equation
+    if grounded then
+      connect(zero.y, u);
+    else
+      connect(minusOne.y, u);
+    end if;
+    y = u + time;
+  end Leg;
+
+  model IfConnectInComponentArray
+    "An array of components whose if-equations with connects take per-element branches (Electrical.AC.ThreePhasesUnbalanced)"
+    Leg leg[3](grounded = {true, false, false});
+  end IfConnectInComponentArray;
+
+  class TimeTable41 "Modelica.Blocks.Types.ExternalCombiTimeTable of MSL 4.1: its constructor calls init3"
+    extends ExternalObject;
+    function constructor
+      input String tableName;
+      input String fileName;
+      input Real table[:, :];
+      input Real startTime;
+      input Integer columns[:];
+      input Integer smoothness;
+      input Integer extrapolation;
+      input Real shiftTime;
+      input Integer timeEvents;
+      input Boolean verboseRead;
+      input String delimiter;
+      input Integer nHeaderLines;
+      output TimeTable41 externalCombiTimeTable;
+    external "C" externalCombiTimeTable = ModelicaStandardTables_CombiTimeTable_init3(fileName, tableName,
+      table, size(table, 1), size(table, 2), startTime, columns, size(columns, 1), smoothness, extrapolation,
+      shiftTime, timeEvents, verboseRead, delimiter, nHeaderLines)
+      annotation(Library = {"ModelicaStandardTables", "ModelicaIO", "ModelicaMatIO", "zlib"});
+    end constructor;
+
+    function destructor
+      input TimeTable41 externalCombiTimeTable;
+    external "C" ModelicaStandardTables_CombiTimeTable_close(externalCombiTimeTable)
+      annotation(Library = {"ModelicaStandardTables", "ModelicaIO", "ModelicaMatIO", "zlib"});
+    end destructor;
+  end TimeTable41;
+
+  function getTimeTableValue "Modelica.Blocks.Tables.Internal.getTimeTableValueNoDer"
+    input TimeTable41 tableID;
+    input Integer icol;
+    input Real timeIn;
+    input Real nextTimeEvent;
+    input Real pre_nextTimeEvent;
+    output Real y;
+  external "C" y = ModelicaStandardTables_CombiTimeTable_getValue(tableID, icol, timeIn, nextTimeEvent, pre_nextTimeEvent)
+    annotation(Library = {"ModelicaStandardTables", "ModelicaIO", "ModelicaMatIO", "zlib"});
+  end getTimeTableValue;
+
+  model TableInit3 "A time table of MSL 4.1's interface (init3: Buildings' tables, schedules, weather data)"
+    parameter Real table[2, 2] = [0, 0; 1, 2];
+    parameter TimeTable41 tab = TimeTable41("NoName", "NoName", table, 0.0, {2}, 1, 2, 0.0, 3, false, ",", 0);
+    Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+  end TableInit3;
+
+  model ExternalObjectVariable "An external object declared without parameter (Buildings: Spawn adapters, schedules, plotters)"
+    parameter Real table[2, 2] = [0, 0; 1, 2];
+    TimeTable41 tab = TimeTable41("NoName", "NoName", table, 0.0, {2}, 1, 2, 0.0, 3, false, ",", 0);
+    Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+  end ExternalObjectVariable;
+
+  model ExternalObjectInSampledWhen
+    "An external object read in a sampled when (Buildings' borehole SingleUTubeBoundaryCondition: an ExtendableArray)"
+    parameter Real table[2, 2] = [0, 0; 1, 2];
+    TimeTable41 tab = TimeTable41("NoName", "NoName", table, 0.0, {2}, 1, 2, 0.0, 3, false, ",", 0);
+    discrete Real y(start = 0, fixed = true);
+  equation
+    when sample(0, 0.25) then
+      y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+    end when;
+  end ExternalObjectInSampledWhen;
+
+  function companionRoots "A matrix of identity() and zeros() sized by a local (Modelica.Math.Polynomials.roots)"
+    input Real p[:];
+    output Real s;
+  protected
+    Integer n = size(p, 1) - 1;
+    Real A[max(size(p, 1) - 1, 0), max(size(p, 1) - 1, 0)];
+  algorithm
+    A[1, :] := -p[2:n + 1]/p[1];
+    A[2:n, :] := [identity(n - 1), zeros(n - 1)];
+    s := sum(A);
+  end companionRoots;
+
+  model IdentityOfLocalSize "A function with [identity(n - 1), zeros(n - 1)], n a local (Polynomials.roots in Buildings' controls)"
+    parameter Real p[3] = {1, -3, 2};
+    Real s = companionRoots(p);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = s;
+  end IdentityOfLocalSize;
+
+  model Layer "Buildings.HeatTransfer.Conduction.SingleLayer: its number of states from its parameters"
+    parameter Boolean stateAtSurface_a = true;
+    parameter Boolean stateAtSurface_b = true;
+    final parameter Integer nSta = if stateAtSurface_a or stateAtSurface_b then 2 else 1;
+    Real T[nSta](each start = 1, each fixed = true);
+  equation
+    der(T) = -T;
+  end Layer;
+
+  model RaggedComponentArray "An array of components whose dimensions differ per element (MultiLayer's lay[nLay]: rooms, walls)"
+    parameter Integer nLay = 3;
+    Layer lay[nLay](stateAtSurface_a = {true, false, false}, stateAtSurface_b = {false, false, true});
+  end RaggedComponentArray;
+
+  record ClimaticConstants "Buildings.BoundaryConditions.GroundTemperature.ClimaticConstants.Generic: parameter fields"
+    parameter Real TSurMea;
+    parameter Real TSurAmp;
+  end ClimaticConstants;
+
+  function correctedConstants "A record constructed from a function's locals (GroundTemperature.BaseClasses.surfaceTemperature)"
+    input Real T;
+    output ClimaticConstants c;
+  protected
+    Real m;
+  algorithm
+    m := T + 1;
+    c := ClimaticConstants(TSurMea = m, TSurAmp = 2*m);
+  end correctedConstants;
+
+  model RecordConstructorOfLocals "A record's constructor called with a function's locals (Buildings' ground temperature)"
+    parameter ClimaticConstants c = correctedConstants(10);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = c.TSurAmp;
+  end RecordConstructorOfLocals;
+
+  block MatrixMaxBlock "CDL Reals.MatrixMax: an if-equation on a parameter, its branches of different sizes"
+    parameter Boolean rowMax = true;
+    parameter Integer nRow;
+    parameter Integer nCol;
+    input Real u[nRow, nCol];
+    output Real y[if rowMax then size(u, 1) else size(u, 2)];
+  equation
+    if rowMax then
+      y = {max(u[i, :]) for i in 1:size(u, 1)};
+    else
+      y = {max(u[:, i]) for i in 1:size(u, 2)};
+    end if;
+  end MatrixMaxBlock;
+
+  model IfEquationBranchSizes "An if-equation whose branch not taken has other sizes (CDL MatrixMax, MatrixMin)"
+    MatrixMaxBlock matMax1(nRow = 2, nCol = 3, u = [1, 2, 3; 4, 5, 6]*time);
+    MatrixMaxBlock matMax2(rowMax = false, nRow = 2, nCol = 3, u = [1, 2, 3; 4, 5, 6]*time);
+  end IfEquationBranchSizes;
+
+  record ChillerDataBase "Buildings.Fluid.Chillers.Data.BaseClasses.Chiller: a constant gives a size"
+    constant Integer nCapFunT;
+    parameter Real capFunT[nCapFunT];
+  end ChillerDataBase;
+
+  record ChillerData "Buildings.Fluid.Chillers.Data.ElectricEIR.Generic: the size's value"
+    extends ChillerDataBase(final nCapFunT = 2);
+  end ChillerData;
+
+  model Chiller
+    parameter ChillerData per;
+    Real y = sum(per.capFunT)*time;
+  end Chiller;
+
+  model ChillerParallel "Buildings.Applications.BaseClasses.Equipment.ElectricChillerParallel"
+    parameter Integer num = 2;
+    parameter ChillerData per[num];
+    Chiller chi[num](per = per);
+  end ChillerParallel;
+
+  model RecordArrayConstantSize "An array of records whose field's size is a constant of the record type (DataCenters' chillers)"
+    parameter ChillerData perChi[2] = {ChillerData(capFunT = {1, 2}), ChillerData(capFunT = {3, 4})};
+    ChillerParallel chiPar(final num = 2, final per = perChi);
+  end RecordArrayConstantSize;
+
+  expandable connector Bus "An empty expandable connector (Buildings' VAVReheat ControlBus)"
+  end Bus;
+
+  block Gain
+    RealInput u;
+    RealOutput y;
+  equation
+    y = 2*u;
+  end Gain;
+
+  model BusUser "A component with a bus of its own (VAVReheat's preCooSta.controlBus)"
+    Bus controlBus;
+    Gain g;
+  equation
+    connect(controlBus.s1, g.u);
+  end BusUser;
+
+  model ExpandableBuses "Two connected connectors of one empty expandable connector class (14 models: control buses)"
+    Bus cb;
+    Constant a(k = 1);
+    Constant b(k = 2);
+    BusUser use;
+    Gain g2;
+  equation
+    connect(a.y, cb.s1);
+    connect(b.y, cb.s2);
+    connect(cb.s2, g2.u);
+    connect(cb, use.controlBus);
+  end ExpandableBuses;
+
+  function isCsvFile "A file name's extension (MSL 4.1 CombiTimeTable: Strings.findLast for isCsvExt)"
+    input String fileName;
+    output Boolean isCsv;
+  algorithm
+    isCsv := fileName == "data.csv";
+  end isCsvFile;
+
+  model ComputedParameterOfExternalObject "An external object's constructor reading a parameter computed by a function (the weather data reader's table)"
+    parameter Real table[2, 2] = [0, 0; 1, 2];
+    parameter String fileName = "NoName";
+    final parameter Boolean isCsvExt = isCsvFile(fileName);
+    parameter TimeTable41 tab = TimeTable41("NoName", "NoName", table, 0.0, {2}, 1, 2, 0.0, 3, false,
+      if isCsvExt then ";" else ",", if isCsvExt then 1 else 0);
+    Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+  end ComputedParameterOfExternalObject;
+
+  function smoothAbs "An if-statement on its input, no derivative annotation (Buildings' smoothExponential, Media property functions)"
+    input Real x;
+    output Real y;
+  algorithm
+    if x < 0 then
+      y := -x*x;
+    else
+      y := x*x;
+    end if;
+  end smoothAbs;
+
+  model DerivativeWithoutAnnotation
+    "der() of a call of a function without a derivative annotation (index reduction: Buildings' SmoothExponentialDerivativeCheck)"
+    Real x;
+    Real y;
+  initial equation
+    y = x;
+  equation
+    x = smoothAbs(time - 0.5);
+    der(y) = der(x);
+  end DerivativeWithoutAnnotation;
+
+  model SecondDerivativeOfAnnotatedFunction
+    "The second derivative of a call: the derivative function's own derivative (Buildings' DerivativeCheck2 examples)"
+    Real x;
+    Real y;
+    Real y_comp;
+    Real der_y;
+    Real der_y_comp;
+  initial equation
+    y = y_comp;
+    der_y = der_y_comp;
+  equation
+    x = 2*time + time^3 - 1;
+    y = cube(x);
+    der_y = der(y);
+    der_y_comp = der(y_comp);
+    der(der_y) = der(der_y_comp);
+  end SecondDerivativeOfAnnotatedFunction;
+
+  model InitialEquationAtStartTime
+    "Initial equations solved at the start time, not at 0 (Buildings' RegNonZeroPowerDerivative_2_Check from -1)"
+    Real x;
+    Real y;
+    Real y_comp;
+  initial equation
+    y_comp = y;
+  equation
+    x = 2*time + 3;
+    y = x*x;
+    der(y_comp) = der(y);
+  end InitialEquationAtStartTime;
+
+  model DerivativeOfParameterBoundVariable
+    "der() of a variable bound to a parameter: the other state has zero derivative and its initial equation (Buildings' WaterDerivativeCheck: cpCod = Medium.cp_const)"
+    parameter Real cp_const = 4184;
+    Real T;
+    Real cpCod;
+    Real cpSym;
+  initial equation
+    cpSym = cpCod;
+  equation
+    T = 273.15 + 270*time^3;
+    cpCod = cp_const;
+    der(cpCod) = der(cpSym);
+  end DerivativeOfParameterBoundVariable;
+
+  function powerLinearized "Buildings.Utilities.Math.Functions.powerLinearized"
+    input Real x;
+    input Real n;
+    input Real x0;
+    output Real y;
+  algorithm
+    if x > x0 then
+      y := x^n;
+    else
+      y := x0^n*(1 - n) + n*x0^(n - 1)*x;
+    end if;
+  end powerLinearized;
+
+  model LargeUnknownInitialization
+    "An unknown of magnitude 1e9 solved at initialization through a function (Buildings' PowerLinearized: T4 = T^4)"
+    Real T4(start = 300^4);
+    Real T;
+  equation
+    T = 1 + 500*time;
+    T = powerLinearized(T4, 0.25, 243.15^4);
+  end LargeUnknownInitialization;
+
+  model ParameterReadByWhenAssert
+    "A parameter read by an assert in a when-equation, its binding reading an evaluated parameter (13 models: Buildings' Airflow.Multizone ZonalFlow_ACS rho_default)"
+    parameter Boolean useDefaultProperties = false;
+    parameter Real p_default = 101325;
+    parameter Real rho_default = p_default*1.2/101325;
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = rho_default;
+    when useDefaultProperties and initial() then
+      assert(abs(1 - rho_default/1.2) < 0.2, "rho_default is off");
+    end when;
+  end ParameterReadByWhenAssert;
+
+  function checkMassFractions "Modelica.Fluid.Utilities.checkBoundary: asserts on the mass fractions"
+    input Real X[:];
+  algorithm
+    assert(abs(sum(X) - 1) < 1e-10, "The mass fractions do not sum up to 1");
+  end checkMassFractions;
+
+  model InitialCallOnVariable
+    "An initial equation's call for its effects on a variable bound to a parameter (Modelica.Fluid sources' checkBoundary of X_in_internal: most fluid models)"
+    parameter Real X[2] = {0.01, 0.99};
+    Real X_in_internal[2];
+    Real x(start = 0, fixed = true);
+  initial equation
+    checkMassFractions(X_in_internal);
+  equation
+    X_in_internal = X;
+    der(x) = X_in_internal[2];
+  end InitialCallOnVariable;
+
+  model InitialAssertOnVariable "An initial equation's assert on a variable, checked on the initialization's values"
+    Real x(start = 1, fixed = true);
+    Real y;
+  initial equation
+    assert(y > 0.5, "y is not above 0.5 at the initialization");
+  equation
+    y = x;
+    der(x) = -x;
+  end InitialAssertOnVariable;
+
+  model InitialAssertOnVariableViolated "InitialAssertOnVariable starting below the bound: the assert stops it"
+    extends InitialAssertOnVariable(x(start = 0.2));
+  end InitialAssertOnVariableViolated;
+
+  connector FluidPort "Modelica.Fluid.Interfaces.FluidPort: a stream variable and a stream array"
+    Real p;
+    flow Real m_flow(min = -1e60, max = 1e60);
+    stream Real h_outflow;
+    stream Real Xi_outflow[1];
+  end FluidPort;
+
+  model StreamPipe "Buildings.Fluid.Interfaces.PartialTwoPortTransport"
+    FluidPort port_a;
+    FluidPort port_b;
+    parameter Boolean allowFlowReversal = true;
+  equation
+    port_a.m_flow + port_b.m_flow = 0;
+    port_a.m_flow = port_a.p - port_b.p;
+    port_a.h_outflow = inStream(port_b.h_outflow);
+    port_b.h_outflow = inStream(port_a.h_outflow);
+    port_a.Xi_outflow = if allowFlowReversal then inStream(port_b.Xi_outflow) else {0.5};
+    port_b.Xi_outflow = inStream(port_a.Xi_outflow);
+  end StreamPipe;
+
+  model StreamBoundary
+    FluidPort port;
+    parameter Real p = 1;
+    parameter Real h = 1;
+    parameter Real Xi = 0.01;
+  equation
+    port.p = p;
+    port.h_outflow = h;
+    port.Xi_outflow = {Xi};
+  end StreamBoundary;
+
+  model StreamConnection
+    "inStream across a connection: the other connector's outflow (every fluid model: Buildings' Airflow.Multizone, MixingVolumes with sensors)"
+    StreamBoundary sou(p = 2, h = 1, Xi = 0.01);
+    StreamPipe pip;
+    StreamBoundary sin(p = 1, h = 5, Xi = 0.02);
+    Real hIn(start = 0, fixed = true) "integral of pip.port_b.h_outflow = inStream(pip.port_a.h_outflow)";
+    Real XiIn(start = 0, fixed = true);
+    Real hBack(start = 0, fixed = true);
+  equation
+    connect(sou.port, pip.port_a);
+    connect(pip.port_b, sin.port);
+    der(hIn) = pip.port_b.h_outflow;
+    der(XiIn) = pip.port_b.Xi_outflow[1];
+    der(hBack) = pip.port_a.h_outflow;
+  end StreamConnection;
+
+  partial package PartialPhaseSystem "Buildings.Electrical.PhaseSystems.PartialPhaseSystem"
+    constant Integer m = 1;
+    replaceable partial function thetaRef
+      input Real theta[m];
+      output Real thetaRef;
+    end thetaRef;
+  end PartialPhaseSystem;
+
+  package OnePhase "Buildings.Electrical.PhaseSystems.OnePhase"
+    extends PartialPhaseSystem(m = 1);
+    redeclare function extends thetaRef
+    algorithm
+      thetaRef := theta[1];
+      annotation(Inline = true);
+    end thetaRef;
+  end OnePhase;
+
+  model PhaseSource "Buildings.Electrical.AC.OnePhase.Sources.FixedVoltage"
+    replaceable package PhaseSystem = OnePhase;
+    parameter Real f = 60;
+    Real theta[PhaseSystem.m];
+  equation
+    PhaseSystem.thetaRef(theta) = 6.283185307179586*f*time;
+  end PhaseSource;
+
+  model InlinedCallInComponentArray
+    "An inlined function call with a subscripted input in an array of components (46 models: Buildings' three-phase unbalanced sources)"
+    PhaseSource vPhase[3](f = {50, 60, 70});
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = vPhase[2].theta[1];
+  end InlinedCallInComponentArray;
+
+  function sortDescending "Modelica.Math.Vectors.sort: two outputs, the second bound to a range and written"
+    input Real v[:];
+    output Real sorted[size(v, 1)] = v;
+    output Integer indices[size(v, 1)] = 1:size(v, 1);
+  protected
+    Real t;
+    Integer k;
+  algorithm
+    for i in 1:size(v, 1) loop
+      for j in 1:size(v, 1) - i loop
+        if sorted[j] < sorted[j + 1] then
+          t := sorted[j];
+          sorted[j] := sorted[j + 1];
+          sorted[j + 1] := t;
+          k := indices[j];
+          indices[j] := indices[j + 1];
+          indices[j + 1] := k;
+        end if;
+      end for;
+    end for;
+  end sortDescending;
+
+  model FirstOutputInArrayEquation
+    "The first of two array outputs in an array equation (Buildings' SignalRanker: y = Modelica.Math.Vectors.sort(u))"
+    Real u[3] = {time, 0.5, 1 - time};
+    Real y[3];
+    Real x(start = 0, fixed = true);
+  equation
+    y = sortDescending(u);
+    der(x) = y[1];
+  end FirstOutputInArrayEquation;
+
+  model InitialEffectCallInIf
+    "A call for its effects in a branch of an initial if-equation (30 models: Buildings' Movers, if not haveMinimumDecrease then Streams.print(...))"
+    parameter Real X[2] = {0.01, 0.99};
+    parameter Real limitSpan[2] = spanC(0, 1) "not evaluated by the frontend (Buildings: 0/0 in haveMinimumDecrease)";
+    parameter Real limit = limitSpan[2];
+    Real x(start = 0, fixed = true);
+  initial equation
+    if X[1] < limit then
+      checkMassFractions(X);
+    end if;
+  equation
+    der(x) = 1;
+  end InitialEffectCallInIf;
+
+  model InitialEffectCallInIfViolated "InitialEffectCallInIf with fractions not summing to 1: the call's assert stops it"
+    extends InitialEffectCallInIf(X = {0.5, 0.6});
+  end InitialEffectCallInIfViolated;
+
+  model InitialEffectCallInIfNotTaken "The violated fractions under a false condition: no call"
+    extends InitialEffectCallInIf(X = {0.5, 0.6}, limitSpan = spanC(0, 0.1));
+  end InitialEffectCallInIfNotTaken;
+
+  class OffsetObject "An external object of Include C code (Buildings' weeklyScheduleInit, initArray, fileWriterInit)"
+    extends ExternalObject;
+    function constructor
+      input Real s;
+      output OffsetObject obj;
+    external "C" obj = offsetInit(s)
+      annotation(Include = "#include <stdlib.h>\nvoid* offsetInit(double s) { double* p = (double*) malloc(sizeof(double)); *p = s; return p; }\nvoid offsetFree(void* p) { free(p); }\ndouble offsetValue(void* p, double x) { return *(double*) p + x; }");
+    end constructor;
+    function destructor
+      input OffsetObject obj;
+    external "C" offsetFree(obj)
+      annotation(Include = "#include <stdlib.h>\nvoid* offsetInit(double s) { double* p = (double*) malloc(sizeof(double)); *p = s; return p; }\nvoid offsetFree(void* p) { free(p); }\ndouble offsetValue(void* p, double x) { return *(double*) p + x; }");
+    end destructor;
+  end OffsetObject;
+
+  function offsetValue
+    input OffsetObject obj;
+    input Real x;
+    output Real y;
+  external "C" y = offsetValue(obj, x)
+    annotation(Include = "#include <stdlib.h>\nvoid* offsetInit(double s) { double* p = (double*) malloc(sizeof(double)); *p = s; return p; }\nvoid offsetFree(void* p) { free(p); }\ndouble offsetValue(void* p, double x) { return *(double*) p + x; }");
+  end offsetValue;
+
+  model ExternalObjectOfIncludeCode "An external object whose constructor and functions are Include C code"
+    parameter OffsetObject obj = OffsetObject(2.0);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = offsetValue(obj, time);
+  end ExternalObjectOfIncludeCode;
+
+  function sumTransposed "transpose of a three-dimensional array (Buildings' Borefields TemporalSuperposition)"
+    input Real a[2, 3, 2];
+    output Real s;
+  protected
+    Real t[3, 2, 2];
+  algorithm
+    t := transpose(a);
+    s := t[3, 1, 2] + 10*t[1, 2, 1];
+  end sumTransposed;
+
+  model TransposeOfThreeDimensions "transpose of a three-dimensional array swaps its first two dimensions (11 models: Borefields)"
+    parameter Real a[2, 3, 2] = {{{1, 2}, {3, 4}, {5, 6}}, {{7, 8}, {9, 10}, {11, 12}}};
+    Real s = sumTransposed(a*time);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = s;
+  end TransposeOfThreeDimensions;
+
+  model CallOfAnnotatedFunction
+    "A call of a function with a derivative annotation on the array path (Buildings' psychrometric functions, spliceFunction, regNonZeroPower)"
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = cube(time);
+  end CallOfAnnotatedFunction;
+
+  model ThreeDimensionalArrayLiteral "A three-dimensional array literal in the ModelingToolkit path (Buildings' Borefields TemporalSuperposition)"
+    parameter Real a[2, 2, 2] = {{{1, 2}, {3, 4}}, {{5, 6}, {7, 8}}};
+    Real x[2, 2, 2](each start = 0, each fixed = true);
+    Real y = x[2, 1, 2] + 10*x[1, 2, 1];
+  equation
+    der(x) = a;
+  end ThreeDimensionalArrayLiteral;
+
+  record PressureCurve
+    parameter Real dp[:];
+  end PressureCurve;
+
+  function curveDerivatives "Stands in for Buildings.Utilities.Math.Functions.splineDerivatives"
+    input Real x[:];
+    output Real d[size(x, 1)];
+  algorithm
+    d := 2*x;
+  end curveDerivatives;
+
+  model CurveInterface
+    parameter PressureCurve per;
+    parameter Integer nOri = size(per.dp, 1);
+    final parameter Boolean haveVMax = abs(per.dp[nOri]) < 1e-10;
+    parameter Integer curve = if haveVMax then 1 else 2;
+    parameter Real a[nOri](each fixed = false);
+    parameter Real b[nOri + 1](each fixed = false);
+  initial equation
+    if curve == 1 then
+      a = curveDerivatives(per.dp);
+      b = zeros(nOri + 1);
+    else
+      a = zeros(nOri);
+      b = curveDerivatives(cat(1, per.dp, {1}));
+    end if;
+  end CurveInterface;
+
+  model InitialIfOnParameterCondition
+    "An initial if-equation on a parameter condition that gives free parameters their values (10 models: Buildings' Movers, if curve == 1 then preDer1 = ... with curve from abs(per.pressure.dp[nOri]) < eps). A guard: the frontend folds this model's curve, not the Movers'"
+    parameter Real dp_nominal = 1;
+    CurveInterface eff(per(dp = {4, dp_nominal}));
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = eff.a[1] + eff.b[1] + 10*eff.b[2];
+  end InitialIfOnParameterCondition;
+
+  model ArrayParameterSubscriptedByIterator
+    "An array parameter subscripted by a comprehension's iterator in an initial if's condition (5 models: Buildings' Movers, haveMinimumDecrease)"
+    parameter Real X[2] = {0.5, 0.6} "not summing to 1: the call stops the run if made";
+    parameter Real limitSpan[2] = spanC(0, 1) "not evaluated by the frontend";
+    parameter Real dp[3] = {3, 2, 1}*limitSpan[2];
+    parameter Real V[3] = {0, 1, 2};
+    final parameter Boolean decreasing = allTrue({(dp[i + 1] - dp[i])/(V[i + 1] - V[i]) < 0 for i in 1:2});
+    Real x(start = 0, fixed = true);
+  initial equation
+    if not decreasing then
+      checkMassFractions(X);
+    end if;
+  equation
+    der(x) = 1;
+  end ArrayParameterSubscriptedByIterator;
+
+  model ArrayParameterSubscriptedByIteratorIncreasing "ArrayParameterSubscriptedByIterator with an increasing dp: the call is made and its assert stops it"
+    extends ArrayParameterSubscriptedByIterator(dp = {1, 2, 3}*limitSpan[2]);
+  end ArrayParameterSubscriptedByIteratorIncreasing;
+
+  function cubeOfAnArgumentWithANameAsLongAsBuildingsOnes "cube with a derivative annotation and a name as long as Buildings' (the derivative error's text wraps after it)"
+    input Real x;
+    output Real y;
+  algorithm
+    if x < 0 then
+      y := -(-x)^3;
+    else
+      y := x^3;
+    end if;
+    annotation(derivative = cubeOfAnArgumentWithANameAsLongAsBuildingsOnes_der);
+  end cubeOfAnArgumentWithANameAsLongAsBuildingsOnes;
+
+  function cubeOfAnArgumentWithANameAsLongAsBuildingsOnes_der "An if-statement: not inlined, its own derivative a call without a rule (Buildings' der_regNonZeroPower)"
+    input Real x;
+    input Real dx;
+    output Real dy;
+  algorithm
+    if x < 0 then
+      dy := 3*x^2*dx;
+    else
+      dy := 3*x*x*dx;
+    end if;
+  end cubeOfAnArgumentWithANameAsLongAsBuildingsOnes_der;
+
+  model SecondDerivativeOfLongNamedFunction
+    "SecondDerivativeOfAnnotatedFunction through a long function name: the retry with the numeric partials matched the error's text, which wraps (Buildings' DerivativeCheck2 examples)"
+    Real x;
+    Real y;
+    Real y_comp;
+    Real der_y;
+    Real der_y_comp;
+  initial equation
+    y = y_comp;
+    der_y = der_y_comp;
+  equation
+    x = 2*time + time^3 - 1;
+    y = cubeOfAnArgumentWithANameAsLongAsBuildingsOnes(x);
+    der_y = der(y);
+    der_y_comp = der(y_comp);
+    der(der_y) = der(der_y_comp);
+  end SecondDerivativeOfLongNamedFunction;
+
+  function powerLawRegularized "A flow from a pressure difference, linear below dpReg (Buildings' powerLaw05): no derivative annotation"
+    input Real dp;
+    input Real dpReg = 0.1;
+    output Real m;
+  algorithm
+    if abs(dp) > dpReg then
+      m := sign(dp)*sqrt(abs(dp));
+    else
+      m := dp/sqrt(dpReg);
+    end if;
+  end powerLawRegularized;
+
+  model CallOfSmallDifferenceOfLargeStates
+    "A call without a derivative annotation reads a small difference of large states (8 models: Buildings' Airflow.Multizone, powerLaw05 at room pressures)"
+    Real p1(start = 101325.05, fixed = true);
+    Real p2(start = 101325, fixed = true);
+    Real m = powerLawRegularized(p1 - p2);
+  equation
+    der(p1) = -1000*m;
+    der(p2) = 1000*m;
+  end CallOfSmallDifferenceOfLargeStates;
+
+  record GasData "Per-gas data (MSL IdealGases' DataRecord)"
+    String name;
+    Real MM;
+    Real a[2];
+  end GasData;
+
+  function enthalpyOfGas "An if-statement: not inlined (MSL IdealGases' h_T)"
+    input GasData d;
+    input Real T;
+    output Real h;
+  algorithm
+    if T > 0 then
+      h := d.a[1]*T + d.a[2]*T^2/d.MM;
+    else
+      h := 0;
+    end if;
+  end enthalpyOfGas;
+
+  package SingleGases "Constant records of single gases (MSL IdealGases.Common.SingleGasesData)"
+    constant GasData A = GasData(name = "A", MM = 2, a = {1, 2});
+    constant GasData B = GasData(name = "B", MM = 4, a = {3, 4});
+  end SingleGases;
+
+  package GasMixture "A medium package with its data a constant array of those records (MSL IdealGases' Medium.data)"
+    constant GasData data[2] = {SingleGases.A, SingleGases.B};
+    constant Integer nX = size(data, 1);
+
+    model BaseProperties "The enthalpy from the data records (MSL PartialMixtureMedium.BaseProperties: h_TX)"
+      Real X[nX] = {0.25, 0.75};
+      Real T = 1 + time;
+      Real h = {X[1], X[2]}*{enthalpyOfGas(data[i], T) for i in 1:nX};
+    end BaseProperties;
+  end GasMixture;
+
+  model RecordArrayElementInReduction
+    "An element of a medium's constant array of records, by an iterator, passed to a function in a reduction: the MSL Media mixtures' h = X*{h_T(data[i], T, ...) for i in 1:nX}, but folded by the frontend into record values (open: the element is passed whole)"
+    package Medium = GasMixture;
+    Medium.BaseProperties medium;
+  end RecordArrayElementInReduction;
+
+  model SymbolicJacobianOverflow
+    "The symbolic Jacobian of a smooth sign is Inf/Inf far from 0 (MSL AIMC_Conveyor's conveyor force at v = -0.55, Buildings' Carnot COP): those columns by finite differences"
+    Real v(start = -1, fixed = true);
+  equation
+    der(v) = -0.1*(2/(1 + exp(-1000*v)) - 1) + 0.05;
+  end SymbolicJacobianOverflow;
+
+  function gaussSum "w*exp(-dis.*dis*u^2): an array negated in a function, its size an input (Borefields' finiteLineSource integrand)"
+    input Real u;
+    input Real dis[n];
+    input Integer w[n];
+    input Integer n;
+    output Real y;
+  algorithm
+    y := w*exp(-dis.*dis*u^2);
+  end gaussSum;
+
+  function sumOfGaussSums "Calls gaussSum from an algorithm, so it is not inlined into the model"
+    input Real dis[2];
+    output Real s = 0;
+  algorithm
+    for k in 1:3 loop
+      s := s + gaussSum(k, dis, {1, 2}, 2);
+    end for;
+  end sumOfGaussSums;
+
+  model NegatedArrayInFunction
+    "-x of an array of unknown size in a function lost its sign (Borefields' TemperatureResponseMatrix: the integrand grew, the quadrature never ended)"
+    parameter Real d[2] = {0.5, 1.0};
+    Real y = sumOfGaussSums(d*(1 + time));
+  end NegatedArrayInFunction;
+
+  impure function processId "MSL's System.getPid: a C function of OMRuntimeExternalC's libraries without a Julia function"
+    output Integer pid;
+  external "C" pid = ModelicaInternal_getpid() annotation(Library = "ModelicaExternalC");
+  end processId;
+
+  model ExternalCOfShippedLibrary
+    "An external C function that OMRuntimeExternalC's libModelicaExternalC defines, no Julia function for it (Borefields' TemperatureResponseMatrix: ModelicaInternal_mkdir)"
+    parameter Integer pid = processId();
+    Real p = pid;
+  end ExternalCOfShippedLibrary;
+
+  impure function logLine "MSL's Streams.print to a file"
+    input String line;
+    input String fileName;
+  external "C" ModelicaInternal_print(line, fileName) annotation(Library = "ModelicaExternalC");
+  end logLine;
+
+  impure function loggedPair "{1, 2}, and a line in fileName for each call"
+    input String fileName;
+    output Real y[2];
+  algorithm
+    logLine("called", fileName);
+    y := {1, 2};
+  end loggedPair;
+
+  model ArrayParameterOfImpureCall
+    "An array parameter bound to an impure call: called once, not once per element (Borefields' TemperatureResponseMatrix: 152 g-function computations)"
+    parameter Real p[2] = loggedPair("brArrayParameterOfImpureCall.log");
+    Real y = p[1] + p[2]*time;
+  end ArrayParameterOfImpureCall;
+
+  impure function label "A String from a function (impure: the translation does not evaluate it)"
+    input Integer n;
+    output String s;
+  algorithm
+    s := "n = " + String(n);
+  end label;
+
+  model StringParameterOfFunction
+    "A String parameter bound to a call of a Modelica function (Buildings' ShaGFunction: the SHA-1 of a g-function's inputs)"
+    parameter String s = label(3);
+    Real y = time;
+  end StringParameterOfFunction;
+
+  block Pulse41 "Modelica.Blocks.Sources.Pulse of MSL 4.1: its period starts are time events"
+    parameter Real amplitude = 1;
+    parameter Real width = 50;
+    parameter Real period = 1;
+    parameter Integer nperiod = -1;
+    parameter Real offset = 0;
+    parameter Real startTime = 0;
+    output Real y;
+  protected
+    Real T_width = period*width/100;
+    Real T_start;
+    Integer count;
+  initial algorithm
+    count := integer((time - startTime)/period);
+    T_start := startTime + count*period;
+  equation
+    when time >= (pre(count) + 1)*period + startTime then
+      count = pre(count) + 1;
+      T_start = time;
+    end when;
+    y = offset + (if (time < startTime or nperiod == 0 or (nperiod > 0 and count >= nperiod)) then 0
+                  else if time < T_start + T_width then amplitude else 0);
+  end Pulse41;
+
+  model PulseOverManyPeriods
+    "MSL 4.1's pulse integrated over 84 periods (Buildings' borehole boundary conditions: it stayed on for most periods, the integral 1.5 times its value)"
+    Pulse41 pulse(amplitude = -100, period = 7200);
+    Real U(start = 0, fixed = true);
+  equation
+    der(U) = pulse.y;
+  end PulseOverManyPeriods;
+
+  model SelfScheduledWhen
+    "when time >= pre(tNext), tNext moved on by its body: events it schedules itself (no period count, as the MSL 4.1 pulse's)"
+    discrete Real tNext(start = 0.3, fixed = true);
+    Integer n(start = 0, fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    when time >= pre(tNext) then
+      tNext = pre(tNext) + 0.3;
+      n = pre(n) + 1;
+    end when;
+  end SelfScheduledWhen;
+
+  function partialDot "The scalar product of the first n elements (Buildings' temporalSuperposition)"
+    input Real a[:];
+    input Real b[size(a, 1)];
+    input Integer n;
+    output Real y;
+  algorithm
+    y := a[1:n]*b[1:n];
+  end partialDot;
+
+  model SliceOfVaryingSize
+    "x[1:n] in a function of one statement, n a discrete at the call: inlined, an array of varying size (Buildings' GroundTemperatureResponse)"
+    parameter Real a[3] = {1, 2, 3};
+    parameter Real b[3] = {4, 5, 6};
+    Integer n(start = 1, fixed = true);
+    discrete Real y(start = 0, fixed = true);
+  equation
+    when sample(0, 0.3) then
+      n = min(pre(n) + 1, 3);
+      y = partialDot(a, b, pre(n));
+    end when;
+  end SliceOfVaryingSize;
+
+  function roundTo "Buildings.Utilities.Math.Functions.round"
+    input Real x;
+    input Integer n;
+    output Real y;
+  algorithm
+    if x > 0 then
+      y := floor(x*10^n + 0.5)/10^n;
+    else
+      y := ceil(x*10^n - 0.5)/10^n;
+    end if;
+  end roundTo;
+
+  model SampleStartOfInitialAlgorithm
+    "A sample() start that an initial algorithm assigns, a free parameter (CDL's samplers and pulses, t0: 145 models)"
+    parameter Real period = 0.25;
+    parameter Real shift = 0.1;
+    Integer n(start = 0, fixed = true);
+  protected
+    parameter Real t0(fixed = false);
+  initial algorithm
+    t0 := roundTo(integer(time/period)*period + mod(shift, period), 6);
+  equation
+    when sample(t0, period) then
+      n = pre(n) + 1;
+    end when;
+  end SampleStartOfInitialAlgorithm;
+
+  model TableStartOfInitialEquation
+    "A table's start time, a free parameter an initial equation gives through a function (CDL TimeTable: t0 = round(integer(time/timeRange)*timeRange, 6), its table's startTime)"
+    parameter Real table[3, 2] = [0, 0; 10, 1; 20, 4];
+    parameter Real period = 20;
+    parameter Real t0(fixed = false);
+    parameter TimeTable41 tab = TimeTable41("NoName", "NoName", table, t0, {2}, 1, 3, t0, 3, false, ",", 0);
+    Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+  initial equation
+    t0 = roundTo(integer(time/period)*period, 6);
+  end TableStartOfInitialEquation;
+
+  model InitialIfEquation
+    "An if-equation among the initial equations, its condition on a variable (CDL SunRiseSet: if cosHou < -1 then nextSunSet = ... else ...; 27 models)"
+    Real c = cos(time);
+    discrete Real a;
+    Real x(start = 0, fixed = true);
+  initial equation
+    if c < 0 then
+      a = 2;
+    else
+      a = 3;
+    end if;
+  equation
+    der(x) = a;
+    when time > 10 then
+      a = 0;
+    end when;
+  end InitialIfEquation;
+
+  model OredSamples
+    "when {sample(...), sample(...)}: a clock each, one body, once at an instant both have (CDL Boolean and Integer TimeTable: a sample() per time stamp)"
+    Integer n(start = 0, fixed = true);
+    Integer m(start = 0, fixed = true);
+  equation
+    when {sample(0.1, 0.5), sample(0.35, 0.5)} then
+      n = pre(n) + 1;
+    end when;
+    when {sample(0, 0.5), sample(0, 0.25)} then
+      m = pre(m) + 1;
+    end when;
+  end OredSamples;
+
+  model ParameterArrayByDiscreteIndex
+    "A parameter array read with a discrete index (CDL Integer and Boolean TimeTable: y[:] = val[idx, :]): its elements dropped as unused, then no table at the build; a discrete named idx was the when body's state index"
+    parameter Real table[3, 2] = {{1, 4}, {2, 2}, {3, 7}};
+    final parameter Integer val[3, 2] = integer(table + fill(1, 3, 2)*1e-37);
+    Integer idx(start = 1, fixed = true);
+    discrete Integer y[2];
+  initial equation
+    y[:] = val[idx, :];
+  equation
+    when sample(0.3, 0.3) then
+      idx = if pre(idx) < 3 then pre(idx) + 1 else 1;
+      y[:] = val[idx, :];
+    end when;
+  end ParameterArrayByDiscreteIndex;
+
+  function deltaCircuit "Matrix outputs (Buildings' multipoleThermalResistances)"
+    input Real r;
+    output Real D[2, 2];
+    output Real R[2, 2];
+  algorithm
+    D := [r, 0; 0, r];
+    R := 2*D;
+  end deltaCircuit;
+
+  function resistances
+    "Several outputs, a branch on an input and a Boolean input, a String input, a while loop: not interpreted at the build nor evaluated symbolically (Buildings' internalResistancesOneUTube)"
+    input Boolean useR;
+    input Real r;
+    input Real k;
+    input String instanceName;
+    output Real x;
+    output Real Rgb;
+    output Real Rgg;
+  protected
+    Real D[2, 2];
+    Real R[2, 2];
+    Integer n;
+  algorithm
+    (D, R) := deltaCircuit(r);
+    x := 0;
+    n := 0;
+    while n < 5 loop
+      n := n + 1;
+      x := x + r/5;
+    end while;
+    if r > 0 and not useR then
+      Rgb := 1/(2*k);
+    else
+      Rgb := R[1, 1];
+    end if;
+    Rgg := Rgb/4 + D[1, 2];
+  end resistances;
+
+  model TupleOfFreeParameters
+    "Free parameters assigned together by a call in an initial equation (Buildings' HexInternalElement): the constraint was dropped, the resistances 0"
+    parameter Real r = 0.5;
+    parameter Real k = 2;
+    parameter Real x(fixed = false);
+    parameter Real Rgb(fixed = false);
+    parameter Real Rgg(fixed = false);
+    Real T(start = 1, fixed = true);
+  initial equation
+    (x, Rgb, Rgg) = resistances(false, r, k, getInstanceName());
+  equation
+    der(T) = -T/Rgb;
+  end TupleOfFreeParameters;
+
+  model TupleOfFreeParametersWithoutStates
+    "The same in a system without states (the validations of Buildings' borehole resistance functions): refused as free parameters"
+    parameter Real r = 0.5;
+    parameter Real k = 2;
+    parameter Real x(fixed = false);
+    parameter Real Rgb(fixed = false);
+    parameter Real Rgg(fixed = false);
+    Real y = Rgb + Rgg;
+  initial equation
+    (x, Rgb, Rgg) = resistances(false, r, k, getInstanceName());
+  end TupleOfFreeParametersWithoutStates;
+
+  function copyThenWrite
+    "An array assigned from another, the other written after (Buildings' multipoleFluidTemperature: PRea := PRea_new)"
+    input Real x;
+    output Real y;
+  protected
+    Real a[2];
+    Real b[2];
+    Integer i;
+  algorithm
+    a := {x, x};
+    i := 0;
+    while i < 3 loop
+      i := i + 1;
+      b[1] := a[1] + 1;
+      b[2] := a[2] + 2;
+      a := b;
+      b[1] := 0;
+    end while;
+    y := a[1] + a[2];
+  end copyThenWrite;
+
+  model ArrayAssignmentCopies
+    "An array assignment in a function is a copy (Buildings' borehole resistances: the multipole iteration stopped after its second step)"
+    Real y = copyThenWrite(time);
+  end ArrayAssignmentCopies;
+
+  record TurnPair
+    Real a;
+    Real b;
+  end TurnPair;
+
+  function turn "A record from a record, two statements (a Complex operator's form)"
+    input TurnPair p;
+    input Real c;
+    output TurnPair q;
+  algorithm
+    q.a := p.a*c + p.b;
+    q.b := p.b*c - p.a;
+  end turn;
+
+  function turned16 "A record-valued call nested 16 deep (Buildings' multipoleFmk: Complex operators ten deep)"
+    input Real x;
+    output Real y;
+  protected
+    TurnPair p;
+  algorithm
+    p := turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(turn(TurnPair(x, 1), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5), 0.5);
+    y := p.a + p.b;
+  end turned16;
+
+  model NestedRecordCalls
+    "A record-valued call as an argument is evaluated once, not once per field: 2^16 calls of turn"
+    Real y = turned16(time);
+  end NestedRecordCalls;
+
+  impure function fileLength "A length the translation does not evaluate (Buildings' getTimeSpanTMY3 reads the weather file)"
+    input Real x;
+    output Real y;
+  algorithm
+    y := x;
+  end fileLength;
+
+  model ParameterInZeroCrossing
+    "Parameters the build does not fold in a state event's condition and body (Buildings' weather data readers: canRepeatWeatherFile and modTimAux > tNext): read as symbols"
+    parameter Real lenWea = fileLength(0.25);
+    final parameter Boolean canRepeat = lenWea > 0;
+    Real tim(start = 0, fixed = true);
+    discrete Real tNext(start = 0.25, fixed = true);
+  equation
+    der(tim) = 1;
+    when canRepeat and tim > pre(tNext) then
+      tNext = pre(tNext) + lenWea;
+    end when;
+  end ParameterInZeroCrossing;
+
+  model DiscretesOfInitialEquations
+    "Discretes set by initial equations from a continuous variable (Buildings' PartialConvertTime: k and tNext; tNext stayed 0, the weather file's time a year ahead)"
+    parameter Real lenWea = fileLength(1.0);
+    final parameter Boolean canRepeat = abs(mod(lenWea, 1.0)) < 1e-2;
+    Real modTimAux;
+    Real calTimAux;
+    discrete Real tNext;
+    Integer k;
+  initial equation
+    k = integer(modTimAux/lenWea) + 1;
+    tNext = if canRepeat then k*lenWea else time;
+  equation
+    modTimAux = time;
+    when (canRepeat and modTimAux > pre(tNext)) then
+      k = pre(k) + 1;
+      tNext = k*lenWea;
+    end when;
+    calTimAux = if canRepeat then modTimAux - tNext + lenWea else modTimAux;
+  end DiscretesOfInitialEquations;
+
+  model NominalResistance "A parameter whose binding reads another parameter (Buildings' PartialResistance)"
+    parameter Real dp_nominal;
+    final parameter Real dp_nominal_pos = abs(dp_nominal);
+    final parameter Boolean computeFlowResistance = dp_nominal_pos > 1e-10 annotation(Evaluate = true);
+    Real dp = dp_nominal_pos*time;
+    Real y;
+  equation
+    if computeFlowResistance then
+      y = dp/sqrt(dp_nominal_pos);
+    else
+      y = 0;
+    end if;
+  end NominalResistance;
+
+  model ArrayModifierThroughBinding
+    "A component array's array modifier read through another parameter's binding (Buildings' PressureDrop[nRes] resSeries(dp_nominal = {dp_nominal*(1 + mod(i, 3)) for i in 1:nRes})): every element's dp_nominal_pos the whole array"
+    parameter Integer n = 3;
+    parameter Real dp_nominal = 1;
+    NominalResistance res[n](dp_nominal = {dp_nominal*(1 + mod(i, 3)) for i in 1:n});
+  end ArrayModifierThroughBinding;
+
+  function nextPair "Two outputs, one an array (Modelica.Math.Random.Generators.Xorshift1024star.random)"
+    input Integer stateIn[2];
+    output Real r;
+    output Integer stateOut[2];
+  algorithm
+    stateOut := {stateIn[2], stateIn[1] + stateIn[2]};
+    r := stateOut[1]/10;
+  end nextPair;
+
+  model TupleOfDiscretes
+    "A discrete and a discrete array assigned together, in an initial equation and in a when, then read (Buildings' occupant windows: (ran, state) = random(...); on = ran < p)"
+    parameter Integer seed = 1;
+    discrete Real r;
+    Integer s[2];
+    Boolean on;
+  initial equation
+    (r, s) = nextPair({seed, seed});
+    on = r > 0.15;
+  equation
+    when sample(0.25, 0.25) then
+      (r, s) = nextPair(pre(s));
+      on = r > 0.15;
+    end when;
+  end TupleOfDiscretes;
+
+  model ResistanceElement "An element whose sub-component's parameter is bound to the element's (Buildings' HexElement: preDro2(dp_nominal = dp2_nominal))"
+    parameter Real dp2_nominal;
+    NominalResistance preDro2(dp_nominal = dp2_nominal);
+  end ResistanceElement;
+
+  model ElementConditionsOfArrayModifier
+    "Elements' if-equation conditions that differ, from a component array's array modifier through a sub-component (Buildings' counter-flow coils: only the last element has a pressure drop): each element's condition was the array"
+    parameter Integer n = 3;
+    ResistanceElement ele[n](dp2_nominal = {if i == n then 2 else 0 for i in 1:n});
+  end ElementConditionsOfArrayModifier;
+
+  model EdgeOrSample
+    "A when on a Boolean's edge or a sample, the body reading the sample's trigger (Buildings' occupant lighting: when {occ, sampleTrigger} then ... if sampleTrigger then ...): occ rises between the ticks and with one"
+    parameter Real period = 0.25;
+    parameter Real t0(fixed = false);
+    discrete Real pulseStart(start = 0, fixed = true);
+    Boolean occ = time >= 0.4 and time < 0.6 or time >= pulseStart + 0.2 and time < pulseStart + 0.3;
+    Boolean sampleTrigger;
+    Integer nTick(start = 0, fixed = true);
+    Integer nEdge(start = 0, fixed = true);
+    Integer nOccAtTick(start = 0, fixed = true);
+  initial equation
+    t0 = time;
+  equation
+    when sample(0.3, 0.5) then
+      pulseStart = time;
+    end when;
+    sampleTrigger = sample(t0, period);
+    when {occ, sampleTrigger} then
+      nTick = if sampleTrigger then pre(nTick) + 1 else pre(nTick);
+      nEdge = if sampleTrigger then pre(nEdge) else pre(nEdge) + 1;
+      nOccAtTick = if sampleTrigger and occ then pre(nOccAtTick) + 1 else pre(nOccAtTick);
+    end when;
+  end EdgeOrSample;
+
+  model GuardedSampleTrigger
+    "A Boolean defined by a guard and-ed with a sample, a when on it (Buildings' plotters: sampleTrigger = active and sample(t0, samplePeriod); when sampleTrigger then ...)"
+    parameter Real t0(fixed = false);
+    discrete Real tOn(start = 0.3, fixed = true);
+    Boolean active = time >= tOn;
+    Boolean sampleTrigger;
+    Integer n(start = 0, fixed = true);
+    discrete Real tLast(start = -1, fixed = true);
+  initial equation
+    t0 = time;
+  equation
+    when time >= 0.6 then
+      tOn = 0.8;
+    end when;
+    sampleTrigger = active and sample(t0, 0.25);
+    when sampleTrigger then
+      n = pre(n) + 1;
+      tLast = time;
+    end when;
+  end GuardedSampleTrigger;
+
+  record StageNominalValues "A stage's nominal values (Buildings' DX coil data: datCoi.sta[i].nomVal)"
+    parameter Real Q_flow_nominal;
+  end StageNominalValues;
+
+  record CoilStage
+    parameter StageNominalValues nomVal;
+  end CoilStage;
+
+  model InitialAlgorithmByLoopIndex
+    "An initial algorithm reading a record array's field by its loop index (Buildings' DX coils: for i in 1:nSta-1 loop assert(datCoi.sta[i].nomVal.Q_flow_nominal >= ...))"
+    parameter Integer n = 3;
+    parameter CoilStage sta[n](nomVal(Q_flow_nominal = {1, 2, 4}));
+    parameter Real total(fixed = false);
+    Real x(start = 0, fixed = true);
+  initial algorithm
+    total := 0;
+    for i in 1:n loop
+      assert(sta[i].nomVal.Q_flow_nominal <= sta[n].nomVal.Q_flow_nominal, "the last stage the largest");
+      total := total + sta[i].nomVal.Q_flow_nominal;
+    end for;
+  equation
+    der(x) = total;
+  end InitialAlgorithmByLoopIndex;
+
+  record UAcpData "A stage's coefficient (Buildings' DX coils' apparatus dew point: uacp[stage].UAcp)"
+    parameter Real UAcp;
+  end UAcpData;
+
+  model RecordArrayFieldByDiscreteIndex
+    "A record array's field read with a discrete index in an equation (Buildings' DX coils: UAcp = uacp[stage].UAcp)"
+    parameter UAcpData uacp[3](UAcp = {10, 20, 40});
+    parameter UAcpData uacpInit[3](each UAcp(fixed = false)) "computed by the initialization (the DX coils' UAcp)";
+    discrete Integer stage(start = 1, fixed = true);
+    Real x(start = 0, fixed = true);
+    Real y(start = 0, fixed = true);
+  initial equation
+    uacpInit[1].UAcp = 10;
+    uacpInit[2].UAcp = 20;
+    uacpInit[3].UAcp = 40;
+  equation
+    when sample(0.25, 0.25) then
+      stage = min(3, pre(stage) + 1);
+    end when;
+    der(x) = uacp[stage].UAcp;
+    der(y) = uacpInit[stage].UAcp;
+  end RecordArrayFieldByDiscreteIndex;
+
+  model NestedLogicalCondition
+    "A when on 24 Booleans and-ed (MSL Digital's registers nest and/or deeply): its zero-crossing function held each operand twice per level, 2^24 terms, and the build did not end"
+    Boolean b[24] = {time > 0.05*i for i in 1:24};
+    Integer n(start = 0, fixed = true);
+    discrete Real tAll(start = -1, fixed = true);
+  equation
+    when b[1] and b[2] and b[3] and b[4] and b[5] and b[6] and b[7] and b[8] and b[9] and b[10] and b[11] and b[12] and b[13] and b[14] and b[15] and b[16] and b[17] and b[18] and b[19] and b[20] and b[21] and b[22] and b[23] and b[24] then
+      n = pre(n) + 1;
+      tAll = time;
+    end when;
+  end NestedLogicalCondition;
+
+  function pressureLossOf "A default that reads another input (MSL WallFriction.Detailed.pressureLoss_m_flow: crossArea = pi*diameter^2/4)"
+    input Real m_flow;
+    input Real diameter;
+    input Real crossArea = 3.14159*diameter^2/4;
+    output Real dp;
+  algorithm
+    dp := m_flow^2/crossArea;
+  end pressureLossOf;
+
+  model DefaultArgumentOfInput
+    "A parameter bound to a call that leaves an input to its default, the default reading another input (Buildings' FixedResistances: dpStraightPipe_nominal = WallFriction.Detailed.pressureLoss_m_flow(..., diameter = dh, ...)): the default kept the function's own input, a continuous binding of a parameter"
+    parameter Real dh = 2;
+    parameter Real m_flow_nominal = 1;
+    parameter Real dp_nominal = pressureLossOf(m_flow = m_flow_nominal, diameter = dh);
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = dp_nominal;
+  end DefaultArgumentOfInput;
+
+  record PlantConfig "A plant's configuration (Buildings' Templates: pla.cfg)"
+    parameter Real rho;
+  end PlantConfig;
+
+  record ControlData "Control data holding the configuration (Buildings' Templates: dat.ctl, ctl.cfg)"
+    parameter PlantConfig cfg;
+    parameter Real T_nominal = 300;
+  end ControlData;
+
+  record PlantData "A plant's data (Buildings' Templates: datAll.pla)"
+    parameter PlantConfig cfg;
+    parameter ControlData ctl(cfg = cfg);
+  end PlantData;
+
+  model TemplatePlant "A plant reading its data, its configuration made of its parameters (Buildings' Templates: pla)"
+    parameter PlantData dat;
+    parameter Real T_nominal = dat.ctl.T_nominal;
+    parameter Real rho = 1000 + T_nominal;
+    parameter PlantConfig cfg(rho = rho);
+    Real v[if cfg.rho > 1200 then 2 else 1](each start = 0, each fixed = true);
+  equation
+    for i in 1:size(v, 1) loop
+      der(v[i]) = i;
+    end for;
+  end TemplatePlant;
+
+  model CyclicRecordBindings
+    "Records bound to other records by reference, reading each other, field by field acyclic, in a dimension (Buildings' Templates: pla.cfg, through THeaWatSup_nominal and datAll.pla.ctl.cfg, back to pla.cfg): the evaluation went round without end, a stack overflow"
+    parameter PlantData datAll(cfg = pla.cfg);
+    TemplatePlant pla(dat = datAll);
+  end CyclicRecordBindings;
+
+  record MoverRecord "A mover's data with a flag from its own field (Buildings' Fluid.Movers.Data.Generic: haveWMot_nominal = WMot_nominal > eps)"
+    parameter Real WMot_nominal = 0;
+    final parameter Boolean haveWMot_nominal = WMot_nominal > 1e-10;
+  end MoverRecord;
+
+  model RecordPump "A pump choosing its equation by its data's flag"
+    parameter MoverRecord per;
+    Real P(start = 0, fixed = true);
+  equation
+    if per.haveWMot_nominal then
+      der(P) = per.WMot_nominal;
+    else
+      der(P) = 2;
+    end if;
+  end RecordPump;
+
+  model RecordArrayToComponentArray
+    "An array of records passed to an array of components, each element's if-equation on its record's flag (Buildings' Templates pumps: pum[nPum](per = per)): every element's condition was the array {false, true}"
+    parameter Integer nPum = 2;
+    parameter MoverRecord per[nPum](WMot_nominal = {0, 5});
+    RecordPump pum[nPum](per = per);
+  end RecordArrayToComponentArray;
+
+  record CurveData "A mover's pressure curve (Fluid.Movers.BaseClasses.Characteristics.flowParameters)"
+    parameter Real V_flow[:];
+    parameter Real dp[size(V_flow, 1)];
+  end CurveData;
+
+  record MoverCurveData "A mover's data with a flag from both curves (Fluid.Movers.Data.Generic: havePressureCurve)"
+    parameter CurveData pressure(V_flow = {0}, dp = {0});
+    final parameter Boolean havePressureCurve = sum(pressure.V_flow) > 1e-10 and sum(pressure.dp) > 1e-10;
+  end MoverCurveData;
+
+  record PumpGroupData "Pumps' data with each pump's curve by a nested array modifier (Templates.Components.Data.PumpMultiple)"
+    parameter Integer nPum;
+    parameter Real m_flow_nominal[nPum];
+    parameter MoverCurveData per[max(nPum, 1)](pressure(
+      V_flow = if nPum > 0 then {{0, 1, 2}*m_flow_nominal[i] for i in 1:nPum} else [0],
+      dp = if nPum > 0 then {{1.14, 1, 0.42}*100 for i in 1:nPum} else [0]));
+  end PumpGroupData;
+
+  model CurvePump "A pump choosing its equation by its data's flag"
+    parameter MoverCurveData per;
+    Real P(start = 0, fixed = true);
+  equation
+    if per.havePressureCurve then
+      der(P) = 1;
+    else
+      der(P) = 2;
+    end if;
+  end CurvePump;
+
+  model PumpsOfGroupData
+    "An array of components given an array of records from a nested array modifier, their if-equations on a flag that and-s two of its fields' relations (Buildings' Templates pumps: pum[nPum](per = dat.per)): every element's condition was {{true, true}, {true, true}}"
+    parameter Integer nPum = 2;
+    parameter PumpGroupData dat(nPum = nPum, m_flow_nominal = fill(1, nPum));
+    CurvePump pum[nPum](per = dat.per);
+  end PumpsOfGroupData;
+
+  partial function FunctionIcon "An empty partial function each function extends (Modelica.Icons.Function)"
+  end FunctionIcon;
+
+  partial package PartialStateMedium "A medium with partial state functions and a constant from them (Modelica.Media.Interfaces.PartialMedium: h_default)"
+    type Temp = Real(unit = "K");
+    replaceable partial function setState
+      extends FunctionIcon;
+      input Real T;
+      output Real st;
+    end setState;
+    replaceable partial function enthalpy
+      extends FunctionIcon;
+      input Real st;
+      output Real h;
+    end enthalpy;
+    function enthalpy_T
+      extends FunctionIcon;
+      input Real T;
+      output Real h;
+    algorithm
+      h := enthalpy(setState(T));
+    end enthalpy_T;
+    constant Real h_default = enthalpy_T(293.15);
+  end PartialStateMedium;
+
+  package StateMedium
+    extends PartialStateMedium;
+    redeclare function extends setState
+    algorithm
+      st := T;
+    end setState;
+    redeclare function extends enthalpy
+    algorithm
+      h := 2*st;
+    end enthalpy;
+  end StateMedium;
+
+  model PartialStatePipe "A component typed by its partial default medium"
+    replaceable package Medium = PartialStateMedium;
+    Medium.Temp T(start = 1);
+  end PartialStatePipe;
+
+  model StatePipe
+    extends PartialStatePipe(redeclare package Medium = StateMedium);
+    Real e(start = 0, fixed = true);
+  equation
+    der(T) = -T;
+    der(e) = Medium.h_default;
+  end StatePipe;
+
+  model StatePlantBase
+    replaceable PartialStatePipe pip;
+  end StatePlantBase;
+
+  model PartialFunctionOfRedeclaredOriginal
+    "A redeclared component's original declaration looks up its partial default medium (allowed there); the medium's constant calls a function calling a partial one (Buildings DHC: PartialMedium's specificEnthalpy_pTX): got non-instantiated function"
+    extends StatePlantBase(redeclare StatePipe pip);
+  end PartialFunctionOfRedeclaredOriginal;
+
+  model BuildingLoad "A building's nominal flow from its load"
+    parameter Real Q = 20000;
+    parameter Real m_flow_nominal = Q / 2.17e6;
+  end BuildingLoad;
+
+  model SumOverComponentArray
+    "Parameters summing a parameter over an array of components, read by dimensions (Buildings DHC: mDis_flow_nominal = sum(bld.m_flow_nominal)*1.2): sum was given each element's value, from the elements' shared binding and from a modifier on the array"
+    parameter Integer N = 3;
+    BuildingLoad bld[N];
+    BuildingLoad bldEach[N](Q = {10000, 20000, 40000});
+    parameter Real mDis = sum(bld.m_flow_nominal)*1.2;
+    parameter Real mEach = sum(bldEach.m_flow_nominal)*1.2;
+    parameter Real x[if mDis > 0.05 then 2 else 1] = fill(mDis, size(x, 1));
+    parameter Real z[if mEach > 0.03 then 2 else 1] = fill(mEach, size(z, 1));
+    Real y(start = 0, fixed = true);
+    Real w(start = 0, fixed = true);
+  equation
+    der(y) = sum(x);
+    der(w) = sum(z);
+  end SumOverComponentArray;
+
+  function lapackLeastSquares "Modelica.Math.Matrices.LAPACK.dgelsy_vec (MSL 4.1)"
+    input Real A[:, :];
+    input Real b[size(A, 1)];
+    input Real rcond = 0.0;
+    output Real x[max(size(A, 1), size(A, 2))] = cat(1, b, zeros(max(nrow, ncol) - nrow));
+    output Integer info;
+    output Integer rank;
+  protected
+    Integer nrow = size(A, 1);
+    Integer ncol = size(A, 2);
+    Integer nrhs = 1;
+    Integer nx = max(nrow, ncol);
+    Integer lwork = max(min(nrow, ncol) + 3*ncol + 1, 2*min(nrow, ncol) + 1);
+    Real work[max(min(size(A, 1), size(A, 2)) + 3*size(A, 2) + 1, 2*min(size(A, 1), size(A, 2)) + 1)];
+    Real Awork[size(A, 1), size(A, 2)] = A;
+    Integer jpvt[size(A, 2)] = zeros(ncol);
+  external "FORTRAN 77" dgelsy(nrow, ncol, nrhs, Awork, nrow, x, nx, jpvt, rcond, rank, work, lwork, info)
+    annotation(Library = "lapack");
+  end lapackLeastSquares;
+
+  function lapackHessenbergEigenvalues "Modelica.Math.Matrices.LAPACK.dhseqr (MSL 4.1), eigenvalues only"
+    input Real H[:, size(H, 1)];
+    output Real alphaReal[size(H, 1)];
+    output Real alphaImag[size(H, 1)];
+    output Integer info;
+    output Real Ho[:, :] = H;
+    output Real Zo[:, :] = H;
+    output Real work[3*max(1, size(H, 1))];
+  protected
+    Integer n = size(H, 1);
+    String job = "E";
+    String compz = "N";
+    Integer ilo = 1;
+    Integer ihi = n;
+    Integer ldh = max(n, 1);
+    Integer lwork = 3*max(1, size(H, 1));
+  external "FORTRAN 77" dhseqr(job, compz, n, ilo, ihi, Ho, ldh, alphaReal, alphaImag, Zo, ldh, work, lwork, info)
+    annotation(Library = "lapack");
+  end lapackHessenbergEigenvalues;
+
+  function cubicPeak "A curve's maximum: a cubic least-squares fit, the roots of its derivative as a companion matrix's eigenvalues (Buildings' Movers Euler.getPeak, MSL Polynomials.roots)"
+    input Real x[:];
+    input Real y[size(x, 1)];
+    output Real xPeak;
+  protected
+    Real A[size(x, 1), 4];
+    Real c[max(size(x, 1), 4)];
+    Real p[3];
+    Real C[2, 2];
+    Real re[2];
+    Real im[2];
+    Integer info;
+    Integer rank;
+  algorithm
+    for i in 1:size(x, 1) loop
+      A[i, :] := {1, x[i], x[i]^2, x[i]^3};
+    end for;
+    (c, info, rank) := lapackLeastSquares(A, y);
+    p := {3*c[4], 2*c[3], c[2]};
+    C[1, :] := -p[2:3]/p[1];
+    C[2:2, :] := [identity(1), zeros(1)];
+    (re, im, info) := lapackHessenbergEigenvalues(C);
+    xPeak := if 6*c[4]*re[1] + 2*c[3] < 0 then re[1] else re[2];
+  end cubicPeak;
+
+  model LapackInDimension
+    "A dimension from a function calling LAPACK (dgelsy, dhseqr) and a matrix concatenation with a vector (Buildings Movers: Euler.getPeak, leastSquares and Polynomials.roots, through WMot_nominal): the frontend did not evaluate external LAPACK calls"
+    parameter Real x[5] = {0, 1, 2, 3, 4};
+    parameter Real y[5] = {2, 4, 6, 2, -14};
+    parameter Real xPeak = cubicPeak(x, y);
+    parameter Real z[if xPeak > 1.5 then 2 else 1] = fill(xPeak, size(z, 1));
+    Real w(start = 0, fixed = true);
+  equation
+    der(w) = sum(z);
+  end LapackInDimension;
+
+  partial package PartialCpMedium "A medium whose constant has no value (Modelica.Media.Interfaces.PartialMedium)"
+    constant Real cp;
+  end PartialCpMedium;
+
+  package CpWater
+    extends PartialCpMedium(cp = 4184);
+  end CpWater;
+
+  model CpPipe
+    replaceable package Medium = PartialCpMedium;
+    parameter Real k = 1;
+    Real e(start = 0, fixed = true);
+  equation
+    der(e) = Medium.cp*k;
+  end CpPipe;
+
+  partial model ConstrainedConnection "A replaceable model whose constraining clause gives the medium (Buildings DHC: PartialConnection2Pipe2Medium's Model_pipDisRet)"
+    replaceable package MediumRet = PartialCpMedium;
+    parameter Real kk = 2;
+    replaceable model Model_pip = CpPipe constrainedby CpPipe(redeclare final package Medium = MediumRet, final k = kk);
+    Model_pip pip;
+  end ConstrainedConnection;
+
+  model ConstrainingModifierOfRedeclaredClass
+    "A replaceable model redeclared without the constraining clause's modifiers (Buildings DHC: ConnectionCondensatePipe's redeclare final model Model_pipDisRet = PressureDrop(...)): they were not applied, the pipe kept the partial medium"
+    model Connection
+      extends ConstrainedConnection(redeclare final model Model_pip = CpPipe);
+    end Connection;
+    Connection c(redeclare package MediumRet = CpWater);
+  end ConstrainingModifierOfRedeclaredClass;
+
+  model ConstrainingModifierOfReplaceableClass
+    "A replaceable model not redeclared: its constraining clause's modifiers apply too (Buildings Obsolete DHC: replaceable model BorefieldType = OneUTube constrainedby PartialBorefield(borFieDat = datBorFie, ...)): the pipe kept the partial medium"
+    model Connection
+      extends ConstrainedConnection;
+    end Connection;
+    Connection c(redeclare package MediumRet = CpWater);
+  end ConstrainingModifierOfReplaceableClass;
+
+  record BorConfTemplate "A borefield configuration: a flow from the number of boreholes, the size of its coordinates (Fluid.Geothermal.Borefields.Data.Configuration.Template)"
+    parameter Real mBor_flow_nominal;
+    parameter Real mBorFie_flow_nominal = mBor_flow_nominal*nBor;
+    parameter Integer nBor = size(cooBor, 1);
+    parameter Real cooBor[:, 2];
+  end BorConfTemplate;
+
+  record BorConfExample
+    extends BorConfTemplate(mBor_flow_nominal = 0.3, cooBor = {{0, 0}, {0, 6}, {6, 0}, {6, 6}});
+  end BorConfExample;
+
+  record BorFieldTemplate
+    parameter BorConfTemplate conDat;
+  end BorFieldTemplate;
+
+  record BorFieldExample
+    extends BorFieldTemplate(conDat = BorConfExample());
+  end BorFieldExample;
+
+  model BorFieldUser
+    parameter BorFieldExample datBorFie;
+    parameter Real m_flow_nominal = datBorFie.conDat.mBorFie_flow_nominal;
+    parameter Real x[if abs(m_flow_nominal) > 1 then 2 else 1] = fill(m_flow_nominal, size(x, 1));
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = sum(x);
+  end BorFieldUser;
+
+  model RecordFieldOfConstructedField
+    "A record's field read through a record without a binding of its own, set by a record constructor (Buildings Obsolete DHC borefields: datBorFie.conDat.mBorFie_flow_nominal): the field was not evaluated (0.3*size({...}, 1)), abs of it failed"
+    parameter BorFieldExample datBorFie(conDat = BorConfExample());
+    BorFieldUser sub(datBorFie = datBorFie);
+  end RecordFieldOfConstructedField;
+
+  function mixedLiteralMatrix "A matrix constructor mixing a Real input and Integer literals, summed"
+    input Real a;
+    output Real r;
+  protected
+    Real M[2, 2];
+  algorithm
+    M := [a, 2; 3, 4];
+    r := sum(M);
+  end mixedLiteralMatrix;
+
+  model MatrixOfMixedLiterals
+    "A function's matrix constructor [a, 2; 3, 4] evaluated by the frontend, its sum read by a dimension: the 2 stayed Integer (typeMatrixComma paired each element with another element's type), sum() failed"
+    parameter Real r = mixedLiteralMatrix(1.5);
+    parameter Real z[if r > 10 then 2 else 1] = fill(r, size(z, 1));
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = sum(z);
+  end MatrixOfMixedLiterals;
+
+  record CoilData "A coil's data"
+    parameter Real k = 1;
+  end CoilData;
+
+  record WaterCoilData "A water-source coil's data"
+    extends CoilData(k = 3);
+  end WaterCoilData;
+
+  model DataCoil
+    replaceable parameter CoilData dat;
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = dat.k;
+  end DataCoil;
+
+  model DataCoilUser
+    parameter CoilData dat;
+    DataCoil coi(dat = dat);
+  end DataCoilUser;
+
+  model RedeclareOverInnerModifier
+    "A final redeclare over a declaration's own modifier of the replaced element (Buildings DX coils: wetCoi(redeclare final ... datCoi = datCoi) over DXCooling's wetCoi(datCoi = datCoi)): the inner modifier was applied to the redeclared element, a final override"
+    parameter WaterCoilData d;
+    DataCoilUser u(coi(redeclare final WaterCoilData dat = d));
+  end RedeclareOverInnerModifier;
+
+  record StageData "A stage's data"
+    parameter Real q = 1;
+  end StageData;
+
+  record WaterStageData "A water-source stage's data"
+    extends StageData(q = 5);
+  end WaterStageData;
+
+  model Stage
+    replaceable parameter StageData per;
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = per.q;
+  end Stage;
+
+  model Stages
+    parameter StageData sta[2] = {StageData(q = 1), StageData(q = 2)};
+    Stage stg[2](per = sta);
+  end Stages;
+
+  model RedeclareInArrayOfComponents
+    "A redeclare in an array of components whose declaration binds the element (Buildings DX coils: uacp[nSta](per = datCoi.sta.nomVal) under uacp(redeclare final ... per)): the binding was not split over the array"
+    Stages s(stg(redeclare final WaterStageData per));
+  end RedeclareInArrayOfComponents;
+
+  record RdrCurve "A performance curve"
+    parameter Real f[:] "Coefficients";
+  end RdrCurve;
+
+  record RdrStage "A stage"
+    parameter RdrCurve cur;
+  end RdrStage;
+
+  record RdrCoil "Coil data"
+    parameter Integer nSta = 1;
+    parameter RdrStage sta[nSta];
+  end RdrCoil;
+
+  record RdrMyCoil "A coil's data"
+    extends RdrCoil(nSta = 1, sta = {RdrStage(cur = RdrCurve(f = {1, 2, 3, 4, 5, 6}))});
+  end RdrMyCoil;
+
+  model RdrPart "Reads the curve's size through its own record, bound to the parent's"
+    parameter RdrCoil datCoi;
+    parameter Integer n = size(datCoi.sta[1].cur.f, 1);
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = n + sum(datCoi.sta[1].cur.f);
+  end RdrPart;
+
+  model RdrMid
+    RdrPart p1(datCoi = datCoi);
+    RdrPart p2(datCoi = datCoi);
+    RdrPart p3(datCoi = datCoi);
+    RdrPart p4(datCoi = datCoi);
+    parameter RdrCoil datCoi;
+  end RdrMid;
+
+  model RecordFieldsTypedInParallel
+    "A record array's field sized through records' bindings, the records declared after their readers (Buildings DX coils: datCoi.sta.perCur.EIRFunFF): the field's type was lifted by sta's dimensions on the wrong side (f[1] for f[6]); with threads, fields read before another task typed them had their element type"
+    RdrMid a(datCoi = datCoi);
+    RdrMid b(datCoi = datCoi);
+    RdrMid c(datCoi = datCoi);
+    RdrMid d(datCoi = datCoi);
+    parameter RdrMyCoil datCoi;
+  end RecordFieldsTypedInParallel;
+
+  record ShrPowerData "Power curve"
+    parameter Real P[:] "Powers";
+  end ShrPowerData;
+
+  record ShrPressureData "Pressure curve"
+    parameter Real V_flow[:] "Flow rates";
+  end ShrPressureData;
+
+  record ShrPumpData "A pump's data, its motor power from the curves (Buildings Movers.Data.Generic)"
+    parameter ShrPowerData power(P = {0});
+    parameter ShrPressureData pressure(V_flow = {0, 1});
+    parameter Real WMot_nominal = if max(power.P) > 1e-15 then max(power.P) else sum(pressure.V_flow);
+  end ShrPumpData;
+
+  model ShrEfficiency "Sizes an array by the motor power"
+    parameter ShrPumpData per;
+    parameter Real x[if per.WMot_nominal > 1 then 2 else 1] = fill(per.WMot_nominal, size(x, 1));
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = sum(x);
+  end ShrEfficiency;
+
+  model ShrPump "Passes its data field by field (PartialFlowMachine's eff(per(...)))"
+    parameter ShrPumpData per;
+    ShrEfficiency eff(per(power = per.power, pressure = per.pressure));
+  end ShrPump;
+
+  model ShrPumps
+    parameter Integer num = 2;
+    parameter ShrPumpData per[num];
+    ShrPump pum[num](per = per);
+  end ShrPumps;
+
+  model ShrPlant
+    parameter ShrPumpData perPum;
+    ShrPumps pumps(per = fill(perPum, 2));
+  end ShrPlant;
+
+  model SharedElementDataOfComponentArray
+    "A dimension in an array of components from each element's data, the elements' data the same (Buildings ElectricChillerParallel: pum[num](per = per), per = fill(perCHWPum, numChi)): evaluated once for all elements, max(power.P) read every element's P ({0.0} > eps)"
+    parameter Real m_flow = 3;
+    parameter ShrPumpData perPum(pressure(V_flow = m_flow/2*{0.5, 1}));
+    ShrPlant pla(perPum = perPum);
+  end SharedElementDataOfComponentArray;
+
+  record MaxPower "Power curve"
+    parameter Real P[:] "Powers";
+  end MaxPower;
+
+  record MaxData "Data with a one-element power curve (Buildings Movers.Data.Generic)"
+    parameter MaxPower power(P = {0});
+    parameter Real V[:] = {0, 1};
+    parameter Real W = if max(power.P) > 1e-15 then max(power.P) else sum(V);
+  end MaxData;
+
+  model MaxOfOneElementFieldInRecordArray
+    "max() of a record's one-element field in an array of records (Buildings DataCenters: Generic[numChi] perPum): max(power.P) is power.P[1], its subscript went on the record array (dat[1].power.P), {0.0} > eps"
+    parameter MaxData[2] dat(each V = {1, 2}, power(P = {{0}, {5}}));
+    Real y(start = 0, fixed = true);
+  equation
+    der(y) = dat[2].W;
+  end MaxOfOneElementFieldInRecordArray;
+
+end BuildingsRepro;

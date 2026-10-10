@@ -1,0 +1,24 @@
+{"format":"Transformational debugger info","version":1,
+"info":{"name":"LapackExternal.SolveInTime","description":"Matrices.solve (LAPACK dgesv) of a time-varying right-hand side: called in the simulation"},
+"variables":{
+"y":{"comment":"","kind":"state","type":"Real","unit":"","displayUnit":"","source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":14,"lineEnd":14,"colStart":5,"colEnd":36}},"index":0},
+"der(y)":{"comment":"","kind":"derivative","type":"Real","unit":"","displayUnit":"","source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":14,"lineEnd":14,"colStart":5,"colEnd":36}},"index":1},
+"x[1]":{"comment":"{0.8, 1.4}*time","kind":"variable","type":"Real","unit":"","displayUnit":"","source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":13,"lineEnd":13,"colStart":5,"colEnd":79}},"index":2},
+"x[2]":{"comment":"{0.8, 1.4}*time","kind":"variable","type":"Real","unit":"","displayUnit":"","source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":13,"lineEnd":13,"colStart":5,"colEnd":79}},"index":3},
+"A[1,1]":{"comment":"","kind":"parameter","type":"Real","unit":"","displayUnit":"","source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":12,"lineEnd":12,"colStart":5,"colEnd":42}},"index":0},
+"A[1,2]":{"comment":"","kind":"parameter","type":"Real","unit":"","displayUnit":"","source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":12,"lineEnd":12,"colStart":5,"colEnd":42}},"index":1},
+"A[2,1]":{"comment":"","kind":"parameter","type":"Real","unit":"","displayUnit":"","source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":12,"lineEnd":12,"colStart":5,"colEnd":42}},"index":2},
+"A[2,2]":{"comment":"","kind":"parameter","type":"Real","unit":"","displayUnit":"","source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":12,"lineEnd":12,"colStart":5,"colEnd":42}},"index":3}
+},
+"equations":[{"eqIndex":0,"tag":"dummy"},
+{"eqIndex":1,"tag":"alias","equation":[4],"section":"initial"},
+{"eqIndex":2,"tag":"alias","equation":[5],"section":"initial"},
+{"eqIndex":3,"section":"initial","tag":"assign","defines":["y"],"uses":["$START.y"],"equation":["$START.y"],"source":{"info":{"file":"","lineStart":0,"lineEnd":0,"colStart":0,"colEnd":0}}},
+{"eqIndex":4,"section":"regular","tag":"assign","defines":["x"],"uses":["A[1,1]","A[1,2]","time","A[2,1]","A[2,2]"],"equation":["Modelica.Math.Matrices.solve(A, {3.0 * time, 5.0 * time})"],"source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":13,"lineEnd":13,"colStart":5,"colEnd":79}}},
+{"eqIndex":5,"section":"regular","tag":"assign","defines":["der(y)"],"uses":["x[2]","x[1]"],"equation":["x[1] + x[2]"],"source":{"info":{"file":"/private/tmp/claude-501/-Users-jtinnerholm-Projects-OM-jl/b641726d-b670-4cbc-baca-f2f76a972607/scratchpad/om-bld/test/Models/LapackExternal.mo","lineStart":16,"lineEnd":16,"colStart":5,"colEnd":25}}}
+],
+"functions":[
+"Modelica.Math.Matrices.solve",
+"Modelica.Math.Matrices.LAPACK.dgesv_vec"
+]
+}

@@ -552,11 +552,14 @@ const IEQ_MSL_MODELS = [
       local s25 = OM.simulate("InitialEquationTests.IEQ25_TupleParameters", file; stopTime = 1.0)
       @test s25(1.0; idxs = :x) ≈ 48.0 rtol = 1e-6
       #= t0 = time could not be evaluated at the build and t0 kept its start (0.6)
-         for any start time: computed for 0, another start time is refused. =#
+         for any start time: the ModelingToolkit path computes it for 0 and refuses
+         another start time; the array path solves it at the start time. =#
       local s26 = OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file; stopTime = 1.0)
       @test s26(0.9; idxs = :n) == 3   # samples at 0.25, 0.5, 0.75
+      local s26b = OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file; startTime = 0.1, stopTime = 1.0)
+      @test [s26b(t; idxs = :n) for t in (0.3, 0.5, 0.7, 0.9)] == [0, 1, 2, 3]   # at 0.35, 0.6, 0.85
       @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ26_ParameterFromTime", file;
-                                                             startTime = 0.1, stopTime = 1.0)
+                                                             startTime = 0.1, stopTime = 1.0, scalarize = true)
       #= Parameter targets of the initial algorithm were never set (k stayed 0).
          OpenModelica: k = 20, x(1) = 20. =#
       local s27 = OM.simulate("InitialEquationTests.IEQ27_ParameterFromInitialAlgorithm", file; stopTime = 1.0)
@@ -573,15 +576,21 @@ const IEQ_MSL_MODELS = [
       local s30 = OM.simulate("InitialEquationTests.IEQ30_ScaledInit", file; stopTime = 1.0)
       @test [s30(0.0; idxs = :x), s30(1.0; idxs = :x)] ≈ [2.0, 2 * exp(-1)] rtol = 1e-5
       #= An initial algorithm reading der() was skipped, its targets at their
-         starts (OpenModelica: b = 1), and dropped every other one (a = 0): refused. =#
-      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ31_DerInOneSection", file; stopTime = 1.0)
+         starts (OpenModelica: b = 1), and dropped every other one (a = 0): refused by the MTK
+         path. The array path runs the initial algorithms after the equations: a = 5, b = 1. =#
+      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ31_DerInOneSection", file;
+                                                             stopTime = 1.0, scalarize = true)
+      local s31 = OM.simulate("InitialEquationTests.IEQ31_DerInOneSection", file; stopTime = 1.0)
+      @test [s31(1.0; idxs = :a), s31(1.0; idxs = :b)] == [5.0, 1.0]
       #= The initial algorithm ran for time 0 at any start time: from 0.1 the
          count is the same (OpenModelica: x(1) = 0.9); a value that differs is
          refused (OpenModelica: t1 = 0.1). =#
       local s32 = OM.simulate("InitialEquationTests.IEQ32_InitialAlgorithmReadsTime", file; startTime = 0.1, stopTime = 1.0)
       @test s32(1.0; idxs = :x) ≈ 0.9 rtol = 1e-6
       @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ33_TimeOfStart", file;
-                                                             startTime = 0.1, stopTime = 1.0)
+                                                             startTime = 0.1, stopTime = 1.0, scalarize = true)
+      #= the array path runs the initial algorithm at the start time =#
+      @test OM.simulate("InitialEquationTests.IEQ33_TimeOfStart", file; startTime = 0.1, stopTime = 1.0)(1.0; idxs = :t1) ≈ 0.1
       #= Neither parameter can be solved alone at the build: the initialization
          solves both (OpenModelica: p = 2, x(1) = 2). =#
       local s34 = OM.simulate("InitialEquationTests.IEQ34_CoupledParameters", file; stopTime = 1.0)

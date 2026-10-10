@@ -270,6 +270,8 @@ directory. Returns the path written by `CSV.write`.
 To view the result in OMEdit, choose `File > Open Result(s) file`.
 """
 function exportCSV(modelName, sol; filePath = nothing)
+  sol.prob.p isa OMBackend.CodeGeneration.ArrayODEGen.ArrayModelParameters &&
+    return _exportCSVArrayModel(modelName, sol, filePath)
   local df1 = DataFrames.DataFrame(sol)
   local finalDf
   vals = Any[]
@@ -314,6 +316,18 @@ function exportCSV(modelName, sol; filePath = nothing)
     filePath
   end
   CSV.write(finalFileName, finalDf)
+end
+
+#= A solution of the array path (OMBackend.ArrayODEGen): time, then the states, algebraic and
+   discrete variables by their Modelica names. =#
+function _exportCSVArrayModel(modelName, sol, filePath)
+  local m = sol.prob.p.model
+  local df = DataFrames.DataFrame("time" => sol.t)
+  for name in Base.invokelatest(() -> vcat(m.STATE_NAMES, m.ALGEBRAIC_NAMES, m.DISCRETE_NAMES))
+    df[!, name] = OMBackend.getVariableValues(sol, name)
+  end
+  local finalFileName = filePath === nothing ? string(replace(modelName, "." => "_"), "_res.csv") : filePath
+  CSV.write(finalFileName, df)
 end
 
 """
@@ -410,7 +424,8 @@ representation and the function cache.
 
 # Keyword arguments
 - `repr`: output representation, `:FM` (FlatModel, default) or `:DAE`
-- `scalarize`: enable scalarization (default `true`, only applies to `:FM`)
+- `scalarize`: scalarize arrays (default `true`; `false` keeps array variables, array
+  equations and for-equations, as omc's `-d=-nfScalarize`; only applies to `:FM`)
 - `MSL`: load the Modelica Standard Library alongside the model file
 - `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
 - `libraries`: cache keys or file/directory paths for user libraries
@@ -425,7 +440,7 @@ OM.flatten("MyModel", "model.mo"; libraries=["MyLib"])
 """
 function flatten(modelName::String, modelFile::String;
                  repr::Symbol = :FM,
-                 scalarize = true,
+                 scalarize::Bool = true,
                  MSL = false,
                  MSL_Version = "MSL:3.2.3",
                  libraries::Vector{String} = String[])::Tuple
@@ -448,7 +463,7 @@ function flatten(modelName::String, modelFile::String;
 end
 
 """
-    flatten(modelName; MSL_Version="MSL:3.2.3", libraries=String[])
+    flatten(modelName; MSL_Version="MSL:3.2.3", libraries=String[], scalarize=true)
 
 Flatten a model by name: an MSL model, or one of `libraries`. Returns a Tuple of
 the flattened representation and the function cache.
@@ -466,10 +481,34 @@ key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
 OM.flatten("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
 ```
 """
-function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector{String} = String[])::Tuple
-  isempty(libraries) || return flatten(modelName, ""; libraries = libraries)
-  return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version)
+function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector{String} = String[],
+                 scalarize::Bool = true)::Tuple
+  isempty(libraries) || return flatten(modelName, ""; libraries = libraries, scalarize = scalarize)
+  return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version, scalarize = scalarize)
 end
+
+"""
+    SCALARIZE
+
+Default for the `scalarize` keyword of `translate` and `simulate`. `false` (the default): the
+flat model keeps its array variables, array equations and for-equations, and the backend
+generates code that keeps the loops (`OMBackend.ARRAY_ODE_GENERATION`): its size does not grow
+with the arrays, and every parameter can be changed in `resimulate`. A model outside that code
+generation's scope (algebraic loops, index reduction, Modelica functions, ...) is flattened
+again with scalarization and translated as with `true` (the reason is logged). `true`: the
+frontend scalarizes, as before.
+`flatten` returns the scalarized flat model unless asked otherwise.
+
+```julia
+OM.SCALARIZE[] = true             # all later calls scalarize
+OM.simulate("M", "m.mo"; scalarize = true)   # one call
+```
+"""
+const SCALARIZE = Ref(false)
+
+#= The scalarize setting each model was last translated with (by canonical name): simulate by
+   name translates again when it is asked for the other one. =#
+const SCALARIZED_AT_TRANSLATE = Dict{String, Bool}()
 
 """
     withDirectRHS(f, value)
@@ -486,6 +525,11 @@ function withDirectRHS(f::Function, value::Bool)
     OMBackend.DIRECT_RHS_GENERATION[] = previous
   end
 end
+
+#= withDirectRHS, and the iMTK build at the simulation's start time (its initialization is
+   solved there: built at 0, a simulation from another start built twice). =#
+_withSimulationSettings(f::Function, directRHS::Bool, startTime::Real) =
+  withDirectRHS(() -> OMBackend.IMTKGen.withBuildStart(f, startTime), directRHS)
 
 """
     simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false,
@@ -520,6 +564,8 @@ to `translate(modelName, modelFile; ...)` followed by
   `eliminatedName` matches at least one pattern are kept.
 - `directRHS`: toggle direct-RHS code generation (default reads
   `OMBackend.DIRECT_RHS_GENERATION[]`).
+- `scalarize`: scalarize arrays in the frontend (default `OM.SCALARIZE[]`, `false`: arrays are
+  kept and the loops reach the generated code where possible, see `OM.SCALARIZE`).
 - `overwriteCache`: force re-evaluation of generated code even if the
   model is already compiled (default `false`).
 
@@ -539,8 +585,9 @@ function simulate(modelName::String,
                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
+                  scalarize::Bool = SCALARIZE[],
                   kwargs...)
-  return withDirectRHS(directRHS) do
+  return _withSimulationSettings(directRHS, startTime) do
     local rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
     translate(modelName, modelFile;
               MSL = MSL,
@@ -549,7 +596,8 @@ function simulate(modelName::String,
               MSL_Version = MSL_Version,
               warnMissingStartValues = warnMissingStartValues,
               eliminateNonDynamic = eliminateNonDynamic,
-              observedFilter = observedFilter)
+              observedFilter = observedFilter,
+              scalarize = scalarize)
     rebuilt = rebuilt && _builtAtTranslate(modelName)
     OMBackend.simulateModel(modelName;
                             MODE = mode, tspan = (startTime, stopTime),
@@ -640,10 +688,12 @@ function simulate(modelName::String;
                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
+                  scalarize::Bool = SCALARIZE[],
                   kwargs...)
-  return withDirectRHS(directRHS) do
+  return _withSimulationSettings(directRHS, startTime) do
     internalName = OMBackend.canonicalName(modelName)
-    alreadyCompiled = haskey(OMBackend.COMPILED_MODELS_MTK, internalName)
+    alreadyCompiled = (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) &&
+                      get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize
     local rebuilt = false
     if (!alreadyCompiled || overwriteCache) && (MSL || !isempty(libraries))
       rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
@@ -653,7 +703,8 @@ function simulate(modelName::String;
                 mode = mode,
                 warnMissingStartValues = warnMissingStartValues,
                 eliminateNonDynamic = eliminateNonDynamic,
-                observedFilter = observedFilter)
+                observedFilter = observedFilter,
+                scalarize = scalarize)
       rebuilt = rebuilt && _builtAtTranslate(modelName)
     end
     OMBackend.simulateModel(modelName;
@@ -730,15 +781,27 @@ function translate(modelName::String,
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
-                   checkSimCode::Bool = true)
+                   checkSimCode::Bool = true,
+                   scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
     #= MTK_MODE and DEMode both consume the FlatModel-derived SIM_CODE. Only the
        deprecated DAE_MODE wants the legacy :DAE representation. =#
     repr = (mode == OMBackend.MTK_MODE || mode == OMBackend.IMTK_MODE || mode == OMBackend.DEMode) ? :FM : :DAE
+    #= Arrays kept (the default mode): the array-preserving translation, else the
+       scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+    local keep = !scalarize && repr == :FM && mode == OMBackend.IMTK_MODE
     (dae, cache) = flatten(modelName, modelFile;
                            repr = repr,
                            MSL = MSL, MSL_Version = MSL_Version,
-                           libraries = libraries)
+                           libraries = libraries,
+                           scalarize = !keep)
+    SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+    if keep
+      local arrays = OMBackend.translateArrays(dae; functionList = OMFrontend.cacheToFunctionList(cache))
+      arrays === nothing || return arrays
+      (dae, cache) = flatten(modelName, modelFile; repr = repr, MSL = MSL, MSL_Version = MSL_Version,
+                             libraries = libraries, scalarize = true)
+    end
     functionList = OMFrontend.cacheToFunctionList(cache)
     OMBackend.translate(dae;
                         functionList = functionList,
@@ -746,7 +809,8 @@ function translate(modelName::String,
                         warnMissingStartValues = warnMissingStartValues,
                         eliminateNonDynamic = eliminateNonDynamic,
                         observedFilter = observedFilter,
-                        checkSimCode = checkSimCode)
+                        checkSimCode = checkSimCode,
+                        scalarized = true)
   end
 end
 
@@ -790,9 +854,20 @@ function translate(modelName::String;
                    eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
-                   checkSimCode::Bool = true)
+                   checkSimCode::Bool = true,
+                   scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
-    (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)
+    #= Arrays kept (the default mode): the array-preserving translation, else the
+       scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+    local keep = !scalarize && mode == OMBackend.IMTK_MODE
+    (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
+                           scalarize = !keep)
+    SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+    if keep
+      local arrays = OMBackend.translateArrays(dae; functionList = OMFrontend.cacheToFunctionList(cache))
+      arrays === nothing || return arrays
+      (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
+    end
     functionList = OMFrontend.cacheToFunctionList(cache)
     OMBackend.translate(dae;
                         functionList = functionList,
@@ -800,7 +875,8 @@ function translate(modelName::String;
                         warnMissingStartValues = warnMissingStartValues,
                         eliminateNonDynamic = eliminateNonDynamic,
                         observedFilter = observedFilter,
-                        checkSimCode = checkSimCode)
+                        checkSimCode = checkSimCode,
+                        scalarized = true)
   end
 end
 
