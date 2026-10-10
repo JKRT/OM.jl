@@ -55,4 +55,16 @@
       sol !== nothing && sol.retcode == ReturnCode.Success
     end
   end
+
+  #= Selective model extension (Modelica 3.6): extends A(break x), extends A(break connect(a, b)). =#
+  @testset "break modifiers" begin
+    local fm = first(OM.OMFrontend.instantiateSCodeToFM("BreakComponent", OM.translateToSCode("Models/BreakModifiers.mo")))
+    @test !occursin("unused", OM.OMFrontend.Frontend.toString(fm))
+    sol = runModelMTK("BreakComponent", "Models/BreakModifiers.mo"; timeSpan = (0.0, 1.0))
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :x), 1.0; atol = 1e-4)
+    sol = runModelMTK("BreakConnect", "Models/BreakModifiers.mo"; timeSpan = (0.0, 1.0))
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-4)
+  end
 end
