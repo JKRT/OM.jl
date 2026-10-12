@@ -16,3 +16,13 @@ deps/deps.jl
 Manifest.toml
 *.mat
 docs/build/
+# omc build output of a model compiled in the repository (e.g. for a reference result)
+*.o
+*.libs
+*.makefile
+*_info.json
+*_init.xml
+*_JacA.bin
+*_external_functions.json
+test/Models/*.c
+test/Models/*.h
