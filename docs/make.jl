@@ -15,6 +15,7 @@ makedocs(
     pages = [
         "Home" => "index.md",
         "Installation" => "installation.md",
+        "Libraries" => "libraries.md",
         "Examples" => "examples.md",
         "Large array models" => "arrays.md",
         "Scripting (.mos)" => "scripting.md",
