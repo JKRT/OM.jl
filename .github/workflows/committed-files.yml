@@ -1,0 +1,21 @@
+name: Committed files
+
+# Fails when a commit holds files that do not belong in the repository
+# (ci/check-committed-files.sh): files .gitignore ignores, binary files other
+# than images, files over 5 MB.
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: No build output or other generated files
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash ci/check-committed-files.sh

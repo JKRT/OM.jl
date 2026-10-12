@@ -83,11 +83,14 @@ models or backend caches.
 
 ## Other MSL versions and third-party libraries
 
-`MSL_Version` selects the bundled serialized MSL (3.2.3 or 4.0.0). To use an
-installed-but-unbundled version or a third-party library, load it through the
-general loader and pass the returned key:
+`MSL_Version` selects the bundled MSL (3.2.3 or 4.0.0). Other versions and other
+libraries are loaded from the libraries installed for OpenModelica and passed by
+their key:
 
 ```julia
 key = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")
-OM.simulate("Modelica....SomeModel"; libraries = [key])
+OM.simulate("Modelica.Blocks.Examples.PID_Controller"; libraries = [key], stopTime = 4.0)
 ```
+
+Where libraries come from, how to install one, and what happens when one is
+missing: [Libraries](libraries.md).
