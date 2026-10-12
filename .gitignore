@@ -14,6 +14,7 @@ deps/deps.jl
 .vscode/
 *.log
 Manifest.toml
+Manifest-v*.toml
 *.mat
 docs/build/
 # omc build output of a model compiled in the repository (e.g. for a reference result)
