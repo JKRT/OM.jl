@@ -106,4 +106,12 @@
     @test sol(0.25; idxs = :y) == 3.0
     @test sol(0.75; idxs = :y) == 7.0
   end
+
+  #= An element of an array-returning call of symbolic parameters (MSL PlanarLoops_analytic's
+     revolute.e = normalizeWithAssert(n)): the call was one opaque term, a BoundsError at [2]. =#
+  @testset "an element of an array call of parameters" begin
+    sol = OM.simulate("ArrayCallElementParam.M", "Models/ArrayCallElementParam.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :x), 1.4; atol = 1e-6)
+  end
 end
