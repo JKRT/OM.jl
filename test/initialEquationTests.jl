@@ -149,7 +149,8 @@ const IEQ_MSL_MODELS = [
     end
 
     @testset "IEQ5: discrete from param (mirrors DOCC T_B_act)" begin
-      #= der(B_act) = 0, initial equation B_act = B = -5.0
+      #= B_act discrete, initial equation B_act = B = -5.0, changed only by a when at t = 2
+         (der of a discrete variable is not Modelica: omc and OMFrontend refuse it)
          der(x) = B_act, x starts at 0.0 (default)
          Solution: B_act(t) = -5.0, x(t) = -5*t, x(1) = -5.0
          If initial equation is lost, B_act = 0 and x(1) = 0. =#

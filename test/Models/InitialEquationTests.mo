@@ -43,14 +43,16 @@ package InitialEquationTests
   end IEQ4_TwoStatesFromInitEq;
 
   model IEQ5_DiscreteFromParamInitEq
-    "Discrete variable set from parameter in initial equation, stays constant."
+    "Discrete variable set from parameter in initial equation, constant until an event after the tests' stopTime."
     parameter Real B = -5.0;
     discrete Real B_act;
     Real x;
   initial equation
     B_act = B;
   equation
-    der(B_act) = 0;
+    when time > 2 then
+      B_act = 0;
+    end when;
     der(x) = B_act;
   end IEQ5_DiscreteFromParamInitEq;
 
