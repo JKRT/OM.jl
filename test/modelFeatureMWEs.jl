@@ -88,4 +88,13 @@
     @test isapprox(sol(1.0; idxs = :n), 2.0; atol = 1e-9)
     @test isapprox(sol(1.0; idxs = :xAt), 1.0; atol = 1e-6)
   end
+
+  #= A record bound in a function argument (MSL 4 Inverse_sh_T's `function f_nonlinear(data
+     = ...)`): the callee takes the record by its fields; the bound value comes boxed. =#
+  @testset "a bound record in a partial application" begin
+    sol = OM.simulate("PartialRecordArg.M", "Models/PartialRecordArg.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.5; idxs = :x), 0.75; atol = 1e-6)
+    @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-6)
+  end
 end
