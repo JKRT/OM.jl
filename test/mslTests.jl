@@ -1025,7 +1025,12 @@ end
                         ("Modelica.Media.Examples.MixtureGases",
                          ("medium1_h" => 305441.306731196, "medium2_h" => 330940.983035711)),
                         ("Modelica.Media.Examples.TestOnly.IdealGasN2Mix", ("medium_h" => 313143.958304714,)),
-                        ("Modelica.Media.Examples.TestOnly.FlueGas", ()))
+                        ("Modelica.Media.Examples.TestOnly.FlueGas", ()),
+                        #= Medium.data[k] = SingleGasesData.CH4, ...: the collected constants had no
+                           value in the backend (UndefVarError), and the ShortPipe-to-FixedAmbient
+                           semiLinear pair needs MLS 3.7.2.5's rule at zero flow. omc 1.27.1, tolerance 1e-8. =#
+                        ("Modelica.Media.Examples.Tests.MediaTestModels.IdealGases.SimpleNaturalGas",
+                         ("volume_medium_T" => 350.841499105324, "volume_medium_p" => 111235.333542179)))
     @testset "$(model)" begin
       local sol = OM.simulate(model; MSL_Version = "MSL:3.2.3", stopTime = 1.0)
       @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
