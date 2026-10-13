@@ -114,4 +114,13 @@
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(1.0; idxs = :x), 1.4; atol = 1e-6)
   end
+
+  #= noEvent(if c then a else b) takes only the chosen branch (MSL ContinuousMean): the
+     arithmetic lowering c*a + (1 - c)*b turned the other branch's 1/0 into NaN (DtNaN). =#
+  @testset "noEvent guards the branch it does not take" begin
+    sol = OM.simulate("NoEventGuard", "Models/NoEventGuard.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.05; idxs = :x) == 0.0
+    @test isapprox(sol(1.0; idxs = :x), 0.9; rtol = 1e-4)
+  end
 end
