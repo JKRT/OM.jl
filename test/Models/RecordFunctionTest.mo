@@ -538,4 +538,49 @@ package RecordFunctionTest
     der(x) = secondOfPairIf(time);
   end RecordIfAssignment;
 
+  record SatPair "MSL R134a SaturationProperties"
+    Real psat;
+    Real Tsat;
+  end SatPair;
+
+  record FieldDefault "a field default reading another field"
+    Real a;
+    Real b = 2 * a;
+  end FieldDefault;
+
+  function satSum
+    input SatPair s;
+    output Real y;
+  algorithm
+    y := s.psat + 2 * s.Tsat;
+  end satSum;
+
+  function recordLocalModifiers "a protected record set by modifiers (MSL R134a getPhase_ph): 2 p"
+    input Real p;
+    output Real y;
+  protected
+    SatPair sat(psat = p, Tsat = 0);
+    Real hl = satSum(sat);
+  algorithm
+    y := hl + sat.psat;
+  end recordLocalModifiers;
+
+  function recordLocalDefaults "a field default reading another field, a record binding: 3 p + 3"
+    input Real p;
+    output Real y;
+  protected
+    FieldDefault w(a = p);
+    SatPair s2 = SatPair(p, 3);
+  algorithm
+    y := w.a + w.b + s2.Tsat;
+  end recordLocalDefaults;
+
+  model RecordLocalBindings "der(x) = 2 (time + 2): x(1) = 5; der(z) = 3 (time + 2) + 3: z(1) = 10.5"
+    Real x(start = 0, fixed = true);
+    Real z(start = 0, fixed = true);
+  equation
+    der(x) = recordLocalModifiers(time + 2);
+    der(z) = recordLocalDefaults(time + 2);
+  end RecordLocalBindings;
+
 end RecordFunctionTest;
