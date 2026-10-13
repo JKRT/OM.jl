@@ -19,8 +19,11 @@ include("testUtils.jl")
 OM.clearCaches!()
 OMBackend.warnMissingStartValues(false)
 
-#= CI runs the suite as parallel jobs, one group each (OM_TEST_GROUP): core,
-   results, events (event semantics, the longest file) and msl. Unset or "all"
+#= CI runs the suite as four parallel jobs, one group each (OM_TEST_GROUP), balanced by
+   the test files' minutes (timedInclude; OM.jl CI run 38431299445, 2026-10-13): about
+   12-13 min each. The names are kept from when the groups were topics: core (with the
+   array-path and Buildings reproducers), events (event semantics, part 1, with the
+   simulation result tests), results (event semantics, part 2) and msl. Unset or "all"
    runs everything. =#
 const TEST_GROUP = get(ENV, "OM_TEST_GROUP", "all")
 TEST_GROUP in ("all", "core", "results", "events", "msl") || error("Unknown OM_TEST_GROUP: $(TEST_GROUP)")
@@ -61,20 +64,21 @@ end
     end
   end #= Libraries and extensions=#
   @info "Testing simulation results..."
-  (ingroup("results") || ingroup("events")) && @testset "Simulation Results:" begin
-    ingroup("results") && timedInclude("simulationResultTests.jl")
+  @testset "Simulation Results:" begin
+    ingroup("events") && timedInclude("simulationResultTests.jl")
     ingroup("results") && timedInclude("recordTests.jl")
-    ingroup("results") && timedInclude("matrixTests.jl")
-    ingroup("results") && timedInclude("eventTests.jl")
+    ingroup("events") && timedInclude("matrixTests.jl")
+    ingroup("events") && timedInclude("eventTests.jl")
     ingroup("results") && timedInclude("vssTests.jl")
-    ingroup("results") && timedInclude("tunableParameterTests.jl")
+    ingroup("msl") && timedInclude("tunableParameterTests.jl")
     ingroup("results") && timedInclude("assertTests.jl")
     ingroup("events") && timedInclude("eventSemanticsTests.jl")
+    ingroup("results") && timedInclude("eventSemanticsTests2.jl")
     ingroup("results") && timedInclude("frictionEventTests.jl")
     ingroup("results") && timedInclude("stateSelectionTests.jl")
     ingroup("results") && timedInclude("deModeTests.jl")
-    ingroup("results") && timedInclude("arrayPathTests.jl")
-    ingroup("results") && timedInclude("buildingsReproTests.jl")
+    ingroup("core") && timedInclude("arrayPathTests.jl")
+    ingroup("core") && timedInclude("buildingsReproTests.jl")
   end
   @info "Testing procedural/algorithmic Modelica..."
   ingroup("core") && @testset "Procedural Modelica:" begin
