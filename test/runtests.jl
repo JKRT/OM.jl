@@ -20,11 +20,12 @@ OM.clearCaches!()
 OMBackend.warnMissingStartValues(false)
 
 #= CI runs the suite as four parallel jobs, one group each (OM_TEST_GROUP), balanced by
-   the test files' minutes (timedInclude; OM.jl CI run 38431299445, 2026-10-13): about
-   12-13 min each. The names are kept from when the groups were topics: core (with the
-   array-path and Buildings reproducers), events (event semantics, part 1, with the
-   simulation result tests), results (event semantics, part 2) and msl. Unset or "all"
-   runs everything. =#
+   the test files' minutes (timedInclude; OM.jl CI runs 38431299445 and 38436445253,
+   2026-10-13): about 13 min each. A file's time depends on its group, since the first
+   file of a job pays most of the compilation. The names are kept from when the groups
+   were topics: core (with the array-path reproducers and the assert tests), events
+   (event semantics, part 1, with the simulation result and Buildings tests), results
+   (event semantics, part 2) and msl. Unset or "all" runs everything. =#
 const TEST_GROUP = get(ENV, "OM_TEST_GROUP", "all")
 TEST_GROUP in ("all", "core", "results", "events", "msl") || error("Unknown OM_TEST_GROUP: $(TEST_GROUP)")
 ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
@@ -71,14 +72,14 @@ end
     ingroup("events") && timedInclude("eventTests.jl")
     ingroup("results") && timedInclude("vssTests.jl")
     ingroup("msl") && timedInclude("tunableParameterTests.jl")
-    ingroup("results") && timedInclude("assertTests.jl")
+    ingroup("core") && timedInclude("assertTests.jl")
     ingroup("events") && timedInclude("eventSemanticsTests.jl")
     ingroup("results") && timedInclude("eventSemanticsTests2.jl")
     ingroup("results") && timedInclude("frictionEventTests.jl")
     ingroup("results") && timedInclude("stateSelectionTests.jl")
     ingroup("results") && timedInclude("deModeTests.jl")
     ingroup("core") && timedInclude("arrayPathTests.jl")
-    ingroup("core") && timedInclude("buildingsReproTests.jl")
+    ingroup("events") && timedInclude("buildingsReproTests.jl")
   end
   @info "Testing procedural/algorithmic Modelica..."
   ingroup("core") && @testset "Procedural Modelica:" begin
