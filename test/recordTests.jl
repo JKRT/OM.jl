@@ -312,6 +312,15 @@
     end
   end
 
+  @testset "Tuple equation with a record output" begin
+    #= `(r, y2) = f(time)`: the record target stayed whole (r did not resolve), and the
+       scalarized path had no lowering of a tuple residual. =#
+    @test true == begin
+      sol = OM.simulate("RecordFunctionTest.TupleWithRecordOutput", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
+      testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 2.5)
+    end
+  end
+
   @testset "Protected array sized by an input" begin
     #= Real w[size(x, 1)] was declared a scalar 0.0, and w[i] := ... failed (setindex! on a
        Float64; the MSL Media massToMoleFractions). der(x) = 1.5 (1 + 2 + 3) = 9. =#

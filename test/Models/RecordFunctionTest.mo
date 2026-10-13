@@ -583,4 +583,23 @@ package RecordFunctionTest
     der(z) = recordLocalDefaults(time + 2);
   end RecordLocalBindings;
 
+  function tupleWithRecord "a record output first (MSL Spice3 diodeNoBypassCode)"
+    input Real u;
+    output SatPair r;
+    output Real y2;
+  algorithm
+    r.psat := 2 * u;
+    r.Tsat := 0;
+    y2 := 3 * u;
+  end tupleWithRecord;
+
+  model TupleWithRecordOutput "(r, y2) = tupleWithRecord(time): der(x) = r.psat + y2 = 5 time, x(1) = 2.5"
+    SatPair r;
+    Real y2;
+    Real x(start = 0, fixed = true);
+  equation
+    (r, y2) = tupleWithRecord(time);
+    der(x) = r.psat + y2;
+  end TupleWithRecordOutput;
+
 end RecordFunctionTest;
