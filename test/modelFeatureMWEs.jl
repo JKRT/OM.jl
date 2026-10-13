@@ -97,4 +97,13 @@
     @test isapprox(sol(0.5; idxs = :x), 0.75; atol = 1e-6)
     @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-6)
   end
+
+  #= A 3-D constant table read with variable subscripts (MSL Digital's MUX2x1Table): its
+     literal was a vector of matrices, a BoundsError at T[i, 2, 1]. =#
+  @testset "a 3-D constant table in an algorithm" begin
+    sol = OM.simulate("Table3DIndex", "Models/Table3DIndex.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.25; idxs = :y) == 3.0
+    @test sol(0.75; idxs = :y) == 7.0
+  end
 end
