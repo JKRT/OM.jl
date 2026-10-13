@@ -133,4 +133,14 @@
     @test isapprox(sol(1.0; idxs = :v), 0.5; atol = 1e-6)
     @test isapprox(sol(1.0; idxs = :x), 0.125; atol = 1e-6)
   end
+
+  #= `R = 1/G` with G in no other equation (MSL FluxTubes' LeakageWithCoefficient): folded
+     as R := 1/G, the other equation determined G nonlinearly and the initialization's Newton
+     diverged (QuadraticCoreAirgap); oriented as G = 1/R. =#
+  @testset "x = 1/y with y in no other equation" begin
+    sol = OM.simulate("ReciprocalVariable", "Models/ReciprocalVariable.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.0; idxs = :G), 1/(9*795774.715459477); rtol = 1e-9)
+    @test isapprox(sol(1.0; idxs = :G), 1/(18*795774.715459477); rtol = 1e-6)
+  end
 end
