@@ -806,4 +806,25 @@ package InitialEquationTests
     end when;
     der(x) = if y then 1 else 0;
   end IEQ58_PreFromNegatedParameter;
+  model IEQ59_NestedInitialIf "an if-equation nested in an initial if-equation (MSL 4 SoftStarter): x(0) = 3, x(1) = 4 (OpenModelica)"
+    Boolean b = time < 0.5;
+    Real p = 2 + time;
+    Real x;
+  initial equation
+    if b then
+      if p < 1 then
+        x = 1;
+      else
+        x = 3;
+      end if;
+    else
+      if p > 0 then
+        x = 5;
+      else
+        x = 7;
+      end if;
+    end if;
+  equation
+    der(x) = 1;
+  end IEQ59_NestedInitialIf;
 end InitialEquationTests;

@@ -659,6 +659,8 @@ const IEQ_MSL_MODELS = [
       @test OM.simulate("InitialEquationTests.IEQ57_HomotopySimplifiedOnlyAtInit", file; stopTime = 1.0)(1.0; idxs = :y) ≈ -1.0 atol = 1e-6
       #= A parameter bound to `not q0` on the right: "not a constant" (only operators and calls were evaluated). =#
       @test OM.simulate("InitialEquationTests.IEQ58_PreFromNegatedParameter", file; stopTime = 1.0)(1.0; idxs = :x) ≈ 0.5 atol = 1e-4
+      #= An if-equation nested in an initial if-equation was not lowered (FieldError: no field lhs). =#
+      @test OM.simulate("InitialEquationTests.IEQ59_NestedInitialIf", file; stopTime = 1.0)(0.0; idxs = :x) ≈ 3.0 atol = 1e-6
     end
 
   end

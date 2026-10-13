@@ -602,4 +602,36 @@ package RecordFunctionTest
     der(x) = r.psat + y2;
   end TupleWithRecordOutput;
 
+  function addPairs
+    input SatPair a;
+    input SatPair b;
+    output SatPair c;
+  algorithm
+    c.psat := a.psat + b.psat;
+    c.Tsat := a.Tsat + b.Tsat;
+  end addPairs;
+
+  function recordArrayLocals "arrays of records as locals (MSL ReferenceAir's Ice09 Gibbs): 25 + u"
+    input Real u;
+    output Real y;
+  protected
+    SatPair[3] r = {SatPair(1, 2), SatPair(3, 4), SatPair(5, 6)};
+    SatPair acc;
+    SatPair o[2];
+  algorithm
+    acc := r[1];
+    for k in 2:3 loop
+      acc := addPairs(acc, r[k]);
+    end for;
+    o[1] := addPairs(acc, SatPair(u, 0));
+    o[2] := r[2];
+    y := o[1].psat + o[2].Tsat + acc.Tsat;
+  end recordArrayLocals;
+
+  model RecordArrayLocals "der(x) = recordArrayLocals(time) = 25 + time: x(1) = 25.5 (OpenModelica)"
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = recordArrayLocals(time);
+  end RecordArrayLocals;
+
 end RecordFunctionTest;

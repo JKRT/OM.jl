@@ -78,4 +78,14 @@
     @test isapprox(sol(1.0; idxs = :y), -2.0; atol = 1e-4)
     @test isapprox(sol(1.0; idxs = :z), 2.0; atol = 1e-4)
   end
+
+  #= terminal() as one element of a vector trigger: lifted into a Boolean of its own, it
+     read an undefined `terminal`; the when is split into the other triggers and a
+     `when terminal()` run after the solve. =#
+  @testset "terminal() in a vector when-condition" begin
+    sol = OM.simulate("TerminalInVectorWhen", "Models/TerminalInVectorWhen.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :n), 2.0; atol = 1e-9)
+    @test isapprox(sol(1.0; idxs = :xAt), 1.0; atol = 1e-6)
+  end
 end
