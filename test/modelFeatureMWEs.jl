@@ -156,4 +156,15 @@
       @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-6)
     end
   end
+
+  #= An assert at a boundary the initialization's state touches, past it by rounding (MSL
+     TanksWithEmptyingPipe1: level_start = height): decided at the next check; a real
+     violation at the start is still reported. MTK path: the array path checks at once. =#
+  @testset "an assert at its boundary at the start" begin
+    sol = OM.simulate("AssertAtBoundary.AtBoundary", "Models/AssertAtBoundary.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(1.0; idxs = :level) < 0.3
+    @test_throws OMBackend.CodeGeneration.ModelicaAssertionError OM.simulate("AssertAtBoundary.Violated", "Models/AssertAtBoundary.mo";
+                                                                             stopTime = 1.0, scalarize = true)
+  end
 end
