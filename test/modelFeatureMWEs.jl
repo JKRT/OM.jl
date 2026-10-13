@@ -143,4 +143,17 @@
     @test isapprox(sol(0.0; idxs = :G), 1/(9*795774.715459477); rtol = 1e-9)
     @test isapprox(sol(1.0; idxs = :G), 1/(18*795774.715459477); rtol = 1e-6)
   end
+
+  #= Free parameters from coupled initial equations (MSL 4 SMPM_ResistiveBraking's idq_sr):
+     one equation at a time none was solved, and they kept their start values (0). =#
+  @testset "free parameters from coupled initial equations" begin
+    for directRHS in (false, true)
+      sol = OM.simulate("CoupledFreeParameters", "Models/CoupledFreeParameters.mo"; stopTime = 1.0,
+                        scalarize = true, directRHS = directRHS)
+      @test sol.retcode == ReturnCode.Success
+      @test isapprox(sol(0.0; idxs = :y), 2.0; atol = 1e-8)
+      @test isapprox(sol(0.0; idxs = :z), 1.0; atol = 1e-8)
+      @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-6)
+    end
+  end
 end
