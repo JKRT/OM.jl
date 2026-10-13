@@ -67,4 +67,15 @@
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-4)
   end
+
+  #= At x = 0 the two semiLinear equations hold for any s1; the rule picks the one
+     OpenModelica does (MSL Media's test models: ShortPipe and FixedAmbient, zero flow at
+     the start). Without it s1(0) was 0. =#
+  @testset "semiLinear chain (MLS 3.7.2.5)" begin
+    sol = OM.simulate("SemiLinearChain", "Models/SemiLinearChain.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.0; idxs = :s1), 1.0; atol = 1e-6)
+    @test isapprox(sol(1.0; idxs = :y), -2.0; atol = 1e-4)
+    @test isapprox(sol(1.0; idxs = :z), 2.0; atol = 1e-4)
+  end
 end
