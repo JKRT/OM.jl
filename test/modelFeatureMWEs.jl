@@ -123,4 +123,14 @@
     @test sol(0.05; idxs = :x) == 0.0
     @test isapprox(sol(1.0; idxs = :x), 0.9; rtol = 1e-4)
   end
+
+  #= An if-condition of several relations, one with a huge operand (MSL Spice3 V_pulse,
+     PW = 1e60): one hysteresis scale for all kept `time < TD` true after TD (v = 0). =#
+  @testset "a relation's hysteresis on its own operands" begin
+    sol = OM.simulate("PulseHysteresis", "Models/PulseHysteresis.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.25; idxs = :v) == 0.0
+    @test isapprox(sol(1.0; idxs = :v), 0.5; atol = 1e-6)
+    @test isapprox(sol(1.0; idxs = :x), 0.125; atol = 1e-6)
+  end
 end
