@@ -178,4 +178,14 @@
     @test sol(0.5; idxs = :y) == 6.0
     @test sol(0.5; idxs = :q) == 6.0
   end
+
+  #= Enumeration inputs, and arrays of them, indexing in a function called from a when (MSL
+     Digital RAM's Logic tables): they arrived as Float64, "invalid index: 1.0". =#
+  @testset "enumeration inputs as indices" begin
+    sol = OM.simulate("EnumIndexInput.M", "Models/EnumIndexInput.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.5; idxs = :w) == 1.0
+    @test sol(1.0; idxs = :w) == 100.0
+    @test sol(1.0; idxs = :v) == 200.0
+  end
 end
