@@ -197,4 +197,13 @@
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(1.0; idxs = :w), 0.5^1.5 + 2/3*0.5^1.5; rtol = 1e-5)
   end
+
+  #= A coefficient of der(v) that is zero by an evaluated parameter in a numerator,
+     tau/vt*exp(v/vt) with tau = 0 (MSL 4.1.0 HeatingNPN_NORGate: the transistors' junction
+     capacitances): 0/vt is 0, the derivative drops out and v is algebraic. =#
+  @testset "a zero numerator in a derivative's coefficient" begin
+    sol = OM.simulate("ZeroNumeratorCoefficient", "Models/ZeroNumeratorCoefficient.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :v), exp(-1.0); rtol = 1e-5)
+  end
 end
