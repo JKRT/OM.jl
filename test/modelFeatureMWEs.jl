@@ -188,4 +188,13 @@
     @test sol(1.0; idxs = :w) == 100.0
     @test sol(1.0; idxs = :v) == 200.0
   end
+
+  #= A function's error only where the step's start is evaluated again with the values after
+     an event (MSL MeasuringTemperature: IF97's region check): a rejected step, as
+     OpenModelica's solvers have it, not the end of the run. MTK path. =#
+  @testset "a function error at a step's re-evaluation" begin
+    sol = OM.simulate("StepRejection", "Models/StepRejection.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :w), 0.5^1.5 + 2/3*0.5^1.5; rtol = 1e-5)
+  end
 end
