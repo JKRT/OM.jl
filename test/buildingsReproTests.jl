@@ -174,6 +174,24 @@ end
     end
   end
 
+  #= A build's tables are freed with it (their destructors): a rebuild frees the previous
+     build's, a solution of it that reads its table throws instead of reaching freed memory, and
+     forgetModel frees the rest. Every translate kept its tables for the whole session before. =#
+  @testset "A build's tables are freed with the build" begin
+    local CG = OMBackend.CodeGeneration
+    local cname = OMBackend.canonicalName("BuildingsRepro.TableInit3")
+    local sol1 = brSimulate("TableInit3"; stopTime = 1.0, scalarize = true, overwriteCache = true)
+    @test brValue(sol1, "y", 0.5) ≈ 1.0 rtol = 1e-6
+    local first = only(CG.EXTERNAL_OBJECTS[cname])
+    local sol2 = brSimulate("TableInit3"; stopTime = 1.0, scalarize = true, overwriteCache = true)
+    @test !first.alive
+    @test length(CG.EXTERNAL_OBJECTS[cname]) == 1
+    @test brValue(sol2, "y", 0.5) ≈ 1.0 rtol = 1e-6
+    @test_throws ErrorException sol1(0.5; idxs = :y)
+    OMBackend.forgetModel("BuildingsRepro.TableInit3")
+    @test !haskey(CG.EXTERNAL_OBJECTS, cname)
+  end
+
   #= Two models' tables of one name in one process: each reads its own. The generated functions
      differed only in the table object, which printed without its pointer, so the global cache
      of RuntimeGeneratedFunctions gave the second model the first one's (0.05 for 1.0). =#
@@ -661,9 +679,9 @@ end
   @testset "An external object in the equations: two builds are the same (CHPs ElectricalFollowing)" begin
     #= its pointer was a constant in the terms reading it, hashed by its address: the order of
        the terms, and the rounding of the generated code, changed from build to build. The
-       object prints its address (new in every build), compared without it. =#
+       object prints its serial number (new in every build), compared without it. =#
     local MTK = OMBackend.ModelingToolkit
-    local observed = () -> [replace(string(eq), r"(ExternalObjectRef\(:\w+), 0x[0-9a-f]+\)" => s"\1)")
+    local observed = () -> [replace(string(eq), r"(ExternalObjectRef\(:\w+), \d+\)" => s"\1)")
                             for eq in MTK.observed(brSimulate("TableInit3"; stopTime = 1.0, scalarize = true,
                                                               overwriteCache = true).prob.f.sys)]
     local (a, b) = (observed(), observed())
