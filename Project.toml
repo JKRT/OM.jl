@@ -1,6 +1,6 @@
 name = "OM"
 uuid = "2f925a0b-2436-437b-858e-49aee461894b"
-version = "0.5.2"
+version = "0.5.3"
 authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
 
 [deps]
