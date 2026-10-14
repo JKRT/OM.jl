@@ -1,0 +1,52 @@
+name: Release
+
+# A version bump of Project.toml merged to master: tag it vX.Y.Z with a GitHub
+# release. Runs only when Project.toml changes, and does nothing unless its version
+# changed. (This package is not in the OpenModelica registry: its Project.toml has
+# a [sources] block, which the registry's auto-update skips.)
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - Project.toml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Version change
+        id: version
+        run: |
+          new=$(sed -n 's/^version = "\(.*\)"/\1/p' Project.toml | head -1)
+          old=$(git show HEAD^:Project.toml 2>/dev/null | sed -n 's/^version = "\(.*\)"/\1/p' | head -1)
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+          if [ -n "$new" ] && [ "$new" != "$old" ] && ! git ls-remote --exit-code --tags origin "refs/tags/v$new" > /dev/null; then
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "Version $old -> $new"
+          else
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            echo "No new version (Project.toml $new, before $old, or v$new is tagged already)"
+          fi
+
+      - name: Tag and GitHub release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.new }}
+        run: |
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" \
+            --notes "$(git log -1 --format=%s "$GITHUB_SHA")"
