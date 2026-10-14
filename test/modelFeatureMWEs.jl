@@ -67,4 +67,153 @@
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-4)
   end
+
+  #= At x = 0 the two semiLinear equations hold for any s1; the rule picks the one
+     OpenModelica does (MSL Media's test models: ShortPipe and FixedAmbient, zero flow at
+     the start). Without it s1(0) was 0. =#
+  @testset "semiLinear chain (MLS 3.7.2.5)" begin
+    sol = OM.simulate("SemiLinearChain", "Models/SemiLinearChain.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.0; idxs = :s1), 1.0; atol = 1e-6)
+    @test isapprox(sol(1.0; idxs = :y), -2.0; atol = 1e-4)
+    @test isapprox(sol(1.0; idxs = :z), 2.0; atol = 1e-4)
+  end
+
+  #= terminal() as one element of a vector trigger: lifted into a Boolean of its own, it
+     read an undefined `terminal`; the when is split into the other triggers and a
+     `when terminal()` run after the solve. =#
+  @testset "terminal() in a vector when-condition" begin
+    sol = OM.simulate("TerminalInVectorWhen", "Models/TerminalInVectorWhen.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :n), 2.0; atol = 1e-9)
+    @test isapprox(sol(1.0; idxs = :xAt), 1.0; atol = 1e-6)
+  end
+
+  #= A record bound in a function argument (MSL 4 Inverse_sh_T's `function f_nonlinear(data
+     = ...)`): the callee takes the record by its fields; the bound value comes boxed. =#
+  @testset "a bound record in a partial application" begin
+    sol = OM.simulate("PartialRecordArg.M", "Models/PartialRecordArg.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.5; idxs = :x), 0.75; atol = 1e-6)
+    @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-6)
+  end
+
+  #= A 3-D constant table read with variable subscripts (MSL Digital's MUX2x1Table): its
+     literal was a vector of matrices, a BoundsError at T[i, 2, 1]. =#
+  @testset "a 3-D constant table in an algorithm" begin
+    sol = OM.simulate("Table3DIndex", "Models/Table3DIndex.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.25; idxs = :y) == 3.0
+    @test sol(0.75; idxs = :y) == 7.0
+  end
+
+  #= An element of an array-returning call of symbolic parameters (MSL PlanarLoops_analytic's
+     revolute.e = normalizeWithAssert(n)): the call was one opaque term, a BoundsError at [2]. =#
+  @testset "an element of an array call of parameters" begin
+    sol = OM.simulate("ArrayCallElementParam.M", "Models/ArrayCallElementParam.mo"; stopTime = 1.0)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :x), 1.4; atol = 1e-6)
+  end
+
+  #= noEvent(if c then a else b) takes only the chosen branch (MSL ContinuousMean): the
+     arithmetic lowering c*a + (1 - c)*b turned the other branch's 1/0 into NaN (DtNaN). =#
+  @testset "noEvent guards the branch it does not take" begin
+    sol = OM.simulate("NoEventGuard", "Models/NoEventGuard.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.05; idxs = :x) == 0.0
+    @test isapprox(sol(1.0; idxs = :x), 0.9; rtol = 1e-4)
+  end
+
+  #= An if-condition of several relations, one with a huge operand (MSL Spice3 V_pulse,
+     PW = 1e60): one hysteresis scale for all kept `time < TD` true after TD (v = 0). =#
+  @testset "a relation's hysteresis on its own operands" begin
+    sol = OM.simulate("PulseHysteresis", "Models/PulseHysteresis.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.25; idxs = :v) == 0.0
+    @test isapprox(sol(1.0; idxs = :v), 0.5; atol = 1e-6)
+    @test isapprox(sol(1.0; idxs = :x), 0.125; atol = 1e-6)
+  end
+
+  #= `R = 1/G` with G in no other equation (MSL FluxTubes' LeakageWithCoefficient): folded
+     as R := 1/G, the other equation determined G nonlinearly and the initialization's Newton
+     diverged (QuadraticCoreAirgap); oriented as G = 1/R. =#
+  @testset "x = 1/y with y in no other equation" begin
+    sol = OM.simulate("ReciprocalVariable", "Models/ReciprocalVariable.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.0; idxs = :G), 1/(9*795774.715459477); rtol = 1e-9)
+    @test isapprox(sol(1.0; idxs = :G), 1/(18*795774.715459477); rtol = 1e-6)
+  end
+
+  #= Free parameters from coupled initial equations (MSL 4 SMPM_ResistiveBraking's idq_sr):
+     one equation at a time none was solved, and they kept their start values (0). =#
+  @testset "free parameters from coupled initial equations" begin
+    for directRHS in (false, true)
+      sol = OM.simulate("CoupledFreeParameters", "Models/CoupledFreeParameters.mo"; stopTime = 1.0,
+                        scalarize = true, directRHS = directRHS)
+      @test sol.retcode == ReturnCode.Success
+      @test isapprox(sol(0.0; idxs = :y), 2.0; atol = 1e-8)
+      @test isapprox(sol(0.0; idxs = :z), 1.0; atol = 1e-8)
+      @test isapprox(sol(1.0; idxs = :x), 2.0; atol = 1e-6)
+    end
+  end
+
+  #= An assert at a boundary the initialization's state touches, past it by rounding (MSL
+     TanksWithEmptyingPipe1: level_start = height): decided at the next check; a real
+     violation at the start is still reported. MTK path: the array path checks at once. =#
+  @testset "an assert at its boundary at the start" begin
+    sol = OM.simulate("AssertAtBoundary.AtBoundary", "Models/AssertAtBoundary.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(1.0; idxs = :level) < 0.3
+    @test_throws OMBackend.CodeGeneration.ModelicaAssertionError OM.simulate("AssertAtBoundary.Violated", "Models/AssertAtBoundary.mo";
+                                                                             stopTime = 1.0, scalarize = true)
+  end
+
+  #= A validation's reference signals that the parameter eliminations fold away (MSL
+     ShowTransferFunction's const.y, readRealParameterModel's J): kept when the observedFilter
+     asks for them. =#
+  @testset "parameters the observedFilter asks for" begin
+    sol = OM.simulate("RequestedParameter", "Models/RequestedParameter.mo"; stopTime = 1.0, scalarize = true,
+                      observedFilter = ["^y\$", "^q\$"])
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.5; idxs = :y) == 6.0
+    @test sol(0.5; idxs = :q) == 6.0
+  end
+
+  #= Enumeration inputs, and arrays of them, indexing in a function called from a when (MSL
+     Digital RAM's Logic tables): they arrived as Float64, "invalid index: 1.0". =#
+  @testset "enumeration inputs as indices" begin
+    sol = OM.simulate("EnumIndexInput.M", "Models/EnumIndexInput.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.5; idxs = :w) == 1.0
+    @test sol(1.0; idxs = :w) == 100.0
+    @test sol(1.0; idxs = :v) == 200.0
+  end
+
+  #= A function's error only where the step's start is evaluated again with the values after
+     an event (MSL MeasuringTemperature: IF97's region check): a rejected step, as
+     OpenModelica's solvers have it, not the end of the run. MTK path. =#
+  @testset "a function error at a step's re-evaluation" begin
+    sol = OM.simulate("StepRejection", "Models/StepRejection.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :w), 0.5^1.5 + 2/3*0.5^1.5; rtol = 1e-5)
+  end
+
+  #= A coefficient of der(v) that is zero by an evaluated parameter in a numerator,
+     tau/vt*exp(v/vt) with tau = 0 (MSL 4.1.0 HeatingNPN_NORGate: the transistors' junction
+     capacitances): 0/vt is 0, the derivative drops out and v is algebraic. =#
+  @testset "a zero numerator in a derivative's coefficient" begin
+    sol = OM.simulate("ZeroNumeratorCoefficient", "Models/ZeroNumeratorCoefficient.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :v), exp(-1.0); rtol = 1e-5)
+  end
+
+  #= A tuple initial equation of an array output, its call reading a parameter the
+     initialization computes (MSL Blocks.Continuous.Filter's poles: (r, a, b, ku) =
+     roots.lowPass(cr, ...)): the initialization assigns r. Dropped, r was 0, a solution of
+     der(y) = 0 too, and the filters of SMEE_Rectifier and ThreePhaseTwoLevel_PWM did not move. =#
+  @testset "a tuple initial equation of an array output for free parameters" begin
+    sol = OM.simulate("TupleArrayFreeParameterInit", "Models/TupleArrayFreeParameterInit.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(1.0; idxs = :y) ≈ 1.0
+  end
 end

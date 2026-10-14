@@ -793,4 +793,38 @@ package InitialEquationTests
     der(x) = -2;
     y = homotopy(actual = x, simplified = ieq57Positive(x));
   end IEQ57_HomotopySimplifiedOnlyAtInit;
+  model IEQ58_PreFromNegatedParameter "pre(y) = ystart = not q0 (MSL Blocks' RSFlipFlop: pre_u_start = not Qini): x(1) = 0.5 (OpenModelica)"
+    parameter Boolean q0 = false;
+    parameter Boolean ystart = not q0;
+    discrete Boolean y;
+    Real x(start = 0, fixed = true);
+  initial equation
+    pre(y) = ystart;
+  equation
+    when time > 0.5 then
+      y = not pre(y);
+    end when;
+    der(x) = if y then 1 else 0;
+  end IEQ58_PreFromNegatedParameter;
+  model IEQ59_NestedInitialIf "an if-equation nested in an initial if-equation (MSL 4 SoftStarter): x(0) = 3, x(1) = 4 (OpenModelica)"
+    Boolean b = time < 0.5;
+    Real p = 2 + time;
+    Real x;
+  initial equation
+    if b then
+      if p < 1 then
+        x = 1;
+      else
+        x = 3;
+      end if;
+    else
+      if p > 0 then
+        x = 5;
+      else
+        x = 7;
+      end if;
+    end if;
+  equation
+    der(x) = 1;
+  end IEQ59_NestedInitialIf;
 end InitialEquationTests;

@@ -69,9 +69,9 @@ end SimpleAgenticTest;
                     MSL = true, MSL_Version = "MSL:3.2.3")
     flat_with_consts = OM.OMFrontend.Frontend.collectConstants(fm[1], fm[2])
     flat_str = OM.toString(flat_with_consts)
-    @test occursin("Real 'Modelica.Mechanics.MultiBody.Types.Defaults.FrameHeadLengthFraction' =", flat_str)
-    @test occursin("Real 'Modelica.Mechanics.MultiBody.Types.Defaults.FrameHeadWidthFraction' =", flat_str)
-    @test occursin("Real 'Modelica.Mechanics.MultiBody.Types.Defaults.ArrowHeadLengthFraction' =", flat_str)
+    @test occursin("constant Real Modelica.Mechanics.MultiBody.Types.Defaults.FrameHeadLengthFraction =", flat_str)
+    @test occursin("constant Real Modelica.Mechanics.MultiBody.Types.Defaults.FrameHeadWidthFraction =", flat_str)
+    @test occursin("constant Real Modelica.Mechanics.MultiBody.Types.Defaults.ArrowHeadLengthFraction =", flat_str)
   end
 
 end

@@ -538,4 +538,100 @@ package RecordFunctionTest
     der(x) = secondOfPairIf(time);
   end RecordIfAssignment;
 
+  record SatPair "MSL R134a SaturationProperties"
+    Real psat;
+    Real Tsat;
+  end SatPair;
+
+  record FieldDefault "a field default reading another field"
+    Real a;
+    Real b = 2 * a;
+  end FieldDefault;
+
+  function satSum
+    input SatPair s;
+    output Real y;
+  algorithm
+    y := s.psat + 2 * s.Tsat;
+  end satSum;
+
+  function recordLocalModifiers "a protected record set by modifiers (MSL R134a getPhase_ph): 2 p"
+    input Real p;
+    output Real y;
+  protected
+    SatPair sat(psat = p, Tsat = 0);
+    Real hl = satSum(sat);
+  algorithm
+    y := hl + sat.psat;
+  end recordLocalModifiers;
+
+  function recordLocalDefaults "a field default reading another field, a record binding: 3 p + 3"
+    input Real p;
+    output Real y;
+  protected
+    FieldDefault w(a = p);
+    SatPair s2 = SatPair(p, 3);
+  algorithm
+    y := w.a + w.b + s2.Tsat;
+  end recordLocalDefaults;
+
+  model RecordLocalBindings "der(x) = 2 (time + 2): x(1) = 5; der(z) = 3 (time + 2) + 3: z(1) = 10.5"
+    Real x(start = 0, fixed = true);
+    Real z(start = 0, fixed = true);
+  equation
+    der(x) = recordLocalModifiers(time + 2);
+    der(z) = recordLocalDefaults(time + 2);
+  end RecordLocalBindings;
+
+  function tupleWithRecord "a record output first (MSL Spice3 diodeNoBypassCode)"
+    input Real u;
+    output SatPair r;
+    output Real y2;
+  algorithm
+    r.psat := 2 * u;
+    r.Tsat := 0;
+    y2 := 3 * u;
+  end tupleWithRecord;
+
+  model TupleWithRecordOutput "(r, y2) = tupleWithRecord(time): der(x) = r.psat + y2 = 5 time, x(1) = 2.5"
+    SatPair r;
+    Real y2;
+    Real x(start = 0, fixed = true);
+  equation
+    (r, y2) = tupleWithRecord(time);
+    der(x) = r.psat + y2;
+  end TupleWithRecordOutput;
+
+  function addPairs
+    input SatPair a;
+    input SatPair b;
+    output SatPair c;
+  algorithm
+    c.psat := a.psat + b.psat;
+    c.Tsat := a.Tsat + b.Tsat;
+  end addPairs;
+
+  function recordArrayLocals "arrays of records as locals (MSL ReferenceAir's Ice09 Gibbs): 25 + u"
+    input Real u;
+    output Real y;
+  protected
+    SatPair[3] r = {SatPair(1, 2), SatPair(3, 4), SatPair(5, 6)};
+    SatPair acc;
+    SatPair o[2];
+  algorithm
+    acc := r[1];
+    for k in 2:3 loop
+      acc := addPairs(acc, r[k]);
+    end for;
+    o[1] := addPairs(acc, SatPair(u, 0));
+    o[2] := r[2];
+    y := o[1].psat + o[2].Tsat + acc.Tsat;
+  end recordArrayLocals;
+
+  model RecordArrayLocals "der(x) = recordArrayLocals(time) = 25 + time: x(1) = 25.5 (OpenModelica)"
+    Real x(start = 0, fixed = true);
+  equation
+    der(x) = recordArrayLocals(time);
+  end RecordArrayLocals;
+
 end RecordFunctionTest;
