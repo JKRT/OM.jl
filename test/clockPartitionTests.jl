@@ -1,6 +1,6 @@
 #= Clocked (synchronous) Modelica, MLS 16: OMBackend's clock partitioning (base clocks, the
-   sub-clocks of the partitions) of the models in Models/ClockedPartitions.mo, and translate
-   refusing clocked partitions until they are generated. =#
+   sub-clocks of the partitions) of the models in Models/ClockedPartitions.mo, and the
+   partitions simulated as when-clauses (ClockedLowering). =#
 @testset "Clock partitioning" begin
   local file = "./Models/ClockedPartitions.mo"
   local partitioning = m -> OMBackend.clockedPartitioning(first(OM.flatten("ClockedPartitions." * m, file)))
@@ -57,7 +57,25 @@
     local (slow, fast) = (clockOf(p, "slow"), clockOf(p, "fast"))
     @test slow[1] == fast[1] && slow[2] // fast[2] == 5
   end
-  @testset "translate refuses clocked partitions (no code generation yet)" begin
-    @test_throws OMBackend.UnsupportedLowering OM.translate("ClockedPartitions.SampleHold", file)
+  #= the partitions as when-clauses (ClockedLowering), at times between ticks; omc's values =#
+  @testset "simulated" begin
+    local value = (m, v, t) -> OM.simulate("ClockedPartitions." * m, file; stopTime = 1.0)(t; idxs = Symbol(v))
+    @test value("SubSampled", "z", 0.35) ≈ 0.3 atol = 1e-9
+    @test value("ShiftedSuperSampled", "z", 0.46) ≈ 0.4 atol = 1e-9
+    @test value("InferredClock", "z", 0.75) ≈ 1.5 atol = 1e-9
+    @test value("ClockedWhen", "y", 0.25) ≈ 0.4 atol = 1e-9
+    @test value("RationalClocks", "y", 0.013) ≈ 0.022 atol = 1e-9
+    @test value("ClockedState", "z", 0.95) ≈ 4.5 atol = 1e-9
+    @test [value("ClockedBoolean", "y", t) for t in (0.28, 0.35)] ≈ [0.0, 1.0] atol = 1e-9
+    #= ticks at 0.8 only (located within the solver's tolerance), not where u < 0.5 or u > 0.8 becomes false =#
+    @test [value("EventCondition", "y", t) for t in (0.6, 0.9)] ≈ [0.0, 1.8] atol = 1e-6
+    #= ticks where sin(10t) rises above 0.5: interval() is startInterval, then 2π/10 =#
+    @test [value("EventInterval", "y", t) for t in (0.3, 0.9)] ≈ [0.2, 2π / 10] atol = 1e-6
+    #= events where sin(20t) rises above 0.5 (t = π/120 + kπ/10): ticks at the first and the third
+       (omc 1.27.1 ticks at every event) =#
+    @test [value("EventSubSampled", "y", t) for t in (0.5, 0.8)] ≈ [π / 120, π / 120 + π / 5] atol = 1e-6
+  end
+  @testset "a solver clock is refused (not lowered yet)" begin
+    @test_throws OMBackend.UnsupportedLowering OM.translate("ClockedPartitions.SolverClock", file)
   end
 end

@@ -815,6 +815,27 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     annotation(experiment(StopTime = 3));
   end DerOfExpression;
 
+  model DerOfIfEquation "der of a variable an if-equation defines (MSL 4 KinematicPTP: sd = der(s)): index-reduced to the derivative of the branches, which the solution reads with each time's branch"
+    parameter Real p = 1;
+    Real c;
+    Real a;
+    Real s;
+    Real sd;
+    Real sdd;
+  equation
+    c = abs(p);
+    if c <= 0 then
+      a = 0;
+      s = 0;
+    else
+      a = 2*p;
+      if time < 0.5*a then s = time*time; elseif time < a then s = 2*time; else s = 3; end if;
+    end if;
+    sd = der(s);
+    sdd = der(sd);
+    annotation(experiment(StopTime = 3));
+  end DerOfIfEquation;
+
   model SelfLatch "a Boolean that holds its own pre(), set and reset by whens (y = (s or pre(y)) and not r): no relation in the equation, the pre() read closes the loop"
     Boolean s(start = false, fixed = true);
     Boolean r(start = false, fixed = true);

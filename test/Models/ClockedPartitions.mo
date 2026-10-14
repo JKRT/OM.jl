@@ -1,6 +1,8 @@
 /*
   Clocked partitions (MLS 16): each model's base clocks and the sub-clocks of
-  its partitions (OMBackend's ClockPartitioning).
+  its partitions (OMBackend's ClockPartitioning), and their values simulated
+  (ClockedLowering: a when-clause per base clock; omc 1.27.1 gives the same
+  values at the times the tests check).
 */
 package ClockedPartitions
   model SampleHold "a sampled sine, held"
@@ -106,4 +108,43 @@ package ClockedPartitions
     fast = superSample(slow) + sample(u, Clock(2, 1000));
     y = hold(fast);
   end RationalClocks;
+  model ClockedBoolean "a clocked Boolean defined by a relation: evaluated at its clock's ticks, not lifted into a when on its relation"
+    Real t;
+    Boolean b;
+    Real y;
+  equation
+    t = sample(time, Clock(0.1));
+    b = t >= 0.25;
+    y = hold(if b then 1.0 else 0.0);
+  end ClockedBoolean;
+  model EventCondition "an event clock on a compound condition: it ticks where the condition becomes true only"
+    Real u = time;
+    Real y;
+  equation
+    y = sample(u + 1, Clock(u < 0.5 or u > 0.8, 0.0));
+  end EventCondition;
+  model EventInterval "interval() of an event clock: its startInterval at the first tick, then the time since the previous tick"
+    Real u = sin(10*time);
+    Real y;
+  equation
+    when Clock(u > 0.5, 0.2) then
+      y = interval();
+    end when;
+  end EventInterval;
+  model EventSubSampled "a sub-sampled event clock: every second event (MLS 16.5.2)"
+    Real u = time;
+    Real x(start = 0, fixed = true);
+    Real y;
+  equation
+    der(x) = 20*cos(20*time);
+    y = sample(u, subSample(Clock(x > 0.5, 0.0), 2));
+  end EventSubSampled;
+  model SolverClock "a clocked discretized continuous-time partition (a solver clock: not lowered yet)"
+    Real u = time;
+    Real x(start = 0);
+    Real v;
+  equation
+    v = sample(u, Clock(Clock(0.1), solverMethod = "ExplicitEuler"));
+    der(x) = v;
+  end SolverClock;
 end ClockedPartitions;

@@ -369,6 +369,11 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     local qOf(t) = (x = 1 + sin(t); x^2 + x - 2)
     @test [s3(1.0; idxs = :q), s3(2.0; idxs = :q)] ≈ [qOf(1.0), qOf(2.0)] atol = 1e-6
     @test [s3(1.0; idxs = :rising), s3(2.0; idxs = :rising)] == [1, 0]
+    #= s = t^2, 2t, 3 by branch: sd = der(s) and sdd with the branch of each time, not the last
+       branch's (the parameters' final values) =#
+    local s4 = _eventSim("DerOfIfEquation")
+    @test [s4(t; idxs = :sd) for t in (0.3, 1.5, 2.5)] ≈ [0.6, 2.0, 0.0] atol = 1e-6
+    @test [s4(t; idxs = :sdd) for t in (0.3, 1.5, 2.5)] ≈ [2.0, 0.0, 0.0] atol = 1e-6
   end
   @testset "a Boolean that holds its own pre()" begin
     #= y = (s or pre(y)) and not r, s and r from whens: set at 0.3, held after s falls at
