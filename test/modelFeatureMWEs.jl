@@ -206,4 +206,14 @@
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(1.0; idxs = :v), exp(-1.0); rtol = 1e-5)
   end
+
+  #= A tuple initial equation of an array output, its call reading a parameter the
+     initialization computes (MSL Blocks.Continuous.Filter's poles: (r, a, b, ku) =
+     roots.lowPass(cr, ...)): the initialization assigns r. Dropped, r was 0, a solution of
+     der(y) = 0 too, and the filters of SMEE_Rectifier and ThreePhaseTwoLevel_PWM did not move. =#
+  @testset "a tuple initial equation of an array output for free parameters" begin
+    sol = OM.simulate("TupleArrayFreeParameterInit", "Models/TupleArrayFreeParameterInit.mo"; stopTime = 1.0, scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(1.0; idxs = :y) ≈ 1.0
+  end
 end
