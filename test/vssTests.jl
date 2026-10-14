@@ -149,4 +149,81 @@
           circuit1_freqOK && circuit1_u_SwOK && circuit2_iOK && circuit2_u_C_OK && circuit3_iOK && circuit3_u_C_OK
         end
       end
+      #= A table in a structural mode (the mode's functions and data structures were undefined
+         in the module), freed with the model's build like any model's tables =#
+      @testset "Tables in structural modes" begin
+        local CG = OMBackend.CodeGeneration
+        local file = "./Models/VSS/ModeTables.mo"
+        OM.translate("ModeTables.OneMode", file)
+        local one = OM.simulate("ModeTables.OneMode"; stopTime = 1.0)
+        @test one[1](1.0; idxs = :single_x) ≈ 1.0 rtol = 1e-6
+        @test one[1](0.5; idxs = :single_y) ≈ 1.0 rtol = 1e-6
+        OM.translate("ModeTables.TwoModes", file)
+        local two = OM.simulate("ModeTables.TwoModes"; stopTime = 1.0)
+        @test length(two) == 2
+        @test two[1](0.7; idxs = :firstMode_x) ≈ 0.49 rtol = 1e-6
+        @test two[2](1.0; idxs = :secondMode_x) ≈ 0.79 rtol = 1e-6
+        @test two[2](0.9; idxs = :secondMode_y) ≈ 1.0 rtol = 1e-6
+        #= both modes' tables, the model's =#
+        local cname = OMBackend.canonicalName("ModeTables.TwoModes")
+        @test length(CG.EXTERNAL_OBJECTS[cname]) == 2
+        OM.simulate("ModeTables.TwoModes"; stopTime = 1.0)
+        @test length(CG.EXTERNAL_OBJECTS[cname]) == 2
+        #= a translate frees them, the next simulate has new ones =#
+        OM.translate("ModeTables.TwoModes", file)
+        @test !haskey(CG.EXTERNAL_OBJECTS, cname)
+        @test_throws ErrorException two[2](0.9; idxs = :secondMode_y)
+        local again = OM.simulate("ModeTables.TwoModes"; stopTime = 1.0)
+        @test again[2](1.0; idxs = :secondMode_x) ≈ 0.79 rtol = 1e-6
+        OMBackend.forgetModel("ModeTables.TwoModes")
+        OMBackend.forgetModel("ModeTables.OneMode")
+        @test !haskey(CG.EXTERNAL_OBJECTS, cname)
+        @test !haskey(CG.EXTERNAL_OBJECTS, OMBackend.canonicalName("ModeTables.OneMode"))
+      end
+      #= A table in a model recompiled during the simulation (the recompiled code had none of
+         the model's functions, parameters or tables): its own module in the model's, its
+         tables the model's =#
+      @testset "A table in a recompiled model" begin
+        local CG = OMBackend.CodeGeneration
+        OM.translate("ModeTables.Recompiled", "./Models/VSS/ModeTables.mo")
+        local sols = OM.simulate("ModeTables.Recompiled"; stopTime = 1.0)
+        @test length(sols) == 2
+        @test sols[1](0.5; idxs = Symbol("x[1]")) ≈ 0.25 rtol = 1e-6
+        @test sols[1](0.25; idxs = :y) ≈ 0.5 rtol = 1e-6
+        @test sols[2](1.0; idxs = Symbol("x[1]")) ≈ 1.0 rtol = 1e-6
+        @test sols[2](1.0; idxs = Symbol("x[2]")) ≈ 0.75 rtol = 1e-6
+        @test sols[2](0.9; idxs = :y) ≈ 1.8 rtol = 1e-6
+        local cname = OMBackend.canonicalName("ModeTables.Recompiled")
+        @test length(CG.EXTERNAL_OBJECTS[cname]) == 2
+        OMBackend.forgetModel("ModeTables.Recompiled")
+        @test !haskey(CG.EXTERNAL_OBJECTS, cname)
+      end
+      #= An MSL table in a recompiled model: the recompilation's program was the modified class
+         alone (and the class it modified the input's last one, Modelica), without the MSL =#
+      @testset "An MSL table in a recompiled model" begin
+        local file = "./Models/VSS/RecompiledMSLTable.mo"
+        OM.translate("RecompiledMSLTable", file; MSL = true, MSL_Version = "MSL:3.2.3")
+        local sols = OM.simulate("RecompiledMSLTable", file; MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+        @test length(sols) == 2
+        @test sols[1](0.5; idxs = Symbol("x[1]")) ≈ 0.25 rtol = 1e-6
+        @test sols[2](1.0; idxs = Symbol("x[1]")) ≈ 1.0 rtol = 1e-6
+        @test sols[2](1.0; idxs = Symbol("x[2]")) ≈ 0.75 rtol = 1e-6
+        OMBackend.forgetModel("RecompiledMSLTable")
+      end
+      #= The agentic switch with a stub agent (no agent server: AGENT_CALLBACK): at x > 5 the
+         agent sets y = -1, the model is recompiled, x falls from 5 to 2 at t = 8 =#
+      @testset "Agentic recompilation with a stub agent" begin
+        local previous = OMBackend.Runtime.AGENT_CALLBACK[]
+        try
+          OMBackend.Runtime.AGENT_CALLBACK[] = (params, context, metamodel, t) -> [-1.0 for _ in params]
+          local file = "../OMFrontend.jl/test/Equations/SimpleAgenticTest.mo"
+          OM.translate("SimpleAgenticTest", file)
+          local sols = OM.simulate("SimpleAgenticTest", file; stopTime = 8.0)
+          @test length(sols) == 2
+          @test last(first(sols).t) ≈ 5.0 rtol = 1e-6
+          @test last(last(sols).u)[1] ≈ 2.0 rtol = 1e-6
+        finally
+          OMBackend.Runtime.AGENT_CALLBACK[] = previous
+        end
+      end
     end
