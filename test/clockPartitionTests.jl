@@ -72,7 +72,8 @@
     #= ticks where sin(10t) rises above 0.5: interval() is startInterval, then 2π/10 =#
     @test [value("EventInterval", "y", t) for t in (0.3, 0.9)] ≈ [0.2, 2π / 10] atol = 1e-6
     #= events where sin(20t) rises above 0.5 (t = π/120 + kπ/10): ticks at the first and the third
-       (omc 1.27.1 ticks at every event) =#
+       (omc 1.27.1 ignores the factor of a subSample applied to a clock inside sample(), periodic
+       clocks too; with subSample of a clocked variable it ticks at these two as well) =#
     @test [value("EventSubSampled", "y", t) for t in (0.5, 0.8)] ≈ [π / 120, π / 120 + π / 5] atol = 1e-6
   end
   @testset "a solver clock is refused (not lowered yet)" begin
