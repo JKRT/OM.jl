@@ -174,6 +174,17 @@ end
     end
   end
 
+  #= Two models' tables of one name in one process: each reads its own. The generated functions
+     differed only in the table object, which printed without its pointer, so the global cache
+     of RuntimeGeneratedFunctions gave the second model the first one's (0.05 for 1.0). =#
+  @testset "Two models' tables of one name, one after the other: each its own" begin
+    for scalarize in (false, true)
+      @test brValue(brSimulate("TableInit3"; stopTime = 1.0, scalarize = scalarize), "y", 0.5) ≈ 1.0 rtol = 1e-6
+      @test brValue(brSimulate("TableStartOfInitialEquation"; stopTime = 1.0, scalarize = scalarize), "y", 0.5) ≈ 0.05 rtol = 1e-6
+      @test brValue(brSimulate("TableInit3"; stopTime = 1.0, scalarize = scalarize), "y", 0.5) ≈ 1.0 rtol = 1e-6
+    end
+  end
+
   @testset "An if-equation among the initial equations (27 models: CDL SunRiseSet, hydronic networks)" begin
     for scalarize in (false, true)
       local sol = brSimulate("InitialIfEquation"; stopTime = 1.0, scalarize = scalarize)
@@ -649,10 +660,12 @@ end
 
   @testset "An external object in the equations: two builds are the same (CHPs ElectricalFollowing)" begin
     #= its pointer was a constant in the terms reading it, hashed by its address: the order of
-       the terms, and the rounding of the generated code, changed from build to build =#
+       the terms, and the rounding of the generated code, changed from build to build. The
+       object prints its address (new in every build), compared without it. =#
     local MTK = OMBackend.ModelingToolkit
-    local observed = () -> string.(MTK.observed(brSimulate("TableInit3"; stopTime = 1.0, scalarize = true,
-                                                           overwriteCache = true).prob.f.sys))
+    local observed = () -> [replace(string(eq), r"(ExternalObjectRef\(:\w+), 0x[0-9a-f]+\)" => s"\1)")
+                            for eq in MTK.observed(brSimulate("TableInit3"; stopTime = 1.0, scalarize = true,
+                                                              overwriteCache = true).prob.f.sys)]
     local (a, b) = (observed(), observed())
     @test a == b
     @test !any(s -> occursin("Ptr{", s), a)
