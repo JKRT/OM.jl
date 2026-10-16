@@ -95,6 +95,9 @@ ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
     include("foldRegressionTests.jl")
   end
   @info "Testing discrete classification (when-driven Real vars)..."
+  ingroup("core") && @testset "Clocked Modelica:" begin
+    include("clockPartitionTests.jl")
+  end
   ingroup("core") && @testset "Discrete Classification Regression:" begin
     include("discreteClassificationTests.jl")
   end
