@@ -221,4 +221,19 @@ package OMJLIRRegressions "the MSL models full coverage run 10 lost on the OMJLI
     eta = curveEfficiency(cur, time);
   end RecordSizedByItsField;
 
+  function spanOf "a function a parameter is bound to (Buildings' getTimeSpanTMY3, which reads the weather file)"
+    input Real a;
+    output Real span;
+  algorithm
+    span := 2 * a;
+  end spanOf;
+
+  model AssertReadsCallBoundParameter "a time-varying assert reads a parameter bound to a function call: the parameter stays a reference in the assert, its value computed once, not the call at every crossing evaluation (Buildings' weather data: 40 ms a call): x = time"
+    parameter Real a = 1.5;
+    parameter Real span = spanOf(a);
+    Real x = time;
+  equation
+    assert(x <= span, "x above the span", AssertionLevel.warning);
+  end AssertReadsCallBoundParameter;
+
 end OMJLIRRegressions;

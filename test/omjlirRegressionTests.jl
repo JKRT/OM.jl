@@ -114,6 +114,14 @@ orSimCode(model::String)::OMBackend.SimCode.SIM_CODE = OMBackend.mtkSimCode(orMo
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(1.0; idxs = :eta), 0.7; atol = 1e-9)
   end
+  @testset "an assert reading a parameter bound to a function call (Buildings: FlatPlateTotalArea's weather data)" begin
+    local sc = orSimCode("AssertReadsCallBoundParameter")
+    @test !isempty(sc.asserts)
+    @test !any(a -> SC.anyExp(e -> e isa SC.CALL && e.kind !== SC.CALL_BUILTIN, a.condition), sc.asserts)
+    local sol = orSimulate("AssertReadsCallBoundParameter")
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :x), 1.0; atol = 1e-9)
+  end
   @testset "a state whose der() a fold removes (SMPM_Braking, IMC_YD)" begin
     local sc = orSimCode("DeadStateAfterFold")
     @test last(sc.stringToSimVarHT["Phi"]).varKind isa SC.ALG_VARIABLE
