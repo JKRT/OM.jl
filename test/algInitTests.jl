@@ -166,7 +166,8 @@ const ALG_INIT_FILE = "./Models/AlgInitTest.mo"
     #= Bound to a call (MSL ReadRealMatrixFromFile's `file = loadResource(...)`): the module's value. =#
     @test OM.simulate("AlgInitTest.ReadsStringOfNumber", ALG_INIT_FILE; stopTime = 1.0)(1.0; idxs = :x) ≈ 2.0
     @test refusedFor("ReadsInitialized", "reading a variable the initialization determines: z")
-    @test refusedFor("ReadsEliminated", "reading a variable the backend eliminated: w2")
+    #= w2 is eliminated as w's alias, and the section reads w in its place =#
+    @test refusedFor("ReadsEliminated", "reading a variable the initialization determines: w")
     @test OM.simulate("AlgInitTest.ReadsInitialized", ALG_INIT_FILE; stopTime = 1.0)(0.5; idxs = :q) ≈ 6.0
     @test OM.simulate("AlgInitTest.ReadsEliminated", ALG_INIT_FILE; stopTime = 1.0)(0.5; idxs = :r) ≈ 2.0
     #= A parameter the initialization computes: the section's results were dropped (s = 0). =#

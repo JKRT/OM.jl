@@ -117,23 +117,17 @@ function runModelMTK(model,
               solver = solver, kwargs...)
 end
 
-function dumpModelsMTK(models, file)
-  local res
-  #= Get the simulation code =#
-  local scode = OM.translateToSCode("Models/$(file).mo")
-  for model in models
-    @info "Dumping : $model"
-    res = OM.OMFrontend.instantiateSCodeToDAE(model, scode)
-    OMBackend.printInitialSystem(res[1])
-  end
-end
+"""
+    dumpModelMTK(model, filePath)
 
-function dumpModelMTK(model, filePath)
-  local res
-  #= Get the simulation code =#
+Print the OMJLIR model of `model` in `filePath` (through its passes), what the simulation code
+is lowered from.
+"""
+function dumpModelMTK(model::String, filePath::String)::Nothing
   @info "Dumping : $model"
-  res = OM.flatten(model, filePath)
-  OMBackend.printInitialSystem(first(res))
+  local (fm, cache) = OM.flatten(model, filePath)
+  println(OMBackend.OMJLIR.toString(OMBackend.omjlirModel(fm; functionList = OMFrontend.cacheToFunctionList(cache))))
+  return nothing
 end
 
 #=
