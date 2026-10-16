@@ -117,4 +117,17 @@ package OMJLIRRegressions "the MSL models full coverage run 10 lost on the OMJLI
     Q = 2 * Vm * der(Phi);
   end DeadStateAfterFold;
 
+  model LiftedDiscreteInitialBranch "off = not control, control a step at 0.1 (MSL BooleanStep, IdealClosingSwitch): lifted with the discrete clusters, whose initial() arm sets off at the start; the if-equation's initial branch reads the value the initialization starts from, not that arm's (MSL 4.1.0 IMC_YD): x = 1e-5 * 0.1 + (time - 0.1)"
+    parameter Real startTime = 0.1;
+    Boolean control;
+    Boolean off;
+    Real g;
+    Real x(start = 0, fixed = true);
+  equation
+    control = if time >= startTime then true else false;
+    off = not control;
+    g = if off then 1e-5 else 1;
+    der(x) = g;
+  end LiftedDiscreteInitialBranch;
+
 end OMJLIRRegressions;

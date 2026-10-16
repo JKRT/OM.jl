@@ -85,6 +85,17 @@ orSimCode(model::String)::OMBackend.SimCode.SIM_CODE = OMBackend.mtkSimCode(orMo
     @test filtered.retcode == ReturnCode.Success
     @test isapprox(filtered(1.0; idxs = :phiA), 1.0; atol = 1e-6)
   end
+  @testset "the initial branch of an if-equation on a lifted discrete (IMC_YD, MSL 4.1.0)" begin
+    #= the discrete cluster's initial() arm sets off at the start; the t0 values the initial
+       branches read are those the initialization starts from =#
+    local sc = orSimCode("LiftedDiscreteInitialBranch")
+    @test any(a -> !a.section, sc.initialAlgorithms)
+    @test get(OMBackend.CodeGeneration._buildT0ValueMap(sc), :off, 0.0) == 0.0
+    local sol = orSimulate("LiftedDiscreteInitialBranch")
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.05; idxs = :g), 1e-5; atol = 1e-12)
+    @test isapprox(sol(1.0; idxs = :x), 0.9 + 1e-6; atol = 1e-6)
+  end
   @testset "a state whose der() a fold removes (SMPM_Braking, IMC_YD)" begin
     local sc = orSimCode("DeadStateAfterFold")
     @test last(sc.stringToSimVarHT["Phi"]).varKind isa SC.ALG_VARIABLE
