@@ -301,8 +301,8 @@ OM.jl is composed of several submodules, each in its own directory:
 | **SCode.jl** | Simplified code representation (intermediate form between Absyn and the frontend) |
 | **OMParser.jl** | Modelica parser that produces Absyn |
 | **OMFrontend.jl** | The new frontend (NF) that performs instantiation, typing, flattening, and simplification |
-| **OMBackend.jl** | Backend that performs matching, sorting, index reduction, code generation, and simulation via ModelingToolkit.jl |
-| **DAE.jl** | Data structures for the DAE (Differential-Algebraic Equation) intermediate representation |
+| **OMBackend.jl** | Backend that lowers the flat model to its own IR (OMJLIR), runs its passes, matches and sorts it into the simulation code, and generates and simulates the system via ModelingToolkit.jl |
+| **DAE.jl** | Data structures of the frontend's DAE form (`OMFrontend.instantiateSCodeToDAE`); the backend does not use it |
 | **MetaModelica.jl** | Julia implementation of MetaModelica language constructs (uniontypes, pattern matching, immutable lists) |
 | **ImmutableList.jl** | Immutable cons-list implementation used throughout the compiler |
 | **ArrayUtil.jl** | Array utility functions (fold, map, etc.) |
