@@ -1,8 +1,8 @@
 #=
 Reduced reproducers of the MSL models full coverage run 10 lost on the OMJLIR pipeline
-(2026-10-16): one model per cause in Models/OMJLIRRegressions.mo, the MSL models in the testset
-names. Each checks that its translation takes the fixed path and the values the model's
-description gives.
+(2026-10-16), and of a Buildings sample's (arrays kept): one model per cause in
+Models/OMJLIRRegressions.mo, the library models in the testset names. Each checks that its
+translation takes the fixed path and the values the model's description gives.
 =#
 using Test
 import OM
@@ -95,6 +95,24 @@ orSimCode(model::String)::OMBackend.SimCode.SIM_CODE = OMBackend.mtkSimCode(orMo
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(0.05; idxs = :g), 1e-5; atol = 1e-12)
     @test isapprox(sol(1.0; idxs = :x), 0.9 + 1e-6; atol = 1e-6)
+  end
+  @testset "the stream equality of an outside connection, arrays kept (Buildings: Performance.Example4, MixingVolumes, Sensors.PPM, ...)" begin
+    #= a connection's cref equality typed by its last part's declared Real[1], not its subscripted Real =#
+    local sol = orSimulate("ConnectedStreamArrayPorts"; scalarize = false)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :y), 1.01; atol = 1e-6)
+  end
+  @testset "a scalar signal on an expandable bus, subscripted by the frontend (Buildings' Templates)" begin
+    #= `two.bus.y1[1] = bus2.y1[1]` of scalar Booleans: the scalars themselves =#
+    local sol = orSimulate("ExpandableBusScalarSignal"; scalarize = false)
+    @test sol.retcode == ReturnCode.Success
+    @test sol(0.2; idxs = :two_x) == 0.0
+    @test sol(1.0; idxs = :two_x) == 1.0
+  end
+  @testset "a record type its own field's dimension reads (Buildings: CoolingTowers, Movers, HydronicConfigurations)" begin
+    local sol = orSimulate("RecordSizedByItsField"; scalarize = false)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :eta), 0.7; atol = 1e-9)
   end
   @testset "a state whose der() a fold removes (SMPM_Braking, IMC_YD)" begin
     local sc = orSimCode("DeadStateAfterFold")

@@ -130,4 +130,95 @@ package OMJLIRRegressions "the MSL models full coverage run 10 lost on the OMJLI
     der(x) = g;
   end LiftedDiscreteInitialBranch;
 
+  connector StreamArrayPort "a fluid port with a stream array (Buildings' Xi_outflow)"
+    Real p;
+    flow Real m_flow;
+    stream Real Xi_outflow[1];
+  end StreamArrayPort;
+
+  model StreamArraySource "sends Xi_outflow = 0.01 + time at m_flow = 1"
+    StreamArrayPort port_a;
+  equation
+    port_a.Xi_outflow[1] = 0.01 + time;
+    port_a.m_flow = 1;
+  end StreamArraySource;
+
+  model StreamArrayVolume "an array of ports, ports[1] connected inside to a component's port (an outside connection: Buildings' MixingVolume, connect(steBal.port_a, ports[1]))"
+    StreamArrayPort ports[1];
+    StreamArraySource steBal;
+  equation
+    connect(steBal.port_a, ports[1]);
+  end StreamArrayVolume;
+
+  model StreamArrayBoundary "p = 1e5, Xi_outflow = 0.02"
+    StreamArrayPort port;
+  equation
+    port.p = 1e5;
+    port.Xi_outflow[1] = 0.02;
+  end StreamArrayBoundary;
+
+  model ConnectedStreamArrayPorts "the stream equality of the outside connection, vol.steBal.port_a.Xi_outflow[1] = vol.ports[1].Xi_outflow[1], is of scalars with arrays kept, not of the part's Real[1] (it named vol_ports[1]_Xi_outflow[1][1]): y = 0.01 + time"
+    StreamArrayVolume vol;
+    StreamArrayBoundary bou;
+    Real y;
+  equation
+    connect(vol.ports[1], bou.port);
+    y = vol.ports[1].Xi_outflow[1];
+  end ConnectedStreamArrayPorts;
+
+  expandable connector SignalBus "an expandable bus (Buildings' Templates)"
+  end SignalBus;
+
+  connector BooleanOutput = output Boolean;
+  connector BooleanInput = input Boolean;
+
+  block BooleanArraySource "y[1] = time > 0.5"
+    BooleanOutput y[1];
+  equation
+    y[1] = time > 0.5;
+  end BooleanArraySource;
+
+  model BusReader "reads the bus's y1"
+    SignalBus bus;
+    BooleanInput u;
+    Real x;
+  equation
+    connect(bus.y1, u);
+    x = if u then 1 else 0;
+  end BusReader;
+
+  model ExpandableBusScalarSignal "an array source's element on a bus, the bus connected to another: the frontend writes bus2.y1[1] = two.bus.y1[1] of the scalar signals (Buildings' Templates): x(1) = 1"
+    SignalBus bus2;
+    BusReader two;
+    BooleanArraySource y1;
+  equation
+    connect(y1.y[1], bus2.y1);
+    connect(bus2, two.bus);
+  end ExpandableBusScalarSignal;
+
+  record FanCurve "a curve whose second array is sized by the first (Buildings' Movers and cooling tower data)"
+    parameter Real r_V[:];
+    parameter Real eta[size(r_V, 1)];
+  end FanCurve;
+
+  function curveEfficiency "reads the record whose field's size reads the record, over the curve's points (not inlined: Buildings' normalizedPower)"
+    input FanCurve per;
+    input Real v;
+    output Real eta;
+  algorithm
+    eta := per.eta[1];
+    for i in 2:size(per.r_V, 1) loop
+      if v >= per.r_V[i - 1] then
+        eta := per.eta[i - 1] + (v - per.r_V[i - 1]) * (per.eta[i] - per.eta[i - 1]) / (per.r_V[i] - per.r_V[i - 1]);
+      end if;
+    end for;
+  end curveEfficiency;
+
+  model RecordSizedByItsField "the record type of a function's input, its field's dimension size(per.r_V, 1) reading the record: lowering the record type again in that dimension recursed without end (Buildings' cooling towers, Movers, HydronicConfigurations): eta(1) = 0.7"
+    parameter FanCurve cur(r_V = {0, 1}, eta = {0.5, 0.7});
+    Real eta;
+  equation
+    eta = curveEfficiency(cur, time);
+  end RecordSizedByItsField;
+
 end OMJLIRRegressions;
