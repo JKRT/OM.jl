@@ -8,7 +8,7 @@ using Test
 import OM
 import OMBackend
 import OMFrontend
-using DifferentialEquations: ReturnCode
+using DifferentialEquations: ReturnCode, solve, remake
 
 const OR_FILE = joinpath(@__DIR__, "Models", "OMJLIRRegressions.mo")
 
@@ -121,6 +121,75 @@ orSimCode(model::String)::OMBackend.SimCode.SIM_CODE = OMBackend.mtkSimCode(orMo
     local sol = orSimulate("AssertReadsCallBoundParameter")
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(1.0; idxs = :x), 1.0; atol = 1e-9)
+  end
+  @testset "review 2026-10-17: a tuple equation on the MTK path, a function named like a Complex operator" begin
+    #= scalarize = true: the MTK path (the array path took these right) =#
+    for model in ("TupleEquationOfFunctionNamedAdd", "TupleAssignmentOfFunctionNamedAdd")
+      local sol = orSimulate(model; scalarize = true)
+      @test sol.retcode == ReturnCode.Success
+      @test isapprox(sol(0.7; idxs = :s), 1.4; atol = 1e-9)
+      @test isapprox(sol(0.7; idxs = :p), 12.0; atol = 1e-9)
+    end
+  end
+  @testset "review 2026-10-17: a Boolean binding of a variable branch is no latch" begin
+    local sol = orSimulate("BooleanBindingOfVariableBranch"; scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test [sol(t; idxs = :y) for t in (0.3, 0.7, 0.9)] == [0.0, 1.0, 0.0]
+  end
+  @testset "review 2026-10-17: the unknowns the residuals determine, the elimination options" begin
+    local model = orModel("OutputOnlyVariable")
+    local sc = OMBackend.mtkSimCode(model)
+    #= x and der(x) are one unknown, y another =#
+    @test SC.residualUnknownCount(sc.stringToSimVarHT) == 2
+    @test !haskey(OMBackend.mtkSimCode(model; eliminateNonDynamic = true).stringToSimVarHT, "y")
+    @test haskey(OMBackend.mtkSimCode(model; eliminateNonDynamic = SC.EliminationOptions(keepPatterns = [r"^y$"])).stringToSimVarHT, "y")
+    @test haskey(OMBackend.mtkSimCode(model; eliminateNonDynamic = SC.EliminationOptions(reachability = false)).stringToSimVarHT, "y")
+    @test !haskey(OMBackend.mtkSimCode(model; eliminateNonDynamic = SC.EliminationOptions(reachability = false, patterns = [r"^y$"])).stringToSimVarHT, "y")
+  end
+  @testset "review 2026-10-17: IR values as Dict and Set keys" begin
+    local IR = OMBackend.OMJLIR
+    @test !isequal(IR.REAL(0.0), IR.REAL(-0.0)) && hash(IR.REAL(0.0)) != hash(IR.REAL(-0.0))
+    @test length(Set([IR.REAL(NaN), IR.REAL(NaN)])) == 1
+    @test length(Set([SC.RCONST(NaN), SC.RCONST(NaN)])) == 1
+    @test IR.REAL(0.0) == IR.REAL(-0.0)
+  end
+  @testset "review 2026-10-17: two solves of a model with delay() at once" begin
+    local sol = orSimulate("DelayedSine"; scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(1.0; idxs = :z), (1 - cos(9.0)) / 10; atol = 1e-3)
+    #= each solve in a task of its own, with its own parameters: the histories are the task's,
+       each solve's state z that of a solve alone (z, a state, is the solution's own; an observed
+       delayed value is read back from the reading task's latest history) =#
+    local prob = sol.prob
+    local alone = solve(remake(prob; p = deepcopy(prob.p)), OMBackend.defaultSolver())
+    local tasks = [Threads.@spawn solve(remake(prob; p = deepcopy(prob.p)), OMBackend.defaultSolver()) for _ in 1:4]
+    for s in fetch.(tasks)
+      @test s.retcode == ReturnCode.Success
+      @test isapprox(s(1.0; idxs = :z), alone(1.0; idxs = :z); atol = 1e-12)
+    end
+  end
+  @testset "review 2026-10-17: an if of an algorithm whose target a later statement assigns" begin
+    local sol = orSimulate("IfThenOverriddenLater"; scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox([sol(t; idxs = :n) for t in (0.3, 0.7)], [20.0, 10.0]; atol = 1e-9)
+    local sampled = orSimulate("SampleGuardOverriddenLater"; scalarize = true)
+    @test sampled.retcode == ReturnCode.Success
+    #= an Integer discrete reads back as a Real (9.999999999999998) =#
+    @test isapprox([sampled(t; idxs = :n) for t in (0.05, 0.2, 0.4, 0.9)], [20.0, 10.0, 10.0, 10.0]; atol = 1e-9)
+  end
+  @testset "review 2026-10-17: a variable named THETA is a variable" begin
+    local sol = orSimulate("VariableNamedTheta"; scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.5; idxs = :THETA), 0.5; atol = 1e-9)
+  end
+  @testset "review 2026-10-17: folded variables in the MTK path's solution" begin
+    local sc = orSimCode("FoldedVariablesObservable")
+    @test "a" in sc.eliminatedVariables || haskey(sc.stringToSimVarHT, "a")
+    local sol = orSimulate("FoldedVariablesObservable"; scalarize = true)
+    @test sol.retcode == ReturnCode.Success
+    @test isapprox(sol(0.5; idxs = :a), 3.0; atol = 1e-9)
+    @test isapprox(sol(0.5; idxs = :b), 3.0; atol = 1e-9)
+    @test isapprox(sol(1.0; idxs = :x), 3.0; atol = 1e-6)
   end
   @testset "a state whose der() a fold removes (SMPM_Braking, IMC_YD)" begin
     local sc = orSimCode("DeadStateAfterFold")

@@ -236,4 +236,89 @@ package OMJLIRRegressions "the MSL models full coverage run 10 lost on the OMJLI
     assert(x <= span, "x above the span", AssertionLevel.warning);
   end AssertReadsCallBoundParameter;
 
+  function add "a Real function named like Complex's operator: s = a b, p = c d"
+    input Real a;
+    input Real b;
+    input Real c;
+    input Real d;
+    output Real s;
+    output Real p;
+  algorithm
+    s := a * b;
+    p := c * d;
+  end add;
+
+  model TupleEquationOfFunctionNamedAdd "(s, p) = add(time, 2, 3, 4), a tuple equation (the MTK path's matching took it for one equation of two unknowns), of a function the Complex lowering took for Complex.'+'.add by its name: s = 2 time, p = 12"
+    Real s;
+    Real p;
+  equation
+    (s, p) = add(time, 2, 3, 4);
+  end TupleEquationOfFunctionNamedAdd;
+
+  model TupleAssignmentOfFunctionNamedAdd "(s, p) := add(time, 2, 3, 4) in an algorithm: s = 2 time, p = 12 (the Complex lowering made them time + 3 and 6)"
+    Real s;
+    Real p;
+  algorithm
+    (s, p) := add(time, 2, 3, 4);
+  end TupleAssignmentOfFunctionNamedAdd;
+
+  model BooleanBindingOfVariableBranch "b = if x > 0 then u else false: b follows u after x's crossing (as a when-equation it latched u's value at the crossing): b = false, true, false"
+    Real x = time - 0.5;
+    Boolean u = time < 0.8;
+    Boolean b = if x > 0 then u else false;
+    Real y = if b then 1 else 0;
+  end BooleanBindingOfVariableBranch;
+
+  model OutputOnlyVariable "2 y = x feeds no dynamics (and is no explicit assignment the folds take): eliminateNonDynamic removes y, unless kept"
+    Real x(start = 1, fixed = true);
+    Real y;
+  equation
+    der(x) = -x;
+    2 * y = x;
+  end OutputOnlyVariable;
+
+  model DelayedSine "the state x = sin(10 time), y = delay(x, 0.1), the state z integrates y: z(1) = (1 - cos(9))/10; solved several times at once, each solve its own history (they shared one, by the model's name)"
+    Real x(start = 0, fixed = true);
+    Real y = delay(x, 0.1);
+    Real z(start = 0, fixed = true);
+  equation
+    der(x) = 10 * cos(10 * time);
+    der(z) = y;
+  end DelayedSine;
+
+  model IfThenOverriddenLater "n := 2; if time > 0.5 then n := 1; end if; n := n * 10: n = 20, then 10 (a when of the if beside the section's lifting assigned 1 at the event)"
+    Integer n;
+  algorithm
+    n := 2;
+    if time > 0.5 then
+      n := 1;
+    end if;
+    n := n * 10;
+  end IfThenOverriddenLater;
+
+  model VariableNamedTheta "an angle named THETA: THETA = time (the backend took any *THETA for Zimmer's homotopy parameter and added THETA = 1)"
+    Real THETA = time;
+  end VariableNamedTheta;
+
+  model FoldedVariablesObservable "a = b, b = 2 p: parameter closures (foldParameterClosure) the later passes drop, still in the solution: a = b = 3, x = 3 time"
+    parameter Real p = 1.5;
+    Real a;
+    Real b;
+    Real x(start = 0, fixed = true);
+  equation
+    a = b;
+    b = 2 * p;
+    der(x) = a;
+  end FoldedVariablesObservable;
+
+  model SampleGuardOverriddenLater "n := 2; if sample(0.1, 0.25) then n := 1; end if; n := n * 10: n = 20, then 10 from the first tick on (a when of the if alone assigned 1; the section's lifting had no event at the ticks)"
+    Integer n;
+  algorithm
+    n := 2;
+    if sample(0.1, 0.25) then
+      n := 1;
+    end if;
+    n := n * 10;
+  end SampleGuardOverriddenLater;
+
 end OMJLIRRegressions;
