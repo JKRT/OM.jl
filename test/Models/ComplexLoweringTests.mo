@@ -232,4 +232,20 @@ package ComplexLoweringTests
     der(x) = tM[2, 2].re + tM[2, 3].im + tM[4, 5].re + tM[3, 4].im;
   end SymmetricTransformation;
 
+  model DerivedTypeOperators
+    "The operators of types extending Complex (Modelica.SIunits.ComplexVoltage's '*'.multiply,
+     ComplexCurrent's '+'): the frontend names them by the type
+     (Modelica_SIunits_ComplexVoltage_'*'_multiply), not by Complex. v = (1 + j t) (2 + j) =
+     (2 - t) + j (1 + 2 t), i = v + t: der(x) = v.re + i.im = 3 + t, x(1) = 3.5. The frontend inlines
+     these calls here; the lowering of the calls it keeps (MSL's QuasiStatic machines) is tested on
+     SimCode in omjlirRegressionTests.jl."
+    Modelica.SIunits.ComplexVoltage v;
+    Modelica.SIunits.ComplexCurrent i;
+    Real x(start = 0, fixed = true);
+  equation
+    v = Modelica.SIunits.ComplexVoltage(1, time) * Modelica.SIunits.ComplexVoltage(2, 1);
+    i = Modelica.SIunits.ComplexCurrent(v.re, v.im) + Modelica.SIunits.ComplexCurrent(time, 0);
+    der(x) = v.re + i.im;
+  end DerivedTypeOperators;
+
 end ComplexLoweringTests;

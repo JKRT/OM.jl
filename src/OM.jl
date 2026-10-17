@@ -56,13 +56,13 @@ include("MosScripting/mosScripting.jl")
 """
     EliminationOptions
 
-Re-export of `OMBackend.SimulationCode.EliminationOptions`. Pass an instance to
+Re-export of `OMBackend.SimCode.EliminationOptions`. Pass an instance to
 the `eliminateNonDynamic` keyword of `translate` / `simulate` for fine-grained
 control over which non-dynamic variables are removed before MTK code generation.
 
-See `OMBackend.SimulationCode.EliminationOptions` for the available fields.
+See `OMBackend.SimCode.EliminationOptions` for the available fields.
 """
-const EliminationOptions = OMBackend.SimulationCode.EliminationOptions
+const EliminationOptions = OMBackend.SimCode.EliminationOptions
 
 function printWelcomeMessage()
   printstyled("Open", bold=true, color=:light_blue)
@@ -784,26 +784,22 @@ function translate(modelName::String,
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
-    #= MTK_MODE and DEMode both consume the FlatModel-derived SIM_CODE. Only the
-       deprecated DAE_MODE wants the legacy :DAE representation. =#
-    repr = (mode == OMBackend.MTK_MODE || mode == OMBackend.IMTK_MODE || mode == OMBackend.DEMode) ? :FM : :DAE
     #= Arrays kept (the default mode): the array-preserving translation, else the
        scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
-    local keep = !scalarize && repr == :FM && mode == OMBackend.IMTK_MODE
-    (dae, cache) = flatten(modelName, modelFile;
-                           repr = repr,
-                           MSL = MSL, MSL_Version = MSL_Version,
-                           libraries = libraries,
-                           scalarize = !keep)
+    local keep = !scalarize && mode == OMBackend.IMTK_MODE
+    (fm, cache) = flatten(modelName, modelFile;
+                          MSL = MSL, MSL_Version = MSL_Version,
+                          libraries = libraries,
+                          scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
     if keep
-      local arrays = OMBackend.translateArrays(dae; functionList = OMFrontend.cacheToFunctionList(cache))
+      local arrays = OMBackend.translateArrays(fm; functionList = OMFrontend.cacheToFunctionList(cache))
       arrays === nothing || return arrays
-      (dae, cache) = flatten(modelName, modelFile; repr = repr, MSL = MSL, MSL_Version = MSL_Version,
-                             libraries = libraries, scalarize = true)
+      (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version,
+                            libraries = libraries, scalarize = true)
     end
     functionList = OMFrontend.cacheToFunctionList(cache)
-    OMBackend.translate(dae;
+    OMBackend.translate(fm;
                         functionList = functionList,
                         BackendMode = mode,
                         warnMissingStartValues = warnMissingStartValues,
@@ -860,16 +856,16 @@ function translate(modelName::String;
     #= Arrays kept (the default mode): the array-preserving translation, else the
        scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
     local keep = !scalarize && mode == OMBackend.IMTK_MODE
-    (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
-                           scalarize = !keep)
+    (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
+                          scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
     if keep
-      local arrays = OMBackend.translateArrays(dae; functionList = OMFrontend.cacheToFunctionList(cache))
+      local arrays = OMBackend.translateArrays(fm; functionList = OMFrontend.cacheToFunctionList(cache))
       arrays === nothing || return arrays
-      (dae, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
+      (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
     end
     functionList = OMFrontend.cacheToFunctionList(cache)
-    OMBackend.translate(dae;
+    OMBackend.translate(fm;
                         functionList = functionList,
                         BackendMode = mode,
                         warnMissingStartValues = warnMissingStartValues,

@@ -752,12 +752,12 @@ end
       @test brValue(sol, "tAll", 1.5) ≈ 1.2 atol = 1e-9
     end
     #= the function of 60 and-ed Booleans: its terms, counted up to 10000 =#
-    local D = OMBackend.DAE
-    local bools = [D.CREF(D.CREF_IDENT("b$i", D.T_BOOL_DEFAULT, OMBackend.MetaModelica.nil), D.T_BOOL_DEFAULT) for i in 1:60]
-    local cond = foldl((a, b) -> D.LBINARY(a, D.AND(D.T_BOOL_DEFAULT), b), bools)
+    local SC = OMBackend.SimCode
+    local bools = [SC.EXP_CREF(SC.SimCref(Symbol("b$i")), SC.TYPE_BOOL()) for i in 1:60]
+    local cond = foldl((a, b) -> SC.LBINARY(a, SC.OP_AND, b), bools)
     local f = OMBackend.CodeGeneration.transformToZeroCrossingCondition(cond)
     local terms = Ref(0)
-    OMBackend.FrontendUtil.Util.traverseExpTopDown(f, (e, c) -> (c[] += 1; (e, c[] < 10_000, c)), terms)
+    SC.anyExp(e -> (terms[] += 1; terms[] >= 10_000), f)
     @test terms[] < 1000
   end
 

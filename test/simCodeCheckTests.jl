@@ -1,67 +1,50 @@
 #=
-  Unit tests for SimulationCode.SimCodeCheck.
-
-  Tests run against a small HelloWorld model whose SIM_CODE is built by
-  replaying the pipeline that `OMBackend.translate` uses up to (but not
-  including) MTK codegen. This keeps the test fast and self-contained.
+  Unit tests for SimCode.check, the invariant checks of the simulation code before the
+  code generation. They run against the simulation code of a small HelloWorld model, built
+  as `OMBackend.translate` builds it (the OMJLIR model through its passes, then the SimCode
+  passes) without the code generation.
 =#
 
-@info "Starting SimCodeCheck Tests"
+@info "Starting SimCode check tests"
 
 using Test
 import OM
 import OMBackend
 import OMFrontend
 
-const SimCodeCheck = OMBackend.SimulationCode.SimCodeCheck
-
-"""
-Replay the simCode-building portion of `OMBackend.translate` and return
-the finalized SIM_CODE. Duplicates the logic at backendAPI.jl rather than
-invoking `translate` because `translate` returns a code `Expr`, not the
-SIM_CODE value.
-"""
-function _buildSimCodeForTest(model::String, file::String)
-  local flatResult = OM.flatten(model, file)
-  local fm = first(flatResult)
-  local bDAE = OMBackend.lower(fm)
-  local simCode = OMBackend.generateSimulationCode(bDAE; mode = OMBackend.MTK_MODE)
-  simCode = OMBackend.SimulationCode.flattenRecordCallSites(simCode)
-  simCode = OMBackend.SimulationCode.resolveIfExpInBindings!(simCode)
-  simCode = OMBackend.SimulationCode.foldParameterClosure(simCode)
-  simCode = OMBackend.SimulationCode.propagateConstants(simCode)
-  simCode = OMBackend.SimulationCode.eliminateAliasVariables(simCode)
-  return simCode
+"The simulation code of `model` in `file`, as `OMBackend.translate` generates code from it."
+function _buildSimCodeForTest(model::String, file::String)::OMBackend.SimCode.SIM_CODE
+  local (fm, cache) = OM.flatten(model, file)
+  return OMBackend.mtkSimCode(OMBackend.omjlirModel(fm; functionList = OMFrontend.cacheToFunctionList(cache)))
 end
 
-@testset "SimCodeCheck" begin
+@testset "SimCode check" begin
+  local SC = OMBackend.SimCode
   @testset "check() runs on HelloWorld without throwing" begin
     local simCode = _buildSimCodeForTest("HelloWorld", "Models/HelloWorld.mo")
-    local result = SimCodeCheck.check(simCode)
-    @test result isa SimCodeCheck.CheckResult
-    @test result.violations isa Vector{SimCodeCheck.CheckViolation}
+    local result = SC.check(simCode)
+    @test result isa SC.CheckResult
+    @test result.violations isa Vector{SC.CheckViolation}
     @test result.elapsed_s >= 0.0
+    @test isempty(SC.strict(result))
   end
 
-  @testset "rule_eliminated_vars_pruned flags overlap with HT" begin
+  @testset "checkEliminatedVariablesPruned flags overlap with the variable table" begin
     local simCode = _buildSimCodeForTest("HelloWorld", "Models/HelloWorld.mo")
-    #= Take any existing HT key and push it to eliminatedVariables. This
-       is an invariant violation: an eliminated variable must not still
-       appear as a live SimVar. =#
-    local anyHTKey = first(keys(simCode.stringToSimVarHT))
-    push!(simCode.eliminatedVariables, anyHTKey)
-    local result = SimCodeCheck.check(simCode)
+    #= An eliminated variable that is still a variable violates the invariant. =#
+    local anyKey = first(keys(simCode.stringToSimVarHT))
+    push!(simCode.eliminatedVariables, anyKey)
+    local result = SC.check(simCode)
     local hit = filter(v -> v.rule === :eliminated_vars_pruned, result.violations)
     @test !isempty(hit)
-    @test any(v -> v.where == anyHTKey, hit)
+    @test any(v -> v.where == anyKey, hit)
   end
 
   @testset "report() prints without error" begin
     local simCode = _buildSimCodeForTest("HelloWorld", "Models/HelloWorld.mo")
-    local result = SimCodeCheck.check(simCode)
+    local result = SC.check(simCode)
     local buf = IOBuffer()
-    SimCodeCheck.report(buf, result)
-    local text = String(take!(buf))
-    @test occursin("[SIMCODE: check]", text)
+    SC.report(buf, result)
+    @test occursin("[SIMCODE: check]", String(take!(buf)))
   end
 end
