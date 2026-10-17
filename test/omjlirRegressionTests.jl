@@ -131,6 +131,21 @@ orSimCode(model::String)::OMBackend.SimCode.SIM_CODE = OMBackend.mtkSimCode(orMo
       @test isapprox(sol(0.7; idxs = :p), 12.0; atol = 1e-9)
     end
   end
+  @testset "review 2026-10-17: the operators of a type extending Complex are Complex operations" begin
+    #= MSL QuasiStatic machines (IMC_DOL, SMPM_Mains, IMS_Start, SMEE_Generator) keep the calls of
+       Modelica.SIunits.ComplexVoltage's '*'.multiply: lowered to Real arithmetic, or MTK gets an
+       opaque call per field and the initialization fails =#
+    local cplx = SC.TYPE_COMPLEX(true, ["re", "im"], SC.SType[SC.TYPE_REAL(), SC.TYPE_REAL()])
+    local args = SC.Exp[SC.RCONST(1.0), SC.RCONST(2.0), SC.RCONST(3.0), SC.RCONST(4.0)]
+    local mul = SC.CALL(Symbol("Modelica_SIunits_ComplexVoltage_'*'_multiply"), args, cplx, SC.CALL_FUNCTION)
+    local lowered = SC.lowerComplex(SC.RSUB(mul, 1, "re", SC.TYPE_REAL()))
+    @test !SC.anyExp(x -> x isa SC.CALL, lowered)
+    @test SC.tryEvalNumeric(lowered) == 1.0 * 3.0 - 2.0 * 4.0
+    #= the same name part on a function returning Reals is no Complex operation =#
+    local real2 = SC.TYPE_TUPLE(SC.SType[SC.TYPE_REAL(), SC.TYPE_REAL()])
+    local notComplex = SC.TSUB(SC.CALL(Symbol("Pkg_'*'_multiply"), args, real2, SC.CALL_FUNCTION), 1, SC.TYPE_REAL())
+    @test SC.lowerComplex(notComplex) == notComplex
+  end
   @testset "review 2026-10-17: a Boolean binding of a variable branch is no latch" begin
     local sol = orSimulate("BooleanBindingOfVariableBranch"; scalarize = true)
     @test sol.retcode == ReturnCode.Success

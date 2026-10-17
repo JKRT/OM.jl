@@ -123,7 +123,8 @@
                     ("ArrayOperatorCallEquation", 3.5 + 7 * (cos(1.0) - 1) - 14 * sin(1.0)),
                     ("ArrayArgFunctions", 2.02820976),    # the integral of y.re + 2 y.im + r; OpenModelica 2.02820969
                     ("ArrayRecordOutputs", -8.74339361),  # analytic (OpenModelica 1.27.1 fails in wrapFunctionCalls)
-                    ("SymmetricTransformation", -0.48042261))  # analytic = OpenModelica 1.27.1
+                    ("SymmetricTransformation", -0.48042261),  # analytic = OpenModelica 1.27.1
+                    ("DerivedTypeOperators", 3.5))             # analytic
       local sol = OM.simulate("ComplexLoweringTests." * m, file; MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1.0)
       @test sol.retcode == ReturnCode.Success
       @test isapprox(sol[:x][end], x1; atol = 1.0e-4)
