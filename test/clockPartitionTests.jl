@@ -3,17 +3,21 @@
    partitions simulated as when-clauses (ClockedLowering). =#
 @testset "Clock partitioning" begin
   local file = "./Models/ClockedPartitions.mo"
-  local partitioning = m -> OMBackend.clockedPartitioning(first(OM.flatten("ClockedPartitions." * m, file)))
+  #= the OMJLIR model as the clock partitioning leaves it (before the clocked lowering):
+     its base clocks and clocked partitions =#
+  local partitioning = m -> OMBackend.Passes.runPasses!(
+    OMBackend.LowerFlatModel.lowerFlatModel(first(OM.flatten("ClockedPartitions." * m, file))); through = "partitionClocks")
   #= the partition of variable `v`: its base clock (as a Clock constructor) and sub-clock =#
   local clockOf = (p, v) -> begin
-    local part = only(q for q in p.partitions if any(x -> string(x.varName) == v, q.vars))
-    (string(p.baseClocks[part.baseClock]), part.subClock.factor, part.subClock.shift)
+    local part = only(q for q in p.clocked if Symbol(v) in q.unknowns)
+    local a = part.association
+    (OMBackend.OMJLIR.toString(p.baseClocks[a.baseClock]), a.subClock.factor, a.subClock.shift)
   end
   @testset "sample and hold" begin
     local p = partitioning("SampleHold")
-    @test length(p.baseClocks) == 1 && length(p.partitions) == 1
+    @test length(p.baseClocks) == 1 && length(p.clocked) == 1
     @test clockOf(p, "y") == ("Clock(0.1)", 1 // 1, 0 // 1)
-    @test !any(q -> any(x -> string(x.varName) in ("u", "z"), q.vars), p.partitions)
+    @test !any(q -> any(in((:u, :z)), q.unknowns), p.clocked)
   end
   @testset "subSample" begin
     local p = partitioning("SubSampled")
@@ -35,7 +39,7 @@
   end
   @testset "an inferred clock" begin
     local p = partitioning("InferredClock")
-    @test length(p.partitions) == 1
+    @test length(p.clocked) == 1
     @test clockOf(p, "v") == clockOf(p, "y") == ("Clock(0.5)", 1 // 1, 0 // 1)
   end
   @testset "two base clocks" begin
@@ -44,11 +48,11 @@
     @test Set(first.([clockOf(p, "y1"), clockOf(p, "y2")])) == Set(["Clock(0.1)", "Clock(0.3)"])
   end
   @testset "an event clock" begin
-    @test clockOf(partitioning("EventClock"), "y") == ("Clock(u > 0.5, 0.0)", 1 // 1, 0 // 1)
+    @test clockOf(partitioning("EventClock"), "y") == ("Clock((u > 0.5), 0.0)", 1 // 1, 0 // 1)
   end
   @testset "a clocked when-clause" begin
     local p = partitioning("ClockedWhen")
-    @test length(p.partitions) == 1
+    @test length(p.clocked) == 1
     @test clockOf(p, "y") == clockOf(p, "s") == ("Clock(1, 10)", 1 // 1, 0 // 1)
   end
   @testset "two rational clocks related by an inferred factor" begin

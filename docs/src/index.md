@@ -39,8 +39,9 @@ six-axis `RobotR3` system.
                                |
                                v
 +---------------------------- BACKEND ---------------------------+
-| FlatModel -> BDAE -> matching / index reduction / optimization |
-|           -> SimCode -> Julia / ModelingToolkit codegen        |
+| FlatModel -> OMJLIR -> passes (records, clocks, derivatives)   |
+|           -> SimCode -> passes (aliases, constants, folds)     |
+|           -> Julia / ModelingToolkit codegen                   |
 +------------------------------+---------------------------------+
                                |
                                v

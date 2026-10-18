@@ -54,26 +54,15 @@
     end
   end
 
-  @testset "SimCode migration boundary regressions" begin
-    local SC = OMBackend.SimulationCode
-    local realTy = DAE.T_REAL_DEFAULT
-    local xDae = DAE.CREF(DAE.CREF_IDENT("x", realTy, MetaModelica.nil), realTy)
-    local rsubDae = DAE.RSUB(xDae, 1, "re", realTy)
-    local rsubSim = SC.toSimExp(rsubDae)
-    @test rsubSim isa SC.RSUB
-    @test rsubSim.exp isa SC.EXP_CREF
-    @test SC.toDAEExp(rsubSim) isa DAE.RSUB
-
-    local sc = SC.SIM_CODE("mock",
-      SC.OrderedDict{String, Tuple{Int, SC.SimVar}}(),
-      SC.RESIDUAL_EQUATION[], SC.Equation[], SC.WHEN_EQUATION[], SC.IF_EQUATION[],
-      false, Int[], SC.Graphs.SimpleDiGraph(0), [], SC.StructuralTransition[], [],
-      String[], String[], SC.Equation[], "mock", NONE(), String[],
-      SC.ModelicaFunction[], false, SC.RESIDUAL_EQUATION[], String[], SC.AliasEntry[],
-      nothing, SC.INITIAL_ALGORITHM[], SC.BDAE.ASSERT_EQUATION[])
-    #= A SimCode cref is a tuple target too; one missing from the variable
-       table is refused (it was bound as a local of the affect, its value lost). =#
+  @testset "A tuple target in a when that is no variable is refused" begin
+    #= A tuple target missing from the variable table was bound as a local of the
+       affect, its value lost. =#
+    local SC = OMBackend.SimCode
+    local (fm, cache) = OM.flatten("HelloWorld", "./Models/HelloWorld.mo")
+    local simCode = OMBackend.mtkSimCode(OMBackend.omjlirModel(fm; functionList = OMFrontend.cacheToFunctionList(cache)))
     @test_throws OMBackend.UnsupportedLowering OMBackend.CodeGeneration._emitWhenTupleElementAssignMTK!(
-      Expr[], SC.EXP_CREF(SC.SimCref(:x), SC.TYPE_REAL()), :(rhs), sc)
+      Expr[], SC.EXP_CREF(SC.SimCref(:notAVariable), SC.TYPE_REAL()), :(rhs), simCode)
+    @test length(OMBackend.CodeGeneration._emitWhenTupleElementAssignMTK!(
+      Expr[], SC.EXP_CREF(SC.SimCref(:x), SC.TYPE_REAL()), :(rhs), simCode)) == 1
   end
 end
