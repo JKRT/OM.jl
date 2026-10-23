@@ -201,9 +201,10 @@ end
 """
     libraries(; installDir = nothing) -> Dict{String, Vector{NamedTuple}}
 
-Return all Modelica libraries discovered in the OpenModelica installation
-directory (`~/.openmodelica/libraries/`) and the bundled `lib/Modelica/`
-folder (excluding the pre-packaged `MSL_*` files).
+Return all Modelica libraries discovered in the directories of installed libraries, OM.jl's
+(`~/OMJL/libraries`, where `installLibrary` installs) before OpenModelica's (`~/.openmodelica/libraries`; on
+Windows both under `%APPDATA%`), or only in `installDir` when it is given, and in OMFrontend's bundled
+`lib/Modelica/` folder (excluding the pre-packaged `MSL_*` files).
 
 Each value is a vector of `(version, path, source)` named tuples.
 
@@ -247,18 +248,19 @@ end
 """
     installLibrary(name; version, url = nothing, tag = nothing, subdir = nothing, dest = nothing) -> String
 
-Install the Modelica library `name` into `~/.openmodelica/libraries/` (or `dest`) as `<name> <version>/`, from a
-shallow git clone of its release tag (OMFrontend.installLibrary). `url` is its git repository (a GitHub URL, say);
-without it a registered library (Buildings) comes from its own. `tag` defaults to `v<version>`, then `<version>`;
-`subdir` to the folder `name` with a package.mo, else the repository's root. The package is checked to be `name`,
-its version annotation against `version`, and the libraries it uses are listed as available or missing.
+Install the Modelica library `name` into `~/OMJL/libraries/` (Windows: `%APPDATA%\\OMJL\\libraries`; or `dest`) as
+`<name> <version>/`, from a shallow git clone of its release tag (OMFrontend.installLibrary). `url` is its git
+repository (a GitHub URL, say); without it a registered library (Buildings) comes from its own. `tag` defaults to
+`v<version>`, then `<version>`; `subdir` to the folder `name` with a package.mo, else the repository's root. The
+package is checked to be `name`, its version annotation against `version`, and the libraries it uses are listed as
+available or missing.
 
 After installation `libraries()` discovers it and `loadInstalledLibrary` loads it.
 
 # Example
 ```julia
 OM.installLibrary("Buildings"; version = "13.0.0")
-OM.installLibrary("ExternData"; version = "3.0.4", url = "https://github.com/modelica-3rdparty/ExternData.mo")
+OM.installLibrary("ExternData"; version = "3.2.0", url = "https://github.com/modelica-3rdparty/ExternData")
 key = OM.loadInstalledLibrary("Buildings")
 ```
 """
