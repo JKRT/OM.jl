@@ -7,16 +7,20 @@
 # <dest dir>/<Package>.jl. The ref is the first branch that exists of
 #   pull request: <PR head branch> in the PR author's fork (fork PRs only),
 #                 <PR head branch>, <line>, master
-#   push:         <line>, master
+#   push:         <PUSH_HEAD>, <line>, master
 # where <line> is LINE if set, else the PR base branch or the pushed branch.
 # So coordinated changes across repositories (same branch name) are tested
-# together, and otherwise the siblings come from the line the change targets
-# (for example 1.13) instead of master. A head branch that is itself a line
-# (master, main, 1.13, ...) or equals the base branch is not a coordinated
-# change: forks carry stale copies of those, so it is skipped.
+# together, also after the first of them is merged (PUSH_HEAD: the siblings
+# not merged yet are still on that branch, the merged ones on master), and
+# otherwise the siblings come from the line the change targets (for example
+# 1.13) instead of master. A head branch that is itself a line (master, main,
+# 1.13, ...) or equals the base branch is not a coordinated change: forks
+# carry stale copies of those, so it is skipped.
 #
 # Environment (set by the action from the GitHub context; all optional):
 #   EVENT_NAME, HEAD_REF, BASE_REF, REF_NAME
+#   PUSH_HEAD             for a push, the head branch of the pull request the
+#                         pushed commit was merged from (the action looks it up)
 #   HEAD_REPO, BASE_REPO  owner/name of the PR head and base repositories
 #   LINE                  force the line (e.g. 1.13) instead of BASE_REF/REF_NAME
 #   OM_REPOSITORY         repository of OM.jl (default JKRT/OM.jl)
@@ -67,6 +71,8 @@ fi
 head=""
 if [ -n "$pr" ] && [ -n "${HEAD_REF:-}" ] && ! is_line "$HEAD_REF" && [ "$HEAD_REF" != "${BASE_REF:-}" ]; then
   head=$HEAD_REF
+elif [ -z "$pr" ] && [ -n "${PUSH_HEAD:-}" ] && ! is_line "$PUSH_HEAD" && [ "$PUSH_HEAD" != "${REF_NAME:-}" ]; then
+  head=$PUSH_HEAD
 fi
 
 summary=""

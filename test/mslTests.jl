@@ -978,7 +978,6 @@ end
      parameter array by a runtime index in an affect (UndefVarError), and ShowCompositeStep's
      `suspend = anyTrue({...}) or ...` had its initialization row on an alias outside the
      lifted names (refused). =#
-  #= The reference names are literals: ci/fetch-msl-refs.sh finds them next to validateMSLModel. =#
   @testset "IntegerNetwork1: a function of discrete variables only" begin
     sol = simulateMSL("Modelica.Blocks.Examples.IntegerNetwork1", 10.0)
     @test sol !== nothing

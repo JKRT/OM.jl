@@ -7,8 +7,8 @@ name: OM.jl integration
 # 1. Check out OM.jl and every sibling package at the branch that matches the
 #    change (.github/actions/checkout-siblings: a PR's feature branch if it
 #    exists in that repository, else the PR base branch or `line`, e.g. 1.13,
-#    else master), in the layout of OM.jl's submodules, with the package under
-#    test in its place.
+#    else master; after a merge the merged PR's branch first), in the layout of
+#    OM.jl's submodules, with the package under test in its place.
 # 2. Build the native libraries (OMParser from source when no release exists
 #    for the Julia version), set up and precompile OM.jl (ci/setup.jl).
 # 3. Run the package's own tests against the checked-out siblings
@@ -126,10 +126,8 @@ jobs:
         run: julia --color=yes OM.jl/ci/test-package.jl "$PACKAGE"
 
       # Also after failing package tests: whether OM.jl still works is the point.
-      - name: MSL reference results
-        if: ${{ !cancelled() && inputs.om-tests && steps.setup.outcome == 'success' }}
-        run: OM.jl/ci/fetch-msl-refs.sh
-
+      # A test downloads the MSL reference results it compares against
+      # (validateMSLModel in test/testUtils.jl).
       - name: OM.jl tests (${{ matrix.group }})
         if: ${{ !cancelled() && inputs.om-tests && steps.setup.outcome == 'success' }}
         working-directory: OM.jl/test
