@@ -3,8 +3,8 @@ description: >
   Clone OM.jl and its sibling packages (Absyn.jl, DAE.jl, ..., OMParser.jl) at
   the branch matching the change under test: for a pull request from a feature
   branch that branch (in the author's fork or upstream), else the PR base
-  branch, else master; for a push the pushed branch, else master. See
-  checkout-siblings.sh.
+  branch, else master; for a push the branch of the pull request it was merged
+  from, else the pushed branch, else master. See checkout-siblings.sh.
 
 inputs:
   path:
@@ -35,10 +35,31 @@ inputs:
       pushed branch; for a package that has one branch for all lines (OMParser)
     required: false
     default: ""
+  token:
+    description: Token to look up the pull request a pushed commit was merged from
+    required: false
+    default: ${{ github.token }}
 
 runs:
   using: composite
   steps:
+    # After a merge, the siblings of a coordinated change that are not merged yet
+    # are still on its branch: the pushed commit's merged pull request names it.
+    # No pull request (a direct or bot push) or a failed lookup: none.
+    - name: Find the merged pull request
+      id: merged-pr
+      if: github.event_name == 'push'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPOSITORY: ${{ github.repository }}
+        SHA: ${{ github.sha }}
+      run: |
+        head=$(gh api "repos/$REPOSITORY/commits/$SHA/pulls" \
+                 --jq '[.[] | select(.merged_at != null) | .head.ref][0] // empty' 2> /dev/null) || head=""
+        echo "head=$head" >> "$GITHUB_OUTPUT"
+        echo "Branch of the pull request $SHA was merged from: ${head:-none}"
+
     - name: Clone siblings
       shell: bash
       env:
@@ -46,6 +67,7 @@ runs:
         HEAD_REF: ${{ github.head_ref }}
         BASE_REF: ${{ github.base_ref }}
         REF_NAME: ${{ github.ref_name }}
+        PUSH_HEAD: ${{ steps.merged-pr.outputs.head }}
         HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         BASE_REPO: ${{ github.repository }}
         LINE: ${{ inputs.line }}

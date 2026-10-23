@@ -320,6 +320,31 @@ function resolveMTKVariable(sol, sym::Symbol)
 end
 
 """
+Held while a reference is downloaded: the tests run with threads.
+"""
+const REFERENCE_DOWNLOAD_LOCK = ReentrantLock()
+
+"""
+    fetchMSLReference(refFile) -> Union{Nothing, String}
+
+Download the MAP-LIB reference `refFile` (its CSV and signal list) into `MSL_REF_DIR` with
+OMLibraryTesting's `download_refs.sh`, unless its CSV is there already. `nothing` once the CSV is
+there, else why it is not.
+"""
+function fetchMSLReference(refFile::String)::Union{Nothing, String}
+  csv_path = joinpath(MSL_REF_DIR, "csv", refFile * ".csv")
+  return lock(REFERENCE_DOWNLOAD_LOCK) do
+    isfile(csv_path) && return nothing
+    isfile(joinpath(MSL_REF_DIR, "download_refs.sh")) || return "no download_refs.sh in $MSL_REF_DIR"
+    Sys.which("bash") === nothing && return "no bash to run download_refs.sh"
+    output = IOBuffer()
+    ok = success(pipeline(Cmd(`bash download_refs.sh $refFile`; dir = MSL_REF_DIR); stdout = output, stderr = output))
+    isfile(csv_path) && return nothing
+    return "download_refs.sh $refFile $(ok ? "downloaded no CSV" : "failed"): $(last(strip(String(take!(output))), 300))"
+  end
+end
+
+"""
     validateMSLModel(sol, refFile; stopTime, reltol, atol, npoints) -> (passed, details)
 
 Validate simulation solution against MAP-LIB reference data.
@@ -329,7 +354,8 @@ Validate simulation solution against MAP-LIB reference data.
 - Returns `(passed::Bool, details::String)` where details describes any failures.
 
 Signals are loaded from `OMLibraryTesting.jl/reference/signals/<refFile>.txt`
-and reference values from `OMLibraryTesting.jl/reference/csv/<refFile>.csv`.
+and reference values from `OMLibraryTesting.jl/reference/csv/<refFile>.csv`,
+downloaded first when they are not there (`fetchMSLReference`).
 Signal names are converted from Modelica dot notation to underscore notation.
 """
 function validateMSLModel(sol, refFile::String;
@@ -340,8 +366,9 @@ function validateMSLModel(sol, refFile::String;
   csv_path = joinpath(MSL_REF_DIR, "csv", refFile * ".csv")
   signals_path = joinpath(MSL_REF_DIR, "signals", refFile * ".txt")
 
-  if !isfile(csv_path)
-    return (false, "Reference CSV not found: $csv_path")
+  missing_reason = fetchMSLReference(refFile)
+  if missing_reason !== nothing
+    return (false, "Reference CSV not found: $csv_path ($missing_reason)")
   end
 
   ref_time, ref_signals = loadReferenceCSV(csv_path)
