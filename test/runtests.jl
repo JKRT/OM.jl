@@ -32,6 +32,7 @@ ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
     include("sanityTests.jl")
     include("backendSanityTests.jl")
     include("simCodeCheckTests.jl")
+    include("translateReuseTests.jl")
   end
   ingroup("core") && @testset "Libraries And Language Extensions:" begin
     #= Translate and run some "advanced" models. Does not check the results =#

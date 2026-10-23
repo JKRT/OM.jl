@@ -218,18 +218,19 @@ function libraries(; installDir = nothing)
 end
 
 """
-    loadInstalledLibrary(name; version=nothing, forceReload=false, autodeps=true) -> String
+    loadInstalledLibrary(name; version=nothing, forceReload=false, autodeps=true, installDir=nothing) -> String
 
 Load a Modelica library discovered via `libraries()` into the cache.
 Returns the cache key for use in the `libraries` keyword argument of
 `translate` / `simulate`.
 
 # Keyword arguments
-- `version`: pin to a specific installed version (e.g. `"4.1.0"`). When
-  `nothing`, the highest discovered version is chosen.
+- `version`: pin to a specific installed version (e.g. `"4.1.0"`): an exact match, else a prefix (`"4.1"`). When
+  `nothing`, the first one `libraries()` lists (OM.jl's directory before OpenModelica's).
 - `forceReload`: re-parse the library even if it is already cached.
-- `autodeps`: also load declared dependencies (e.g. `ModelicaServices`,
-  `Complex`) of the requested library.
+- `autodeps`: also load the libraries its `uses` annotation names (e.g. `ModelicaServices`, `Complex`), resolved
+  before it is parsed; a missing one is an error naming it.
+- `installDir`: look only in this directory of installed libraries (one `installLibrary(...; dest)` installed into).
 
 # Example
 ```julia
@@ -237,27 +238,32 @@ key = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")
 OM.simulate("Modelica.Blocks.Continuous.Integrator"; libraries = [key])
 ```
 """
-function loadInstalledLibrary(name::String; version = nothing, forceReload::Bool = false, autodeps::Bool = true)
-  OMFrontend.loadInstalledLibrary(name; version = version, forceReload = forceReload, autodeps = autodeps)
+function loadInstalledLibrary(name::String; version = nothing, forceReload::Bool = false, autodeps::Bool = true,
+                              installDir = nothing)
+  OMFrontend.loadInstalledLibrary(name; version = version, forceReload = forceReload, autodeps = autodeps,
+                                  installDir = installDir)
 end
 
 """
-    installLibrary(name; version, dest = nothing) -> String
+    installLibrary(name; version, url = nothing, tag = nothing, subdir = nothing, dest = nothing) -> String
 
-Download and install a Modelica library into `~/.openmodelica/libraries/`
-(or `dest`). Performs a shallow git clone of the tagged release and extracts
-the Modelica package into `<dest>/<Name> <version>/`.
+Install the Modelica library `name` into `~/.openmodelica/libraries/` (or `dest`) as `<name> <version>/`, from a
+shallow git clone of its release tag (OMFrontend.installLibrary). `url` is its git repository (a GitHub URL, say);
+without it a registered library (Buildings) comes from its own. `tag` defaults to `v<version>`, then `<version>`;
+`subdir` to the folder `name` with a package.mo, else the repository's root. The package is checked to be `name`,
+its version annotation against `version`, and the libraries it uses are listed as available or missing.
 
 After installation `libraries()` discovers it and `loadInstalledLibrary` loads it.
 
 # Example
 ```julia
 OM.installLibrary("Buildings"; version = "13.0.0")
+OM.installLibrary("ExternData"; version = "3.0.4", url = "https://github.com/modelica-3rdparty/ExternData.mo")
 key = OM.loadInstalledLibrary("Buildings")
 ```
 """
-function installLibrary(name::String; version = nothing, dest = nothing)
-  OMFrontend.installLibrary(name; version = version, dest = dest)
+function installLibrary(name::String; version = nothing, url = nothing, tag = nothing, subdir = nothing, dest = nothing)
+  OMFrontend.installLibrary(name; version = version, url = url, tag = tag, subdir = subdir, dest = dest)
 end
 
 """
@@ -539,6 +545,26 @@ const SCALARIZE = Ref(false)
    name translates again when it is asked for the other one. =#
 const SCALARIZED_AT_TRANSLATE = Dict{String, Bool}()
 
+#= The MSL version and libraries each model was last translated with by name (by canonical name), so a simulate by
+   name with others translates again: a build of MSL 3.2.3's SignConvention answered for MSL 4.1.0's. A translate of
+   a file leaves none (any reuse by name stands, as before). =#
+const LIBRARIES_AT_TRANSLATE = Dict{String, Tuple{String, Vector{String}}}()
+
+"""
+    _reusableTranslation(internalName, scalarize, MSL_Version, libraries) -> Bool
+
+Whether a simulate by name can use the model's translation from earlier in the session: it was translated (or
+taken by the array path), with the same scalarize setting, and with the same MSL version and libraries where its
+translate by name recorded them.
+"""
+function _reusableTranslation(internalName::String, scalarize::Bool, MSL_Version::String,
+                              libraries::Vector{String})::Bool
+  (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) || return false
+  get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize || return false
+  local key = (MSL_Version, libraries)
+  return get(LIBRARIES_AT_TRANSLATE, internalName, key) == key
+end
+
 """
     withDirectRHS(f, value)
 
@@ -721,8 +747,7 @@ function simulate(modelName::String;
                   kwargs...)
   return _withSimulationSettings(directRHS, startTime) do
     internalName = OMBackend.canonicalName(modelName)
-    alreadyCompiled = (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) &&
-                      get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize
+    alreadyCompiled = _reusableTranslation(internalName, scalarize, String(MSL_Version), libraries)
     local rebuilt = false
     if (!alreadyCompiled || overwriteCache) && (MSL || !isempty(libraries))
       rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
@@ -822,6 +847,7 @@ function translate(modelName::String,
                           libraries = libraries,
                           scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+    delete!(LIBRARIES_AT_TRANSLATE, OMBackend.canonicalName(modelName))
     if keep
       local keptFunctions = OMFrontend.cacheToFunctionList(cache)
       local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
@@ -896,6 +922,7 @@ function translate(modelName::String;
     (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
                           scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+    LIBRARIES_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = (String(MSL_Version), copy(libraries))
     if keep
       local keptFunctions = OMFrontend.cacheToFunctionList(cache)
       local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)

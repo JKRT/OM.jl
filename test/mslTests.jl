@@ -49,12 +49,12 @@
     end
   end
 
-  @testset "MSL v4.0.0 Flat Modelica Generation" begin
+  @testset "MSL v4.1.0 Flat Modelica Generation" begin
     @test true == begin
       try
         flatModelica = OM.exportModelica("MechanicsExamples.EngineTest",
                                                "./Models/MSL/Mechanics.mo";
-                                               MSL = true, MSL_Version = "MSL:4.0.0")
+                                               MSL = true, MSL_Version = "MSL:4.1.0")
         true
       catch
         @info "Failed to instantiate some flat Models from the MSL..."

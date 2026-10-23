@@ -19,6 +19,8 @@ six-axis `RobotR3` system.
 
 - **[Installation](installation.md)** — how to get OM.jl and its submodules set up.
 - **[Examples](examples.md)** — worked simulations.
+- **[Libraries](libraries.md)** — the bundled MSL versions, installed libraries, installing one from GitHub,
+  your own; with examples.
 - **[Large array models](arrays.md)** — models with thousands of components:
   arrays are kept, the generated code does not grow with them.
 - **[Scripting (`.mos`)](scripting.md)** — run OpenModelica-style `.mos` scripts
