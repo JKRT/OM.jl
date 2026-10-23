@@ -978,15 +978,25 @@ end
      parameter array by a runtime index in an affect (UndefVarError), and ShowCompositeStep's
      `suspend = anyTrue({...}) or ...` had its initialization row on an alias outside the
      lifted names (refused). =#
-  for (model, stopTime) in (("Blocks.Examples.IntegerNetwork1", 10.0), ("StateGraph.Examples.ShowCompositeStep", 5.0))
-    @testset "$(model): a function of discrete variables only" begin
-      sol = simulateMSL("Modelica." * model, stopTime)
-      @test sol !== nothing
-      sol === nothing || @test begin
-        passed, details = validateMSLModel(sol, replace(model, "." => "_"); stopTime = stopTime)
-        passed || @warn "$(model) validation failed" details
-        passed
-      end
+  #= The reference names are literals: ci/fetch-msl-refs.sh finds them next to validateMSLModel. =#
+  @testset "IntegerNetwork1: a function of discrete variables only" begin
+    sol = simulateMSL("Modelica.Blocks.Examples.IntegerNetwork1", 10.0)
+    @test sol !== nothing
+    sol === nothing || @test begin
+      passed, details = validateMSLModel(sol,
+        "Blocks_Examples_IntegerNetwork1"; stopTime = 10.0)
+      passed || @warn "IntegerNetwork1 validation failed" details
+      passed
+    end
+  end
+  @testset "ShowCompositeStep: a function of discrete variables only" begin
+    sol = simulateMSL("Modelica.StateGraph.Examples.ShowCompositeStep", 5.0)
+    @test sol !== nothing
+    sol === nothing || @test begin
+      passed, details = validateMSLModel(sol,
+        "StateGraph_Examples_ShowCompositeStep"; stopTime = 5.0)
+      passed || @warn "ShowCompositeStep validation failed" details
+      passed
     end
   end
 
