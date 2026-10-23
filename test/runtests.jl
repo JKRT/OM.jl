@@ -32,6 +32,7 @@ ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
     include("sanityTests.jl")
     include("backendSanityTests.jl")
     include("simCodeCheckTests.jl")
+    include("translateReuseTests.jl")
   end
   ingroup("core") && @testset "Libraries And Language Extensions:" begin
     #= Translate and run some "advanced" models. Does not check the results =#
@@ -61,6 +62,7 @@ ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
     ingroup("events") && include("eventSemanticsTests.jl")
     ingroup("results") && include("frictionEventTests.jl")
     ingroup("results") && include("stateSelectionTests.jl")
+    ingroup("results") && include("indexReductionTests.jl")
     ingroup("results") && include("deModeTests.jl")
     ingroup("results") && include("arrayPathTests.jl")
     ingroup("results") && include("buildingsReproTests.jl")

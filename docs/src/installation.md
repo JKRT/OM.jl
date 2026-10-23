@@ -83,13 +83,15 @@ models or backend caches.
 
 ## Other MSL versions and third-party libraries
 
-`MSL_Version` selects the bundled MSL (3.2.3 or 4.0.0). Other versions and other
-libraries are loaded from the libraries installed for OpenModelica and passed by
-their key:
+`MSL_Version` selects the bundled MSL (3.2.3 or 4.1.0). Other versions and other
+libraries are installed ones (OM.jl's `~/OMJL/libraries`, where `installLibrary` puts a
+library cloned from its git repository, or OpenModelica's `~/.openmodelica/libraries`),
+loaded and passed by their key:
 
 ```julia
-key = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")
-OM.simulate("Modelica.Blocks.Examples.PID_Controller"; libraries = [key], stopTime = 4.0)
+OM.installLibrary("ExternData"; version = "3.2.0", url = "https://github.com/modelica-3rdparty/ExternData")
+key = OM.loadInstalledLibrary("ExternData")
+(fm, _) = OM.flatten("ExternData.Examples.CSVTest"; libraries = [key])
 ```
 
 Where libraries come from, how to install one, and what happens when one is

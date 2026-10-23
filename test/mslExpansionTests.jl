@@ -636,14 +636,15 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
      unassigned (#EMPTY# reached the DAE), `(cc, m_dCap) = diodeNoBypassCode(...)` has a
      record in the tuple (D1_cc did not resolve, then the tuple residual had no lowering),
      and a folded record parameter went to the function as a NamedTuple. omc 1.27.1 with
-     tolerance 1e-8: D2.icap(0.0003) = 2.5674459e-5, compared at that tolerance. The value moves by
-     0.2% with the step control and the reduced system's structure (2.5618e-5 to 2.5726e-5 here;
-     omc's own is 2.70e-5 at its default tolerance): within 0.5%. =#
+     tolerance 1e-8: D2.icap(0.0003) = 2.5674459e-5, compared at that tolerance, relative and absolute
+     (omc's tolerance is both): icap is of 1e-5, so the default absolute tolerance 1e-6 left it to the
+     step control and the reduced system's structure (2.543e-5 to 2.5726e-5; omc's own is 2.70e-5 at its
+     default tolerance). At 1e-8 both: 0.03%. =#
   @testset "Spice3 Graetz" begin
     local sol = OM.simulate("Modelica.Electrical.Spice3.Examples.Graetz"; MSL_Version = "MSL:3.2.3", stopTime = 0.025,
-                            reltol = 1e-8)
+                            reltol = 1e-8, abstol = 1e-8)
     @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-    @test sol(0.0003; idxs = :D2_icap) ≈ 2.5674459467084227e-5 rtol = 5e-3
+    @test sol(0.0003; idxs = :D2_icap) ≈ 2.5674459467084227e-5 rtol = 1e-3
   end
 
 end

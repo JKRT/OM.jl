@@ -322,7 +322,7 @@ package AlgInitTest
     end when;
   end ReadsFixedState;
 
-  model ReadsInitialized "reads z, which an initial equation sets (OpenModelica: q = 6; refused)"
+  model ReadsInitialized "reads z, which an initial equation sets (OpenModelica: q = 6)"
     Real z(start = 0);
     discrete Real q(start = 0, fixed = false);
   initial equation
@@ -336,7 +336,7 @@ package AlgInitTest
     end when;
   end ReadsInitialized;
 
-  model ReadsEliminated "reads w2, eliminated as w's equal (OpenModelica: r = 2; refused)"
+  model ReadsEliminated "reads w2, eliminated as w's equal (OpenModelica: r = 2)"
     Real w = 2 * time + 1;
     Real w2 = 2 * time + 1;
     discrete Real r(start = 0, fixed = false);

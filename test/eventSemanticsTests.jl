@@ -576,5 +576,39 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
        table's output inlined into it). =#
     local tableEdges = OM.simulate("TableEdgeBlocks", "./Models/TableEdgeBlocks.mo"; MSL = true, stopTime = 1.0)
     @test [tableEdges(0.5; idxs = :nRise), tableEdges(0.5; idxs = :nChange), last(tableEdges[:nChange])] == [1, 2, 3]
+    #= MSL RadioButtonSource (Blocks.Examples.Interaction1): `pre_reset := pre(reset)` fired once,
+       where reset changed, and read the old value; the start button never reset (on = 1 at 0.8). =#
+    for m in ("RadioButtons", "RadioButtonsArray")
+      local buttons = _eventSim(m; stopTime = 1.0)
+      @test [buttons(t; idxs = :start_on) for t in (0.1, 0.4, 0.8)] == [0, 1, 0]
+      @test [buttons(t; idxs = :stop_on) for t in (0.1, 0.4, 0.8)] == [0, 0, 1]
+    end
+    #= The event iteration after the initialization, pre() the initial values
+       (OpenModelica's updateDiscreteSystem): mode 0 at the initialization, 1 after;
+       without it mode stayed 0 and x at 0. =#
+    local afterInit = _eventSim("PreAfterInit"; stopTime = 1.0)
+    @test [afterInit(0.0; idxs = :mode), afterInit(0.5; idxs = :mode)] == [1, 1]
+    @test afterInit(1.0; idxs = :x) ≈ 1.0 atol = 1e-6
+    #= pre() of an algebraic variable at a branch event reads its value before the step
+       (MSL 4 DemonstrateContinuousSignalExtrema): the branch callback's re-solve ran before
+       the instant's pre-state was recorded, and the array path read the current value
+       (peak = -1.5). =#
+    for m in ("PreAtBranchEvent", "PreAtStateBranchEvent", "PreAtPulseStep")
+      local s = _eventSim(m; stopTime = 0.9)
+      @test [s(0.4; idxs = :peak), s(0.6; idxs = :peak)] ≈ [0.0, 1.5] atol = 1e-6
+    end
+    #= A relation <= on its boundary (to rounding) at a time event holds: MSL SimpleGearShift's
+       brake normal force ramps to 0, and free = f <= 0 stayed false (x(1) = 0). Both paths. =#
+    for kw in ((;), (; scalarize = true))
+      local b = _eventSim("ExactBoundaryAtEvent"; stopTime = 1.0, kw...)
+      @test [b(0.45; idxs = :free), b(0.6; idxs = :free)] == [0, 1]
+      @test b(1.0; idxs = :x) ≈ 0.5 atol = 1e-6
+    end
+    #= delay() of a value that steps at a branch event: its left limit was not recorded, and the
+       delayed step ramped (d = 0.83, 0.21 at 0.6, 0.75; MSL 4 CompareLosslessLines). Both paths. =#
+    for kw in ((;), (; scalarize = true))
+      local dl = _eventSim("DelayOfBranchStep"; stopTime = 1.0, kw...)
+      @test [dl(t; idxs = :d) for t in (0.6, 0.75, 0.85)] ≈ [1.0, 1.0, 0.0] atol = 1e-6
+    end
   end
 end

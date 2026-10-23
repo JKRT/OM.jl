@@ -153,7 +153,8 @@ plot(OM.OMBackend.getVariableValues(chua, "C1.v"), OM.OMBackend.getVariableValue
 
 ## A model from another library: Buildings
 
-Libraries besides the MSL are installed once and passed by their key. The first
+Libraries besides the MSL are installed once and passed by their key (more in
+[Libraries](libraries.md)). The first
 step of the Buildings library's space-cooling tutorial: a room with an air
 volume, a wall to the outside and an air supply.
 

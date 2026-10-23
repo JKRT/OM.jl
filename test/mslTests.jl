@@ -49,12 +49,12 @@
     end
   end
 
-  @testset "MSL v4.0.0 Flat Modelica Generation" begin
+  @testset "MSL v4.1.0 Flat Modelica Generation" begin
     @test true == begin
       try
         flatModelica = OM.exportModelica("MechanicsExamples.EngineTest",
                                                "./Models/MSL/Mechanics.mo";
-                                               MSL = true, MSL_Version = "MSL:4.0.0")
+                                               MSL = true, MSL_Version = "MSL:4.1.0")
         true
       catch
         @info "Failed to instantiate some flat Models from the MSL..."
@@ -969,6 +969,33 @@ end
       passed, details = validateMSLModel(sol,
         "Electrical_PowerConverters_Examples_DCAC_MultiPhaseTwoLevel_MultiPhaseTwoLevel_R"; stopTime = 0.1)
       passed || @warn "MultiPhaseTwoLevel_R validation failed" details
+      passed
+    end
+  end
+
+  #= A discrete definition through a pure function of discrete variables only stays an
+     equation: lifted to events, IntegerNetwork1's `y = expr[firstTrueIndex(u)]` read a
+     parameter array by a runtime index in an affect (UndefVarError), and ShowCompositeStep's
+     `suspend = anyTrue({...}) or ...` had its initialization row on an alias outside the
+     lifted names (refused). =#
+  #= The reference names are literals: ci/fetch-msl-refs.sh finds them next to validateMSLModel. =#
+  @testset "IntegerNetwork1: a function of discrete variables only" begin
+    sol = simulateMSL("Modelica.Blocks.Examples.IntegerNetwork1", 10.0)
+    @test sol !== nothing
+    sol === nothing || @test begin
+      passed, details = validateMSLModel(sol,
+        "Blocks_Examples_IntegerNetwork1"; stopTime = 10.0)
+      passed || @warn "IntegerNetwork1 validation failed" details
+      passed
+    end
+  end
+  @testset "ShowCompositeStep: a function of discrete variables only" begin
+    sol = simulateMSL("Modelica.StateGraph.Examples.ShowCompositeStep", 5.0)
+    @test sol !== nothing
+    sol === nothing || @test begin
+      passed, details = validateMSLModel(sol,
+        "StateGraph_Examples_ShowCompositeStep"; stopTime = 5.0)
+      passed || @warn "ShowCompositeStep validation failed" details
       passed
     end
   end

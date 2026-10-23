@@ -152,7 +152,7 @@ const ALG_INIT_FILE = "./Models/AlgInitTest.mo"
      determines, or one the backend eliminated, was read as its start or 0.0
      (q = 1, r = 1; OpenModelica 6 and 2). =#
   #= A refusal for the reason the test means (one for another reason passed). =#
-  #= the MTK path (scalarize = true) refuses these; the array path gives OpenModelica's values =#
+  #= the MTK path (scalarize = true) refuses what it cannot run; the array path gives OpenModelica's values =#
   local refusedFor = (m, what) -> try
     OM.simulate("AlgInitTest.$m", ALG_INIT_FILE; stopTime = 1.0, scalarize = true)
     false
@@ -165,9 +165,10 @@ const ALG_INIT_FILE = "./Models/AlgInitTest.mo"
     @test OM.simulate("AlgInitTest.ReadsStringParameter", ALG_INIT_FILE; stopTime = 1.0)(1.0; idxs = :x) ≈ 2.0
     #= Bound to a call (MSL ReadRealMatrixFromFile's `file = loadResource(...)`): the module's value. =#
     @test OM.simulate("AlgInitTest.ReadsStringOfNumber", ALG_INIT_FILE; stopTime = 1.0)(1.0; idxs = :x) ≈ 2.0
-    @test refusedFor("ReadsInitialized", "reading a variable the initialization determines: z")
-    #= w2 is eliminated as w's alias, and the section reads w in its place =#
-    @test refusedFor("ReadsEliminated", "reading a variable the initialization determines: w")
+    #= the MTK path runs these after the initialization since OMBackend 5e54981 (it refused them): OpenModelica's
+       values too. w2 is eliminated as w's alias, and the section reads w in its place. =#
+    @test OM.simulate("AlgInitTest.ReadsInitialized", ALG_INIT_FILE; stopTime = 1.0, scalarize = true)(0.5; idxs = :q) ≈ 6.0
+    @test OM.simulate("AlgInitTest.ReadsEliminated", ALG_INIT_FILE; stopTime = 1.0, scalarize = true)(0.5; idxs = :r) ≈ 2.0
     @test OM.simulate("AlgInitTest.ReadsInitialized", ALG_INIT_FILE; stopTime = 1.0)(0.5; idxs = :q) ≈ 6.0
     @test OM.simulate("AlgInitTest.ReadsEliminated", ALG_INIT_FILE; stopTime = 1.0)(0.5; idxs = :r) ≈ 2.0
     #= A parameter the initialization computes: the section's results were dropped (s = 0). =#

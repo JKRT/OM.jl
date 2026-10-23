@@ -1,7 +1,7 @@
 # OpenModelicaJL (OM.jl) [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://jkrt.github.io/OM.jl/dev/) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
 A Modelica Environment in Julia.
 
-Documentation: <https://jkrt.github.io/OM.jl/dev/> (installation, examples, large array models, scripting, API).
+Documentation: <https://jkrt.github.io/OM.jl/dev/> (installation, examples, [Modelica libraries](https://jkrt.github.io/OM.jl/dev/libraries/), large array models, scripting, API).
 
 Please leave a star or make an issue to support the repository!
 * Note that this package is still under development
@@ -25,6 +25,37 @@ a planar slider-crank loop solved by OM.jl and animated from the crankshaft angl
 
 See [`examples/Animation/Engine`](examples/Animation/Engine) for the runnable
 example and the slider-crank walkthrough.
+
+## Modelica libraries
+
+OM.jl ships the Modelica Standard Library 3.2.3 and 4.1.0, and loads any other Modelica library: installed with
+OpenModelica, installed by OM.jl from its git repository (GitHub, say), or a folder of your own. The libraries a
+library uses come along, and a missing one is reported by name before anything is parsed.
+
+**→ [Libraries guide, with examples](https://jkrt.github.io/OM.jl/dev/libraries/)**
+
+```julia
+import OM
+
+# The bundled MSL, by version
+OM.simulate("Modelica.Blocks.Examples.PID_Controller"; MSL_Version = "MSL:4.1.0", stopTime = 4.0)
+
+# A library from GitHub, installed once into ~/OMJL/libraries (Windows: %APPDATA%\OMJL\libraries)
+OM.installLibrary("ExternData"; version = "3.2.0", url = "https://github.com/modelica-3rdparty/ExternData")
+key = OM.loadInstalledLibrary("ExternData")
+
+# A model of an installed library (Buildings is registered: no url needed)
+OM.installLibrary("Buildings"; version = "13.0.0")
+key = OM.loadInstalledLibrary("Buildings")
+sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
+
+# Your own model on an installed library (Smoothing.mo uses Modelica.Blocks; the guide shows it)
+msl = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")
+sol = OM.simulate("Smoothing", "Smoothing.mo"; libraries = [msl])
+
+# What is installed: OM.jl's directory and OpenModelica's
+OM.libraries()
+```
 
 ## Developer instructions
 ---
@@ -208,20 +239,15 @@ flatModelica = OM.exportModelica("Influenza", "./Models/Influenza.mo")
 print(modelName)
 ```
 ### Using different versions of the Modelica Standard Library
-Currently two versions of the MSL can be used by executing the following commands:
+MSL 3.2.3 and 4.1.0 are bundled; `MSL_Version` picks one for a model in a file:
 
 ```julia
-jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_VERSION = "MSL_4_0_0.mo")
+jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_Version = "MSL:4.1.0")
+jl = OM.translate("<model_using_msl_3>", "<filepath>"; MSL = true, MSL_Version = "MSL:3.2.3")
 ```
 
-Or if you would like to use the old 3.2.3
-
-```julia
-jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_VERSION = "MSL_4_0_0.mo")
-```
-
-These libraries are currently a part of this package.
-It is possible to include more libraries by adding them to the lib folder in the frontend submodule.
+Any other version, and any other library, is an installed one: see [Modelica libraries](#modelica-libraries) and
+the [Libraries guide](https://jkrt.github.io/OM.jl/dev/libraries/).
 
 ### Additional notes
 There are some code examples in the test folder at the root of the repository `OM/test/runtests.jl`

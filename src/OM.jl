@@ -121,6 +121,7 @@ function help()
   println("    OM.runScript(file)                    Execute an OpenModelica .mos script")
   println()
   printstyled("  Debugging:\n", color=:cyan)
+  println("    OM.explainIndexReduction(name, file) Which states and why (index reduction)")
   println("    OM.LogBackend()                      Enable backend debug logging")
   println("    OM.LogFrontend()                     Enable frontend debug logging")
   println("    ...; warnMissingStartValues=true     Show warnings for implicit 0.0 start values")
@@ -200,9 +201,10 @@ end
 """
     libraries(; installDir = nothing) -> Dict{String, Vector{NamedTuple}}
 
-Return all Modelica libraries discovered in the OpenModelica installation
-directory (`~/.openmodelica/libraries/`) and the bundled `lib/Modelica/`
-folder (excluding the pre-packaged `MSL_*` files).
+Return all Modelica libraries discovered in the directories of installed libraries, OM.jl's
+(`~/OMJL/libraries`, where `installLibrary` installs) before OpenModelica's (`~/.openmodelica/libraries`; on
+Windows both under `%APPDATA%`), or only in `installDir` when it is given, and in OMFrontend's bundled
+`lib/Modelica/` folder (excluding the pre-packaged `MSL_*` files).
 
 Each value is a vector of `(version, path, source)` named tuples.
 
@@ -217,18 +219,19 @@ function libraries(; installDir = nothing)
 end
 
 """
-    loadInstalledLibrary(name; version=nothing, forceReload=false, autodeps=true) -> String
+    loadInstalledLibrary(name; version=nothing, forceReload=false, autodeps=true, installDir=nothing) -> String
 
 Load a Modelica library discovered via `libraries()` into the cache.
 Returns the cache key for use in the `libraries` keyword argument of
 `translate` / `simulate`.
 
 # Keyword arguments
-- `version`: pin to a specific installed version (e.g. `"4.1.0"`). When
-  `nothing`, the highest discovered version is chosen.
+- `version`: pin to a specific installed version (e.g. `"4.1.0"`): an exact match, else a prefix (`"4.1"`). When
+  `nothing`, the first one `libraries()` lists (OM.jl's directory before OpenModelica's).
 - `forceReload`: re-parse the library even if it is already cached.
-- `autodeps`: also load declared dependencies (e.g. `ModelicaServices`,
-  `Complex`) of the requested library.
+- `autodeps`: also load the libraries its `uses` annotation names (e.g. `ModelicaServices`, `Complex`), resolved
+  before it is parsed; a missing one is an error naming it.
+- `installDir`: look only in this directory of installed libraries (one `installLibrary(...; dest)` installed into).
 
 # Example
 ```julia
@@ -236,27 +239,33 @@ key = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")
 OM.simulate("Modelica.Blocks.Continuous.Integrator"; libraries = [key])
 ```
 """
-function loadInstalledLibrary(name::String; version = nothing, forceReload::Bool = false, autodeps::Bool = true)
-  OMFrontend.loadInstalledLibrary(name; version = version, forceReload = forceReload, autodeps = autodeps)
+function loadInstalledLibrary(name::String; version = nothing, forceReload::Bool = false, autodeps::Bool = true,
+                              installDir = nothing)
+  OMFrontend.loadInstalledLibrary(name; version = version, forceReload = forceReload, autodeps = autodeps,
+                                  installDir = installDir)
 end
 
 """
-    installLibrary(name; version, dest = nothing) -> String
+    installLibrary(name; version, url = nothing, tag = nothing, subdir = nothing, dest = nothing) -> String
 
-Download and install a Modelica library into `~/.openmodelica/libraries/`
-(or `dest`). Performs a shallow git clone of the tagged release and extracts
-the Modelica package into `<dest>/<Name> <version>/`.
+Install the Modelica library `name` into `~/OMJL/libraries/` (Windows: `%APPDATA%\\OMJL\\libraries`; or `dest`) as
+`<name> <version>/`, from a shallow git clone of its release tag (OMFrontend.installLibrary). `url` is its git
+repository (a GitHub URL, say); without it a registered library (Buildings) comes from its own. `tag` defaults to
+`v<version>`, then `<version>`; `subdir` to the folder `name` with a package.mo, else the repository's root. The
+package is checked to be `name`, its version annotation against `version`, and the libraries it uses are listed as
+available or missing.
 
 After installation `libraries()` discovers it and `loadInstalledLibrary` loads it.
 
 # Example
 ```julia
 OM.installLibrary("Buildings"; version = "13.0.0")
+OM.installLibrary("ExternData"; version = "3.2.0", url = "https://github.com/modelica-3rdparty/ExternData")
 key = OM.loadInstalledLibrary("Buildings")
 ```
 """
-function installLibrary(name::String; version = nothing, dest = nothing)
-  OMFrontend.installLibrary(name; version = version, dest = dest)
+function installLibrary(name::String; version = nothing, url = nothing, tag = nothing, subdir = nothing, dest = nothing)
+  OMFrontend.installLibrary(name; version = version, url = url, tag = tag, subdir = subdir, dest = dest)
 end
 
 """
@@ -488,14 +497,42 @@ function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector
 end
 
 """
+    explainIndexReduction(modelName, modelFile; MSL=false, MSL_Version="MSL:3.2.3", libraries=String[])
+    explainIndexReduction(modelName; MSL_Version="MSL:3.2.3", libraries=String[])
+
+What the backend's index reduction does to a model and why, as a report: the equations it
+differentiates and how often, the candidates of each choice of states with their StateSelect
+(of the alias set and their own) and which became dummy derivatives, the states, the dynamic
+state sets; or that the model needs none. Nothing is translated.
+
+# Examples
+```julia
+OM.explainIndexReduction("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
+OM.explainIndexReduction("PendulumCartesian", "Pendulum.mo")
+```
+"""
+function explainIndexReduction(modelName::String, modelFile::String; MSL::Bool = false, MSL_Version::String = "MSL:3.2.3",
+                               libraries::Vector{String} = String[])
+  local (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, libraries = libraries)
+  return OMBackend.explainIndexReduction(fm; functionList = OMFrontend.cacheToFunctionList(cache))
+end
+
+function explainIndexReduction(modelName::String; MSL_Version::String = "MSL:3.2.3", libraries::Vector{String} = String[])
+  local (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)
+  return OMBackend.explainIndexReduction(fm; functionList = OMFrontend.cacheToFunctionList(cache))
+end
+
+"""
     SCALARIZE
 
 Default for the `scalarize` keyword of `translate` and `simulate`. `false` (the default): the
 flat model keeps its array variables, array equations and for-equations, and the backend
 generates code that keeps the loops (`OMBackend.ARRAY_ODE_GENERATION`): its size does not grow
-with the arrays, and every parameter can be changed in `resimulate`. A model outside that code
-generation's scope (algebraic loops, index reduction, Modelica functions, ...) is flattened
-again with scalarization and translated as with `true` (the reason is logged). `true`: the
+with the arrays, and every parameter can be changed in `resimulate`. A model of index above one
+whose index OMBackend reduces in array form (`OMBACKEND_ARRAY_INDEX_REDUCTION`) keeps its arrays
+through index reduction and is scalarized after it. Another model outside that code generation's
+scope (algebraic loops, Modelica functions, ...) is flattened again with scalarization and
+translated as with `true` (the reason is logged). `true`: the
 frontend scalarizes, as before.
 `flatten` returns the scalarized flat model unless asked otherwise.
 
@@ -509,6 +546,26 @@ const SCALARIZE = Ref(false)
 #= The scalarize setting each model was last translated with (by canonical name): simulate by
    name translates again when it is asked for the other one. =#
 const SCALARIZED_AT_TRANSLATE = Dict{String, Bool}()
+
+#= The MSL version and libraries each model was last translated with by name (by canonical name), so a simulate by
+   name with others translates again: a build of MSL 3.2.3's SignConvention answered for MSL 4.1.0's. A translate of
+   a file leaves none (any reuse by name stands, as before). =#
+const LIBRARIES_AT_TRANSLATE = Dict{String, Tuple{String, Vector{String}}}()
+
+"""
+    _reusableTranslation(internalName, scalarize, MSL_Version, libraries) -> Bool
+
+Whether a simulate by name can use the model's translation from earlier in the session: it was translated (or
+taken by the array path), with the same scalarize setting, and with the same MSL version and libraries where its
+translate by name recorded them.
+"""
+function _reusableTranslation(internalName::String, scalarize::Bool, MSL_Version::String,
+                              libraries::Vector{String})::Bool
+  (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) || return false
+  get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize || return false
+  local key = (MSL_Version, libraries)
+  return get(LIBRARIES_AT_TRANSLATE, internalName, key) == key
+end
 
 """
     withDirectRHS(f, value)
@@ -692,8 +749,7 @@ function simulate(modelName::String;
                   kwargs...)
   return _withSimulationSettings(directRHS, startTime) do
     internalName = OMBackend.canonicalName(modelName)
-    alreadyCompiled = (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) &&
-                      get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize
+    alreadyCompiled = _reusableTranslation(internalName, scalarize, String(MSL_Version), libraries)
     local rebuilt = false
     if (!alreadyCompiled || overwriteCache) && (MSL || !isempty(libraries))
       rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
@@ -784,17 +840,25 @@ function translate(modelName::String,
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
-    #= Arrays kept (the default mode): the array-preserving translation, else the
-       scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+    #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
+       in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
+       MTK or DE mode gets that backend. =#
     local keep = !scalarize && mode == OMBackend.IMTK_MODE
     (fm, cache) = flatten(modelName, modelFile;
                           MSL = MSL, MSL_Version = MSL_Version,
                           libraries = libraries,
                           scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+    delete!(LIBRARIES_AT_TRANSLATE, OMBackend.canonicalName(modelName))
     if keep
-      local arrays = OMBackend.translateArrays(fm; functionList = OMFrontend.cacheToFunctionList(cache))
+      local keptFunctions = OMFrontend.cacheToFunctionList(cache)
+      local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
       arrays === nothing || return arrays
+      local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
+                                                       warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                                       checkSimCode)
+      reduced === nothing || return reduced
+      logScalarizedFallback(fm)
       (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version,
                             libraries = libraries, scalarize = true)
     end
@@ -853,15 +917,23 @@ function translate(modelName::String;
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
-    #= Arrays kept (the default mode): the array-preserving translation, else the
-       scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+    #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
+       in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
+       MTK or DE mode gets that backend. =#
     local keep = !scalarize && mode == OMBackend.IMTK_MODE
     (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
                           scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+    LIBRARIES_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = (String(MSL_Version), copy(libraries))
     if keep
-      local arrays = OMBackend.translateArrays(fm; functionList = OMFrontend.cacheToFunctionList(cache))
+      local keptFunctions = OMFrontend.cacheToFunctionList(cache)
+      local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
       arrays === nothing || return arrays
+      local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
+                                                       warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                                       checkSimCode)
+      reduced === nothing || return reduced
+      logScalarizedFallback(fm)
       (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
     end
     functionList = OMFrontend.cacheToFunctionList(cache)
@@ -874,6 +946,18 @@ function translate(modelName::String;
                         checkSimCode = checkSimCode,
                         scalarized = true)
   end
+end
+
+"""
+    logScalarizedFallback(fm)
+
+The log line of `translate` falling back to the scalarizing flatten for a model it tried with its
+arrays kept, with the reasons the array code generation and the array index reduction gave.
+"""
+function logScalarizedFallback(fm::OMFrontend.Frontend.FlatModel)::Nothing
+  local name = OMBackend.canonicalName(fm.name)
+  @info "[translate] $(name): arrays not kept, scalarized in the frontend (fallback): $(OMBackend.scalarizedFallbackReason(name))"
+  return nothing
 end
 
 """
