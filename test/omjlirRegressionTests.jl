@@ -76,7 +76,9 @@ orSimCode(model::String)::OMBackend.SimCode.SIM_CODE = OMBackend.mtkSimCode(orMo
     local sc = orSimCode("AliasOfEliminatedRepresentative")
     @test isempty(SC.check(sc).violations)
     @test all(e -> haskey(sc.stringToSimVarHT, e.representativeName), sc.aliasMap)
-    @test !haskey(sc.stringToSimVarHT, "der(phi)")
+    #= no der() entry of a variable that is no state (phi's was left behind; with index reduction phi is the state) =#
+    local isState = name -> haskey(sc.stringToSimVarHT, name) && last(sc.stringToSimVarHT[name]).varKind isa SC.STATE
+    @test all(k -> !startswith(k, "der(") || isState(k[5:end-1]), keys(sc.stringToSimVarHT))
     local sol = orSimulate("AliasOfEliminatedRepresentative")
     @test sol.retcode == ReturnCode.Success
     @test isapprox(sol(1.0; idxs = :phiA), 1.0; atol = 1e-6)
@@ -208,7 +210,8 @@ orSimCode(model::String)::OMBackend.SimCode.SIM_CODE = OMBackend.mtkSimCode(orMo
   end
   @testset "a state whose der() a fold removes (SMPM_Braking, IMC_YD)" begin
     local sc = orSimCode("DeadStateAfterFold")
-    @test last(sc.stringToSimVarHT["Phi"]).varKind isa SC.ALG_VARIABLE
+    #= Phi no state: algebraic, or eliminated (with index reduction: observed) =#
+    @test !haskey(sc.stringToSimVarHT, "Phi") || last(sc.stringToSimVarHT["Phi"]).varKind isa SC.ALG_VARIABLE
     @test isempty(SC.deadStateNames(sc))
     local sol = orSimulate("DeadStateAfterFold")
     @test sol.retcode == ReturnCode.Success

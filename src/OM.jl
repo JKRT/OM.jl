@@ -121,6 +121,7 @@ function help()
   println("    OM.runScript(file)                    Execute an OpenModelica .mos script")
   println()
   printstyled("  Debugging:\n", color=:cyan)
+  println("    OM.explainIndexReduction(name, file) Which states and why (index reduction)")
   println("    OM.LogBackend()                      Enable backend debug logging")
   println("    OM.LogFrontend()                     Enable frontend debug logging")
   println("    ...; warnMissingStartValues=true     Show warnings for implicit 0.0 start values")
@@ -488,14 +489,42 @@ function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector
 end
 
 """
+    explainIndexReduction(modelName, modelFile; MSL=false, MSL_Version="MSL:3.2.3", libraries=String[])
+    explainIndexReduction(modelName; MSL_Version="MSL:3.2.3", libraries=String[])
+
+What the backend's index reduction does to a model and why, as a report: the equations it
+differentiates and how often, the candidates of each choice of states with their StateSelect
+(of the alias set and their own) and which became dummy derivatives, the states, the dynamic
+state sets; or that the model needs none. Nothing is translated.
+
+# Examples
+```julia
+OM.explainIndexReduction("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
+OM.explainIndexReduction("PendulumCartesian", "Pendulum.mo")
+```
+"""
+function explainIndexReduction(modelName::String, modelFile::String; MSL::Bool = false, MSL_Version::String = "MSL:3.2.3",
+                               libraries::Vector{String} = String[])
+  local (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, libraries = libraries)
+  return OMBackend.explainIndexReduction(fm; functionList = OMFrontend.cacheToFunctionList(cache))
+end
+
+function explainIndexReduction(modelName::String; MSL_Version::String = "MSL:3.2.3", libraries::Vector{String} = String[])
+  local (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)
+  return OMBackend.explainIndexReduction(fm; functionList = OMFrontend.cacheToFunctionList(cache))
+end
+
+"""
     SCALARIZE
 
 Default for the `scalarize` keyword of `translate` and `simulate`. `false` (the default): the
 flat model keeps its array variables, array equations and for-equations, and the backend
 generates code that keeps the loops (`OMBackend.ARRAY_ODE_GENERATION`): its size does not grow
-with the arrays, and every parameter can be changed in `resimulate`. A model outside that code
-generation's scope (algebraic loops, index reduction, Modelica functions, ...) is flattened
-again with scalarization and translated as with `true` (the reason is logged). `true`: the
+with the arrays, and every parameter can be changed in `resimulate`. A model of index above one
+whose index OMBackend reduces in array form (`OMBACKEND_ARRAY_INDEX_REDUCTION`) keeps its arrays
+through index reduction and is scalarized after it. Another model outside that code generation's
+scope (algebraic loops, Modelica functions, ...) is flattened again with scalarization and
+translated as with `true` (the reason is logged). `true`: the
 frontend scalarizes, as before.
 `flatten` returns the scalarized flat model unless asked otherwise.
 
@@ -784,8 +813,9 @@ function translate(modelName::String,
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
-    #= Arrays kept (the default mode): the array-preserving translation, else the
-       scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+    #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
+       in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
+       MTK or DE mode gets that backend. =#
     local keep = !scalarize && mode == OMBackend.IMTK_MODE
     (fm, cache) = flatten(modelName, modelFile;
                           MSL = MSL, MSL_Version = MSL_Version,
@@ -793,8 +823,14 @@ function translate(modelName::String,
                           scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
     if keep
-      local arrays = OMBackend.translateArrays(fm; functionList = OMFrontend.cacheToFunctionList(cache))
+      local keptFunctions = OMFrontend.cacheToFunctionList(cache)
+      local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
       arrays === nothing || return arrays
+      local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
+                                                       warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                                       checkSimCode)
+      reduced === nothing || return reduced
+      logScalarizedFallback(fm)
       (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version,
                             libraries = libraries, scalarize = true)
     end
@@ -853,15 +889,22 @@ function translate(modelName::String;
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[])
   return withDirectRHS(directRHS) do
-    #= Arrays kept (the default mode): the array-preserving translation, else the
-       scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+    #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
+       in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
+       MTK or DE mode gets that backend. =#
     local keep = !scalarize && mode == OMBackend.IMTK_MODE
     (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
                           scalarize = !keep)
     SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
     if keep
-      local arrays = OMBackend.translateArrays(fm; functionList = OMFrontend.cacheToFunctionList(cache))
+      local keptFunctions = OMFrontend.cacheToFunctionList(cache)
+      local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
       arrays === nothing || return arrays
+      local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
+                                                       warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                                       checkSimCode)
+      reduced === nothing || return reduced
+      logScalarizedFallback(fm)
       (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
     end
     functionList = OMFrontend.cacheToFunctionList(cache)
@@ -874,6 +917,18 @@ function translate(modelName::String;
                         checkSimCode = checkSimCode,
                         scalarized = true)
   end
+end
+
+"""
+    logScalarizedFallback(fm)
+
+The log line of `translate` falling back to the scalarizing flatten for a model it tried with its
+arrays kept, with the reasons the array code generation and the array index reduction gave.
+"""
+function logScalarizedFallback(fm::OMFrontend.Frontend.FlatModel)::Nothing
+  local name = OMBackend.canonicalName(fm.name)
+  @info "[translate] $(name): arrays not kept, scalarized in the frontend (fallback): $(OMBackend.scalarizedFallbackReason(name))"
+  return nothing
 end
 
 """

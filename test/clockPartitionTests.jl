@@ -80,7 +80,9 @@
        clocks too; with subSample of a clocked variable it ticks at these two as well) =#
     @test [value("EventSubSampled", "y", t) for t in (0.5, 0.8)] ≈ [π / 120, π / 120 + π / 5] atol = 1e-6
   end
-  @testset "a solver clock is refused (not lowered yet)" begin
-    @test_throws OMBackend.UnsupportedLowering OM.translate("ClockedPartitions.SolverClock", file)
+  #= lowered since OMBackend e4a1a9e (it was refused): ExplicitEuler on the 0.1 s clock, omc 1.27.1's values =#
+  @testset "a solver clock" begin
+    local x = OM.simulate("ClockedPartitions.SolverClock", file; stopTime = 1.0)
+    @test [x(t; idxs = :x) for t in (0.25, 0.55, 0.95)] ≈ [0.01, 0.1, 0.36] atol = 1e-9
   end
 end

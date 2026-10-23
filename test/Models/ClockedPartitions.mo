@@ -139,7 +139,7 @@ package ClockedPartitions
     der(x) = 20*cos(20*time);
     y = sample(u, subSample(Clock(x > 0.5, 0.0), 2));
   end EventSubSampled;
-  model SolverClock "a clocked discretized continuous-time partition (a solver clock: not lowered yet)"
+  model SolverClock "a clocked discretized continuous-time partition (a solver clock, ExplicitEuler; omc 1.27.1: x = 0.01, 0.1, 0.36 at 0.25, 0.55, 0.95)"
     Real u = time;
     Real x(start = 0);
     Real v;

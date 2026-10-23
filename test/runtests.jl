@@ -61,6 +61,7 @@ ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
     ingroup("events") && include("eventSemanticsTests.jl")
     ingroup("results") && include("frictionEventTests.jl")
     ingroup("results") && include("stateSelectionTests.jl")
+    ingroup("results") && include("indexReductionTests.jl")
     ingroup("results") && include("deModeTests.jl")
     ingroup("results") && include("arrayPathTests.jl")
     ingroup("results") && include("buildingsReproTests.jl")

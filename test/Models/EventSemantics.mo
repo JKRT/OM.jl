@@ -1484,4 +1484,116 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     end when;
     when ch then q = pre(q) + 1; end when;
   end ChangeOfSelfScheduled;
+  model RadioButtons "MSL RadioButtonSource: pre_reset := pre(reset) and the whens on it in one algorithm"
+    block Button
+      parameter Real t1;
+      input Boolean reset;
+      output Boolean on(start = false, fixed = true);
+    protected
+      Boolean pressed = time >= t1;
+      Boolean pre_reset;
+    initial equation
+      pre(pre_reset) = false;
+      pre(reset) = false;
+    algorithm
+      pre_reset := pre(reset);
+      when pre_reset then
+        on := false;
+      end when;
+      when change(pressed) then
+        on := true;
+      end when;
+    end Button;
+    Button start(t1 = 0.2, reset = stop.on);
+    Button stop(t1 = 0.6, reset = start.on);
+  end RadioButtons;
+  model RadioButtonsArray "the same with reset[1], as in MSL: pre({reset[1]})[1]"
+    block Button
+      parameter Real t1;
+      input Boolean reset[1];
+      output Boolean on(start = false, fixed = true);
+    protected
+      Boolean pressed = time >= t1;
+      Boolean pre_reset[1];
+    initial equation
+      pre(pre_reset) = {false};
+      pre(reset) = {false};
+    algorithm
+      pre_reset := pre(reset);
+      when pre_reset then
+        on := false;
+      end when;
+      when change(pressed) then
+        on := true;
+      end when;
+    end Button;
+    Button start(t1 = 0.2, reset = {stop.on});
+    Button stop(t1 = 0.6, reset = {start.on});
+  end RadioButtonsArray;
+  model PreAfterInit "the event iteration after the initialization: pre() takes the initial values (mode 3 -> 0 -> 1)"
+    Integer mode(start = 3, fixed = true);
+    Boolean started(start = false, fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    started = pre(mode) == 0 and x < 0.5 or pre(started);
+    mode = if started then 1 else 0;
+    der(x) = mode;
+  end PreAfterInit;
+  model PreAtBranchEvent "pre() of an algebraic variable at an if-equation's time event: its value before the step"
+    Real x(start = 0, fixed = true);
+    Real u;
+    Real peak(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    u = if time < 0.5 then 1 + x else x - 2;
+    when u < 0 then
+      peak = pre(u);
+    end when;
+  end PreAtBranchEvent;
+  model PreAtStateBranchEvent "pre() of an algebraic variable at a branch event on a state's crossing: its value before the step"
+    parameter Real T0 = 0.5;
+    Real x(start = 0, fixed = true);
+    Real u;
+    Real peak(start = 0, fixed = true);
+  equation
+    der(x) = 1;
+    u = if x < T0 then 1 + x else x - 2;
+    when u < 0 then
+      peak = pre(u);
+    end when;
+  end PreAtStateBranchEvent;
+  model PreAtPulseStep "pre() at a pulse's step (MSL Pulse: a relation on time and a discrete start)"
+    discrete Real T0(start = 0, fixed = true);
+    Real x(start = 0, fixed = true);
+    Real u;
+    Real peak(start = 0, fixed = true);
+  equation
+    when sample(0, 1) then
+      T0 = time;
+    end when;
+    der(x) = 1;
+    u = x + (if time < T0 + 0.5 then 1 else -2);
+    when u < 0 then
+      peak = pre(u);
+    end when;
+  end PreAtPulseStep;
+  model ExactBoundaryAtEvent "a relation <= on its boundary exactly at a time event holds (MSL SimpleGearShift's brake)"
+    Real f;
+    Boolean free;
+    Real x(start = 0, fixed = true);
+  equation
+    f = 1 + (if time < 0.4 then 0 else if time < 0.5 then -(time - 0.4) / 0.1 else -1);
+    free = f <= 0;
+    der(x) = if free then 1 else 0;
+  end ExactBoundaryAtEvent;
+  model DelayOfBranchStep "delay() of a value that steps at a branch event: the step delayed, not a ramp (MSL 4 CompareLosslessLines)"
+    parameter Real T0 = 0.3;
+    Real x(start = 0, fixed = true);
+    Real u;
+    Real d;
+  equation
+    der(x) = 1;
+    u = if x < T0 then 1 else 0;
+    d = delay(u, 0.5);
+  end DelayOfBranchStep;
 end EventSemantics;

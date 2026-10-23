@@ -973,6 +973,23 @@ end
     end
   end
 
+  #= A discrete definition through a pure function of discrete variables only stays an
+     equation: lifted to events, IntegerNetwork1's `y = expr[firstTrueIndex(u)]` read a
+     parameter array by a runtime index in an affect (UndefVarError), and ShowCompositeStep's
+     `suspend = anyTrue({...}) or ...` had its initialization row on an alias outside the
+     lifted names (refused). =#
+  for (model, stopTime) in (("Blocks.Examples.IntegerNetwork1", 10.0), ("StateGraph.Examples.ShowCompositeStep", 5.0))
+    @testset "$(model): a function of discrete variables only" begin
+      sol = simulateMSL("Modelica." * model, stopTime)
+      @test sol !== nothing
+      sol === nothing || @test begin
+        passed, details = validateMSLModel(sol, replace(model, "." => "_"); stopTime = stopTime)
+        passed || @warn "$(model) validation failed" details
+        passed
+      end
+    end
+  end
+
   @testset "GenerateRandomNumbers: an external C function of a parameter" begin
     #= final parameter Integer id = initializeImpureRandom(globalSeed): the C
        function seeds the generator and returns the constant local seed. (The
