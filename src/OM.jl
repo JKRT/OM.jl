@@ -64,6 +64,22 @@ See `OMBackend.SimCode.EliminationOptions` for the available fields.
 """
 const EliminationOptions = OMBackend.SimCode.EliminationOptions
 
+"""
+The backend modes the `mode` keyword of `translate` and `simulate` takes: `IMTK_MODE` (the default:
+the ModelingToolkit system built and simplified at translate time, its build kept for every
+simulation), `MTK_MODE` (built at each simulate), `DE_MODE` (DifferentialEquations.jl directly,
+pure ODEs).
+"""
+const IMTK_MODE = OMBackend.IMTK_MODE
+@doc (@doc IMTK_MODE) const MTK_MODE = OMBackend.MTK_MODE
+@doc (@doc IMTK_MODE) const DE_MODE = OMBackend.DEMode
+
+"""
+The error a simulation throws when a Modelica `assert` of level error fails (its time, message and
+condition).
+"""
+const ModelicaAssertionError = OMBackend.CodeGeneration.ModelicaAssertionError
+
 function printWelcomeMessage()
   printstyled("Open", bold=true, color=:light_blue)
   printstyled("Modelica", bold=true, color=:white)
@@ -792,6 +808,78 @@ function getMTKProblem(modelName::String; tspan = (0.0, 1.0), overwriteCache::Bo
   OMBackend.getMTKProblem(modelName; tspan = tspan, overwriteCache = overwriteCache)
 end
 
+#= ==================================================================================== =#
+#= Tunable parameters and the compiled build                                            =#
+#= ==================================================================================== =#
+
+"""
+    _withTunableParameters(f, names)
+
+`f()` with `names` kept tunable while it translates (`OMBackend.withTunableParameters`); with no names
+`f()` as it is, so a scope set around `translate` stays in force.
+"""
+_withTunableParameters(f::Function, names::Vector{String}) =
+  isempty(names) ? f() : OMBackend.withTunableParameters(f, names)
+
+"""
+    isTunable(modelName, names) -> Bool
+
+Whether the compiled `modelName` has all `names` as tunable parameters (`translate(...;
+tunableParameters)`), so that `simulate(...; parameters)` can set them. `names` are Modelica names
+(`body.m`) or OM.jl's (`body_m`, `canonicalName`). False without a compiled build, or after the model
+was translated again with other tunable parameters.
+
+```julia
+OM.translate("LotkaVolterra", "lv.mo"; tunableParameters = ["alpha", "beta"])
+OM.isTunable("LotkaVolterra", ["alpha", "beta"])   # true
+OM.simulate("LotkaVolterra"; MSL = false, parameters = Dict(:alpha => 1.2), tspan = (0.0, 10.0))
+```
+"""
+isTunable(modelName::String, names::AbstractVector{<:Union{AbstractString, Symbol}})::Bool =
+  OMBackend.isTunable(modelName, names)
+
+"""
+    pristineParameters(modelName) -> Union{Nothing, Vector}
+
+The parameter vector the simulations of the compiled `modelName` start from. A solution's problem
+(`sol.prob.p`) carries the values its event callbacks left, so a problem solved again starts from
+this one (`remake(sol.prob; p = OM.pristineParameters(name))`). `nothing` without a compiled build
+(the default mode, `IMTK_MODE`, keeps one from `translate`).
+"""
+pristineParameters(modelName::String)::Union{Nothing, Vector} = OMBackend.pristineParameters(modelName)
+
+"""
+    canonicalName(name) -> String
+
+The name of a Modelica variable or parameter (`body.m`, `der(x)`, `a[2].b`) in OM.jl's problems
+and solutions (`body_m`, `der(x)`, `a[2]_b`), as a `Symbol` indexes them:
+`sol[Symbol(OM.canonicalName("body.m"))]`.
+"""
+canonicalName(name::AbstractString)::String = OMBackend.canonicalName(name)
+
+"""
+    eventCount(modelName; problem = nothing, tspan = (0.0, 1.0)) -> Int
+
+The number of event callbacks of the compiled `modelName`: of its build (a problem built for `tspan`
+without one), or of `problem`'s own callbacks (`problem.kwargs[:callback]`), whichever is larger.
+OMBackend's step control of algebraic variables only limits steps: no event.
+"""
+function eventCount(modelName::String; problem::Union{Nothing, DiffEqBase.AbstractDEProblem} = nothing,
+                    tspan::Tuple{Real, Real} = (0.0, 1.0))::Int
+  local built::Any = OMBackend.eventCallbacks(modelName)
+  built === nothing &&
+    (built = getMTKProblem(modelName; tspan = (Float64(first(tspan)), Float64(last(tspan))))[2])
+  local own::Any = problem === nothing ? nothing : get(problem.kwargs, :callback, nothing)
+  return max(_eventCount(built), _eventCount(own))
+end
+
+"The event callbacks of a callback, a set or a collection of them (eventCount)."
+_eventCount(::Nothing)::Int = 0
+_eventCount(cb::DiffEqBase.CallbackSet)::Int =
+  length(cb.continuous_callbacks) + count(c -> !OMBackend.CodeGeneration.isStepControl(c), cb.discrete_callbacks)
+_eventCount(cb::DiffEqBase.DECallback)::Int = OMBackend.CodeGeneration.isStepControl(cb) ? 0 : 1
+_eventCount(cbs::Union{Tuple, AbstractVector})::Int = sum(_eventCount, cbs; init = 0)
+
 """
     translate(modelName, modelFile; MSL=false, libraries=String[], ...)
 
@@ -799,7 +887,7 @@ Translate a Modelica model from a file and load it in memory.
 The model can be simulated at a later stage by calling `simulate` with the name of the model.
 
 If `MSL = true` the compiler will use the Modelica Standard Library (MSL) version 3.2.3 by default.
-Valid libraries are `MSL:3.2.3` and `MSL:4.0.0`.
+The bundled versions are `MSL:3.2.3` and `MSL:4.1.0`.
 
 # Keyword arguments
 
@@ -808,7 +896,12 @@ Valid libraries are `MSL:3.2.3` and `MSL:4.0.0`.
 - `libraries::Vector{String} = String[]`: cache keys or file paths for user
   libraries to load alongside the model. Load libraries first with
   `OM.loadLibrary` or pass `.mo` file paths directly.
-- `mode`: backend mode (default `OMBackend.MTK_MODE`).
+- `mode`: backend mode (default `IMTK_MODE`).
+- `tunableParameters::Vector{String} = String[]`: parameters kept as parameters of the compiled
+  model instead of being folded into its equations (`["body.m", "k"]`; an array as a whole), so
+  `simulate(...; parameters)` can set them without translating again; `isTunable`,
+  `pristineParameters`. A parameter the compiler needs as a constant (an array size, a structural
+  condition) stays folded (`isTunable` is false).
 - `warnMissingStartValues`: control warnings for missing start values.
 - `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
   opt-in elimination of variables that do not influence the dynamic states.
@@ -838,39 +931,42 @@ function translate(modelName::String,
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true,
-                   scalarize::Bool = SCALARIZE[])
-  return withDirectRHS(directRHS) do
-    #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
-       in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
-       MTK or DE mode gets that backend. =#
-    local keep = !scalarize && mode == OMBackend.IMTK_MODE
-    (fm, cache) = flatten(modelName, modelFile;
-                          MSL = MSL, MSL_Version = MSL_Version,
-                          libraries = libraries,
-                          scalarize = !keep)
-    SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
-    delete!(LIBRARIES_AT_TRANSLATE, OMBackend.canonicalName(modelName))
-    if keep
-      local keptFunctions = OMFrontend.cacheToFunctionList(cache)
-      local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
-      arrays === nothing || return arrays
-      local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
-                                                       warnMissingStartValues, eliminateNonDynamic, observedFilter,
-                                                       checkSimCode)
-      reduced === nothing || return reduced
-      logScalarizedFallback(fm)
-      (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version,
-                            libraries = libraries, scalarize = true)
+                   scalarize::Bool = SCALARIZE[],
+                   tunableParameters::Vector{String} = String[])
+  return _withTunableParameters(tunableParameters) do
+    withDirectRHS(directRHS) do
+      #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
+         in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
+         MTK or DE mode gets that backend. =#
+      local keep = !scalarize && mode == OMBackend.IMTK_MODE
+      (fm, cache) = flatten(modelName, modelFile;
+                            MSL = MSL, MSL_Version = MSL_Version,
+                            libraries = libraries,
+                            scalarize = !keep)
+      SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+      delete!(LIBRARIES_AT_TRANSLATE, OMBackend.canonicalName(modelName))
+      if keep
+        local keptFunctions = OMFrontend.cacheToFunctionList(cache)
+        local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
+        arrays === nothing || return arrays
+        local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
+                                                         warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                                         checkSimCode)
+        reduced === nothing || return reduced
+        logScalarizedFallback(fm)
+        (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version,
+                              libraries = libraries, scalarize = true)
+      end
+      functionList = OMFrontend.cacheToFunctionList(cache)
+      OMBackend.translate(fm;
+                          functionList = functionList,
+                          BackendMode = mode,
+                          warnMissingStartValues = warnMissingStartValues,
+                          eliminateNonDynamic = eliminateNonDynamic,
+                          observedFilter = observedFilter,
+                          checkSimCode = checkSimCode,
+                          scalarized = true)
     end
-    functionList = OMFrontend.cacheToFunctionList(cache)
-    OMBackend.translate(fm;
-                        functionList = functionList,
-                        BackendMode = mode,
-                        warnMissingStartValues = warnMissingStartValues,
-                        eliminateNonDynamic = eliminateNonDynamic,
-                        observedFilter = observedFilter,
-                        checkSimCode = checkSimCode,
-                        scalarized = true)
   end
 end
 
@@ -885,7 +981,12 @@ Translate a model by name, an MSL model or one of `libraries`, and load it in me
 - `libraries`: the libraries the model is in, instead of the MSL: cache keys
   (`loadInstalledLibrary`, `loadLibrary`, `loadPackage`) or file/directory paths.
   The libraries an installed library uses come along with its key.
-- `mode`: backend mode (default `OMBackend.MTK_MODE`).
+- `mode`: backend mode (default `IMTK_MODE`).
+- `tunableParameters::Vector{String} = String[]`: parameters kept as parameters of the compiled
+  model instead of being folded into its equations (`["body.m", "k"]`; an array as a whole), so
+  `simulate(...; parameters)` can set them without translating again; `isTunable`,
+  `pristineParameters`. A parameter the compiler needs as a constant (an array size, a structural
+  condition) stays folded (`isTunable` is false).
 - `warnMissingStartValues`: control warnings for missing start values.
 - `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
   opt-in elimination of variables that do not influence the dynamic states.
@@ -915,36 +1016,39 @@ function translate(modelName::String;
                    observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true,
-                   scalarize::Bool = SCALARIZE[])
-  return withDirectRHS(directRHS) do
-    #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
-       in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
-       MTK or DE mode gets that backend. =#
-    local keep = !scalarize && mode == OMBackend.IMTK_MODE
-    (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
-                          scalarize = !keep)
-    SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
-    LIBRARIES_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = (String(MSL_Version), copy(libraries))
-    if keep
-      local keptFunctions = OMFrontend.cacheToFunctionList(cache)
-      local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
-      arrays === nothing || return arrays
-      local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
-                                                       warnMissingStartValues, eliminateNonDynamic, observedFilter,
-                                                       checkSimCode)
-      reduced === nothing || return reduced
-      logScalarizedFallback(fm)
-      (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
+                   scalarize::Bool = SCALARIZE[],
+                   tunableParameters::Vector{String} = String[])
+  return _withTunableParameters(tunableParameters) do
+    withDirectRHS(directRHS) do
+      #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
+         in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
+         MTK or DE mode gets that backend. =#
+      local keep = !scalarize && mode == OMBackend.IMTK_MODE
+      (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
+                            scalarize = !keep)
+      SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+      LIBRARIES_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = (String(MSL_Version), copy(libraries))
+      if keep
+        local keptFunctions = OMFrontend.cacheToFunctionList(cache)
+        local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
+        arrays === nothing || return arrays
+        local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
+                                                         warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                                         checkSimCode)
+        reduced === nothing || return reduced
+        logScalarizedFallback(fm)
+        (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
+      end
+      functionList = OMFrontend.cacheToFunctionList(cache)
+      OMBackend.translate(fm;
+                          functionList = functionList,
+                          BackendMode = mode,
+                          warnMissingStartValues = warnMissingStartValues,
+                          eliminateNonDynamic = eliminateNonDynamic,
+                          observedFilter = observedFilter,
+                          checkSimCode = checkSimCode,
+                          scalarized = true)
     end
-    functionList = OMFrontend.cacheToFunctionList(cache)
-    OMBackend.translate(fm;
-                        functionList = functionList,
-                        BackendMode = mode,
-                        warnMissingStartValues = warnMissingStartValues,
-                        eliminateNonDynamic = eliminateNonDynamic,
-                        observedFilter = observedFilter,
-                        checkSimCode = checkSimCode,
-                        scalarized = true)
   end
 end
 
