@@ -327,4 +327,15 @@ package TunableParameters "Models for test/tunableParameterTests.jl"
     end when;
   end BoundInWhen;
 
+  model Switched "a when-equation: one event (OM.eventCount)"
+    parameter Real k = 2.0;
+    Real x(start = 0, fixed = true);
+    discrete Real d(start = 0, fixed = true);
+  equation
+    der(x) = k * d;
+    when time > 0.5 then
+      d = 1;
+    end when;
+  end Switched;
+
 end TunableParameters;

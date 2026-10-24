@@ -249,3 +249,31 @@ const SII = OMBackend.Runtime.ModelingToolkit.SymbolicIndexingInterface
   @test_throws OMBackend.UnsupportedLowering OM.simulate("TunableParameters.InitImpossible"; MSL = false, stopTime = 1.0,
                                                          parameters = Dict("c" => 1.0))
 end
+
+#= OM's API for tunable parameters (translate's tunableParameters, isTunable, pristineParameters,
+   canonicalName, eventCount): what OMSurrogates.jl uses instead of OMBackend's functions. =#
+@testset "Tunable parameters through OM's API" begin
+  local mo::String = joinpath(@__DIR__, "Models", "TunableParameters.mo")
+  local tight::NamedTuple = (; abstol = 1e-10, reltol = 1e-8)
+  OM.translate("TunableParameters.LotkaVolterraAlpha1", mo)
+  local ref::OMBackend.Runtime.ModelingToolkit.SciMLBase.AbstractODESolution =
+    OM.simulate("TunableParameters.LotkaVolterraAlpha1"; MSL = false, tspan = (0.0, 3.0), tight...)
+  OM.translate("TunableParameters.LotkaVolterra", mo; tunableParameters = ["alpha", "beta"])
+  @test OM.isTunable("TunableParameters.LotkaVolterra", ["alpha", "beta"])
+  @test OM.isTunable("TunableParameters.LotkaVolterra", [:alpha])
+  @test !OM.isTunable("TunableParameters.LotkaVolterra", ["gamma"])
+  local p0::Union{Nothing, Vector} = OM.pristineParameters("TunableParameters.LotkaVolterra")
+  @test p0 !== nothing && !isempty(p0)
+  local sol::OMBackend.Runtime.ModelingToolkit.SciMLBase.AbstractODESolution =
+    OM.simulate("TunableParameters.LotkaVolterra"; MSL = false, tspan = (0.0, 3.0), parameters = Dict(:alpha => 1.0), tight...)
+  @test isapprox(sol(3.0; idxs = :x), ref(3.0; idxs = :x); rtol = 1e-4)
+  @test OM.eventCount("TunableParameters.LotkaVolterra") == 0
+  @test OM.eventCount("TunableParameters.LotkaVolterra"; problem = sol.prob) == 0
+  #= translated again without them: folded, not tunable =#
+  OM.translate("TunableParameters.LotkaVolterra", mo)
+  @test !OM.isTunable("TunableParameters.LotkaVolterra", ["alpha", "beta"])
+  OM.translate("TunableParameters.Switched", mo)
+  @test OM.eventCount("TunableParameters.Switched") >= 1
+  @test OM.canonicalName("body.m") == "body_m" && OM.canonicalName("der(a.b)") == "der(a_b)"
+  @test OM.IMTK_MODE === OMBackend.IMTK_MODE && OM.DE_MODE === OMBackend.DEMode
+end
