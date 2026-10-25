@@ -1,0 +1,50 @@
+// name: LibraryCoverageCommands
+// keywords: loadFile, loadModel, translateModel, buildModel, simulate, getErrorString, failure
+// status: correct
+//
+// The commands of a library test script behave as in omc: a failing command returns its
+// failure value, getErrorString() returns its message and clears it, the script goes on.
+
+loaded := loadFile("Coverage.mo");
+translated := translateModel(CoverageDecay);
+built := buildModel(CoverageDecay);
+failed := simulate(CoverageBroken, stopTime=1.0);
+errors := getErrorString();
+cleared := getErrorString();
+missing := loadFile("NoSuchFile.mo");
+missingError := getErrorString();
+mslOld := loadModel(Modelica, {"4.0.0"});
+mslNote := getErrorString();
+mslNone := loadModel(Modelica, {"2.2.2"});
+mslError := getErrorString();
+simulation := simulate(CoverageDecay, stopTime=1.0, numberOfIntervals=10);
+xFinal := val(x, 1.0);
+print(loaded, "\n");
+print(translated, "\n");
+print(built[1], "\n");
+print(failed.resultFile == "", "\n");
+print(size(errors) > 0, "\n");
+print(cleared == "", "\n");
+print(missing, "\n");
+print(size(missingError) > 0, "\n");
+print(mslOld, "\n");
+print(size(mslNote) > 0, "\n");
+print(mslNone, "\n");
+print(size(mslError) > 0, "\n");
+print(xFinal > 0.13 and xFinal < 0.14, "\n");
+
+// Result:
+// true
+// true
+// CoverageDecay
+// true
+// true
+// true
+// false
+// true
+// true
+// true
+// false
+// true
+// true
+// endResult

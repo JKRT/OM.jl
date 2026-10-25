@@ -31,10 +31,18 @@ case-insensitive command registry.
 Initial command coverage includes:
 
 - `loadFile`, `loadString`, `loadModel`, `simulate`/`simulateModel`,
-  `instantiateModel`, `val`
+  `translateModel`, `buildModel`, `instantiateModel`, `val`
 - `readFile`, `writeFile`, `fileExists`, `directoryExists`, `cd`, `pwd`
 - `getErrorString`, `clear`/`clearAll`, `getVersion`
 - basic conversion, output, array `size`, and `fill` helpers
+
+As in omc, a failing model command (`loadFile`, `loadString`, `loadModel`,
+`simulate`, `translateModel`, `buildModel`, `instantiateModel`, `val`) records
+`[file:line:column] Error: ...` for `getErrorString()` (which clears what it
+returns) and returns its failure value (`false`, an empty `SimulationResult`,
+`{"", ""}`, `""`, `NaN`); the script goes on. `stopOnError = true` (a
+`ScriptContext` or `runfile` keyword) stops at it with a `MosExecutionError`.
+`loadModel(Modelica)` selects the newest bundled MSL (4.1.0).
 
 Compiler flags, plotting commands, result-file readers, package installation,
 and source-editing/conversion commands require explicit implementations.
@@ -82,8 +90,8 @@ result.variables["simulation"]
 
 The engine is available as `OM.MosScripting`. Its supported extension API is:
 
-- `ScriptContext(OM; cwd, output, maxLoopIterations)`
-- `runfile(path, OM; context)` for direct engine use
+- `ScriptContext(OM; cwd, output, maxLoopIterations, stopOnError)`
+- `runfile(path, OM; context, stopOnError)` for direct engine use
 - `registerCommand!(context, name, command)` for additional commands
 - `close(context)` for temporary-source cleanup
 

@@ -1471,11 +1471,16 @@ end
 _registerGUIAPIDelegates!()
 
 """
-    runScript(path; context=nothing, output=stdout, maxLoopIterations=1_000_000)
+    runScript(path; context=nothing, output=stdout, maxLoopIterations=1_000_000, stopOnError=nothing)
         -> MosScripting.ScriptResult
 
 Execute an OpenModelica-style `.mos` script. Relative paths used by scripting
-commands are resolved from the script's directory. A supplied
+commands are resolved from the script's directory. As in omc, a failing model
+command (`loadFile`, `loadModel`, `simulate`, `translateModel`, `buildModel`, ...)
+records its message for `getErrorString()` and returns its failure value (`false`,
+an empty `SimulationResult`), and the script goes on; `stopOnError = true` stops at
+it with a `MosExecutionError` instead (the context's setting when `nothing`; a new
+context goes on). A supplied
 `MosScripting.ScriptContext` may be reused to preserve variables, loaded
 libraries, and the last simulation between scripts.
 
@@ -1491,11 +1496,13 @@ result.variables
 function runScript(path::AbstractString;
                    context::Union{Nothing, MosScripting.ScriptContext}=nothing,
                    output::IO=stdout,
-                   maxLoopIterations::Integer=1_000_000)
+                   maxLoopIterations::Integer=1_000_000,
+                   stopOnError::Union{Nothing, Bool}=nothing)
   return MosScripting.runfile(path, @__MODULE__;
                               context=context,
                               output=output,
-                              maxLoopIterations=maxLoopIterations)
+                              maxLoopIterations=maxLoopIterations,
+                              stopOnError=stopOnError)
 end
 
 #= Precompilation script=#

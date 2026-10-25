@@ -107,9 +107,11 @@ function Base.showerror(io::IO, error::MosExecutionError)
 end
 
 """
-    ScriptContext(api; cwd=pwd(), output=stdout, maxLoopIterations=1_000_000)
+    ScriptContext(api; cwd=pwd(), output=stdout, maxLoopIterations=1_000_000, stopOnError=false)
 
-Mutable state for one or more MOS script executions.
+Mutable state for one or more MOS script executions. `stopOnError = false` lets a
+failing model command record its message and return its omc failure value; `true`
+stops the script there with a `MosExecutionError`.
 
 The context owns script variables, its logical working directory, loaded
 Modelica source/library mappings, temporary files created by `loadString`, the
@@ -133,6 +135,7 @@ mutable struct ScriptContext
   errors::Vector{String}
   output::IO
   maxLoopIterations::Int
+  stopOnError::Bool          # false: a failing model command records its message and returns omc's failure value
 end
 
 """
@@ -806,7 +809,18 @@ function _evaluate(context::ScriptContext, expression::ExprNode, source::String)
     command = get(context.commands, lowercase(callee), nothing)
     command === nothing && throw(MosExecutionError(source, expression.line, expression.column,
                                                     "unsupported scripting command '$callee'", nothing))
-    return command(context, positional, keywords)
+    failure = context.stopOnError ? nothing : get(_FAILURE_VALUES, lowercase(callee), nothing)
+    failure === nothing && return command(context, positional, keywords)
+    #= As omc: a failing model command records its message for getErrorString and returns its
+       failure value; the script goes on. =#
+    try
+      return command(context, positional, keywords)
+    catch err
+      err isa InterruptException && rethrow()
+      local message::String = sprint(showerror, err)
+      push!(context.errors, "[$source:$(expression.line):$(expression.column)] Error: $message")
+      return failure(context, message)
+    end
   end
   throw(MosExecutionError(source, _line(expression), _column(expression), "cannot evaluate expression", nothing))
 end
@@ -922,9 +936,40 @@ end
 
 "Record an MSL dependency using the bundled-MSL path used by the OM API."
 function _record_msl!(context::ScriptContext, version)
-  version === nothing || (context.mslVersion = "MSL:" * replace(_name(version), r"^MSL:"i => ""))
+  if version !== nothing
+    local requested::String = replace(_name(version), r"^MSL:"i => "")
+    context.mslVersion = "MSL:" * _bundled_msl_for(context, requested)
+  end
   context.mslLoaded = true
   return nothing
+end
+
+"The MSL versions the API bundles (`OMFrontend._bundledMSLVersions`), or `nothing` when it cannot tell (a mock)."
+function _bundled_msl_versions(api::Module)::Union{Nothing, Vector{String}}
+  (isdefined(api, :OMFrontend) && isdefined(api.OMFrontend, :_bundledMSLVersions)) || return nothing
+  local versions::Vector{String} = api.OMFrontend._bundledMSLVersions()
+  return isempty(versions) ? nothing : versions
+end
+
+"The newest bundled MSL version (what `loadModel(Modelica)` without a version selects); 4.1.0 if unknown."
+function _newest_bundled_msl(api::Module)::String
+  local versions::Union{Nothing, Vector{String}} = _bundled_msl_versions(api)
+  return versions === nothing ? "4.1.0" : versions[argmax(VersionNumber.(versions))]
+end
+
+"""
+The bundled MSL version for a requested one: itself if bundled, else the newest bundled one of the same
+major version (a library's `uses(Modelica(version = "4.0.0"))`), noted in the error buffer; an error
+for another major version. A mock API that does not list versions takes the request as it is.
+"""
+function _bundled_msl_for(context::ScriptContext, requested::String)::String
+  local versions::Union{Nothing, Vector{String}} = _bundled_msl_versions(context.api)
+  (versions === nothing || requested in versions) && return requested
+  local same::Vector{String} = filter(v -> VersionNumber(v).major == VersionNumber(requested).major, versions)
+  isempty(same) && error("Modelica $requested is not bundled with OM.jl (bundled: $(join(versions, ", ")))")
+  local chosen::String = same[argmax(VersionNumber.(same))]
+  push!(context.errors, "Notification: Modelica $requested is not bundled with OM.jl; using $chosen.")
+  return chosen
 end
 
 "Load and record one installed library and its transitive `uses(...)` closure."
@@ -1093,6 +1138,60 @@ function _command_val(context::ScriptContext, positional, keywords)
   return values[index]
 end
 
+"Translate a model with the loaded sources, resolved as `simulate` resolves them (`translateModel`, `buildModel`)."
+function _translate_model(context::ScriptContext, model::String)::Nothing
+  modelFile, sourceKey = _model_source(context, model)
+  if modelFile === nothing
+    context.api.translate(model; MSL_Version=context.mslVersion)
+  else
+    libraries = isempty(modelFile) ? copy(context.libraries) : filter(!=(sourceKey), context.libraries)
+    context.api.translate(model, modelFile; libraries=libraries, MSL=context.mslLoaded,
+                          MSL_Version=context.mslVersion)
+  end
+  return nothing
+end
+
+"`translateModel(Model)`: translate it (OM.jl compiles into the session, no executable); true."
+function _command_translate(context::ScriptContext, positional::AbstractVector, keywords::Vector{Pair{Symbol, Any}})::Bool
+  isempty(positional) && error("translateModel requires a model name")
+  _translate_model(context, _name(positional[1]))
+  return true
+end
+
+"`buildModel(Model)`: translate it; omc's {executable, init file} as {model name, \"\"} (no executable)."
+function _command_build(context::ScriptContext, positional::AbstractVector, keywords::Vector{Pair{Symbol, Any}})::Vector{Any}
+  isempty(positional) && error("buildModel requires a model name")
+  local model::String = _name(positional[1])
+  _translate_model(context, model)
+  return Any[model, ""]
+end
+
+"""
+The value a failing model command returns when the script goes on (omc's): false for loading and
+translating, an empty `SimulationResult` (no result file, the error in `messages`; `val` then has no
+simulation) for `simulate`, {"", ""} for `buildModel`, "" for `instantiateModel`, NaN for `val`.
+"""
+const _FAILURE_VALUES = Dict{String, Function}(
+  "loadfile" => (context, message) -> false,
+  "loadstring" => (context, message) -> false,
+  "loadmodel" => (context, message) -> false,
+  "translatemodel" => (context, message) -> false,
+  "buildmodel" => (context, message) -> Any["", ""],
+  "instantiatemodel" => (context, message) -> "",
+  "val" => (context, message) -> NaN,
+  "simulate" => (context, message) -> _failed_simulation(context, message),
+  "simulatemodel" => (context, message) -> _failed_simulation(context, message),
+)
+
+"An empty `SimulationResult` after a failed `simulate`; the previous simulation is forgotten."
+function _failed_simulation(context::ScriptContext, message::String)::MosRecord
+  context.lastSolution = nothing
+  context.lastModel = nothing
+  return MosRecord("SimulationResult", Dict{Symbol, Any}(:resultFile => "", :simulationOptions => "",
+                                                         :messages => "Simulation failed: " * message,
+                                                         :solution => nothing))
+end
+
 """
     _default_commands() -> Dict{String, Function}
 
@@ -1109,7 +1208,13 @@ function _default_commands()
   commands["simulatemodel"] = _command_simulate
   commands["instantiatemodel"] = _command_instantiate
   commands["val"] = _command_val
-  commands["geterrorstring"] = (context, positional, keywords) -> join(context.errors, '\n')
+  commands["geterrorstring"] = function (context, positional, keywords)
+    local text::String = join(string.(context.errors, "\n"))
+    empty!(context.errors)
+    return text
+  end
+  commands["translatemodel"] = _command_translate
+  commands["buildmodel"] = _command_build
   commands["clear"] = function (context, positional, keywords)
     close(context)
     empty!(context.variables)
@@ -1161,11 +1266,10 @@ end
 
 "Construct a fresh scripting context with the default command registry."
 function ScriptContext(api::Module; cwd::AbstractString=pwd(), output::IO=stdout,
-                       maxLoopIterations::Integer=1_000_000)
+                       maxLoopIterations::Integer=1_000_000, stopOnError::Bool=false)
   return ScriptContext(api, Dict{String, Any}(), _default_commands(), abspath(cwd), String[],
-                       Dict{String, String}(), String[], String[], "MSL:4.0.0", false, nothing, nothing,
-                       String[], output,
-                       Int(maxLoopIterations))
+                       Dict{String, String}(), String[], String[], "MSL:" * _newest_bundled_msl(api), false,
+                       nothing, nothing, String[], output, Int(maxLoopIterations), stopOnError)
 end
 
 """
@@ -1220,13 +1324,15 @@ libraries, temporary sources, and the most recent simulation across calls.
 `api` is normally the root `OM` module.
 """
 function runfile(path::AbstractString, api::Module; context::Union{Nothing, ScriptContext}=nothing,
-                 output::IO=stdout, maxLoopIterations::Integer=1_000_000)
+                 output::IO=stdout, maxLoopIterations::Integer=1_000_000,
+                 stopOnError::Union{Nothing, Bool}=nothing)
   absolutePath = abspath(path)
   isfile(absolutePath) || throw(ArgumentError("MOS script does not exist: $absolutePath"))
   endswith(lowercase(absolutePath), ".mos") || throw(ArgumentError("expected a .mos script: $absolutePath"))
   executionContext = context === nothing ?
     ScriptContext(api; cwd=dirname(absolutePath), output=output,
                   maxLoopIterations=maxLoopIterations) : context
+  stopOnError === nothing || (executionContext.stopOnError = stopOnError)
   return run(read(absolutePath, String), executionContext; sourceName=absolutePath)
 end
 
