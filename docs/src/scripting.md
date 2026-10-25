@@ -46,6 +46,48 @@ Initial built-in commands include:
 - `getErrorString`, `clear`/`clearAll`, `getVersion`
 - basic conversion, output, array `size`, and `fill` helpers
 
+The commands a library test script uses work as follows:
+
+- `loadFile("Model.mo")` loads a file; a relative path is resolved against the
+  script's directory.
+- `loadModel(Modelica, {"4.1.0"})` (or `{"3.2.3"}`) selects a bundled Modelica
+  Standard Library. Give the version: without one, a later `simulate` of an MSL
+  model fails, because the default (4.0.0) is not bundled.
+- `simulate(Model, startTime = 0, stopTime = 1, tolerance = 1e-6,
+  numberOfIntervals = 500)` (also `simulateModel`) translates and simulates the
+  model. `tolerance` sets the relative and the absolute tolerance;
+  `numberOfIntervals` sets the output interval; `resultFile = "name.csv"`
+  writes the result as CSV (it is kept in memory otherwise); `overwriteCache`
+  and `warnMissingStartValues` are passed on. Other options (`outputFormat`,
+  `method`, `variableFilter`, `simflags`, ...) are ignored and listed in the
+  returned record's `messages`.
+- `val(x, 1.0)` reads a variable of the last simulation at a time.
+- `getErrorString()` returns the messages of the statements that failed so far
+  (it does not clear them). A failing statement stops the script with an
+  `OM.MosScripting.MosExecutionError` naming its file, line and column, so a
+  `getErrorString()` after it is not reached: unlike `omc`, where a failing
+  `simulate` returns an empty record and the script goes on. To test many
+  models, run one script per model, or catch the error around `OM.runScript`:
+
+```julia
+for model in ["Modelica.Mechanics.Rotational.Examples.First", "Modelica.Blocks.Examples.PID_Controller"]
+  local script = tempname() * ".mos"
+  write(script, "loadModel(Modelica, {\"4.1.0\"});\nsimulate($model, stopTime = 1.0);\n")
+  try
+    OM.runScript(script)
+    println(model, ": simulated")
+  catch err
+    err isa OM.MosScripting.MosExecutionError || rethrow()
+    println(model, ": ", err)
+  end
+end
+```
+
+`translateModel` and `buildModel` are not supported (an unknown command is a
+`MosExecutionError` too); `simulate` does both. OM.jl's own library coverage
+runs through the Julia API in
+[OMLibraryTesting.jl](https://github.com/OpenModelica/OMLibraryTesting.jl).
+
 Compiler flags, plotting commands, result-file readers, package installation,
 and source-editing commands are not implemented yet. `setCommandLineOptions`
 raises an error rather than silently ignoring flags, and unknown commands raise
