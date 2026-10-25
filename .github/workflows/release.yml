@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: write  # dispatch docs.yml for the new tag
 
 concurrency:
   group: release
@@ -50,3 +51,14 @@ jobs:
         run: |
           gh release create "v$VERSION" --target "$GITHUB_SHA" --title "v$VERSION" \
             --notes "$(git log -1 --format=%s "$GITHUB_SHA")"
+
+      # Versioned docs. A tag created with the workflow's token starts no other workflow
+      # (GitHub's rule against recursive runs), so docs.yml's tag trigger never fires for these
+      # releases. A workflow_dispatch is exempt from that rule: build the docs at the new tag,
+      # and Documenter deploys vX.Y.Z and `stable`. The token reaches gh only through GH_TOKEN.
+      - name: Versioned docs
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.new }}
+        run: gh workflow run docs.yml --repo "$GITHUB_REPOSITORY" --ref "v$VERSION"
