@@ -18,7 +18,10 @@ makedocs(
         "Libraries" => "libraries.md",
         "Examples" => "examples.md",
         "Large array models" => "arrays.md",
+        "Scripting in Julia" => "julia.md",
         "Scripting (.mos)" => "scripting.md",
+        "Coverage" => "coverage.md",
+        "Troubleshooting" => "troubleshooting.md",
         "API reference" => "api.md",
     ],
     # Keep the first deploys from hard-failing on as-yet-undocumented bindings

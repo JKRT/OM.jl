@@ -180,7 +180,8 @@ their arrays; see [Large array models](arrays.md).
 ## Scripts
 
 The same models can be run from an OpenModelica `.mos` script with
-`OM.runScript`; see [Scripting (`.mos`)](scripting.md).
+`OM.runScript`; see [Scripting (`.mos`)](scripting.md). For scripts in Julia
+(results, sweeps, many models), see [Scripting in Julia](julia.md).
 
 ## Showcase: validated multibody systems
 
