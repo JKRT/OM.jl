@@ -100,6 +100,50 @@ end
   @test result.variables["label"] == "ok"
 end
 
+module MockTranslate
+const calls = Any[]
+loadLibrary(path::String) = (push!(calls, (:loadLibrary, path)); "UserModels")
+translate(model::String, source::String; kwargs...) = (push!(calls, (:translate, model, source, Dict(kwargs))); nothing)
+function simulate(model::String, source::String; kwargs...)
+  model == "UserModels.Fails" && error("cannot simulate $model")
+  push!(calls, (:simulate, model, source, Dict(kwargs)))
+  return (t = [0.0, 1.0],)
+end
+end
+
+@testset "failing commands as omc; translateModel, buildModel" begin
+  mktempdir() do directory
+    write(joinpath(directory, "UserModels.mo"), "model placeholder end placeholder;")
+    context = ScriptContext(MockTranslate; cwd=directory, output=devnull)
+    @test context.mslVersion == "MSL:4.1.0" && !context.stopOnError
+    result = MosScripting.run("""
+      missing := loadFile("NoSuchFile.mo");
+      firstErrors := getErrorString();
+      noErrors := getErrorString();
+      loaded := loadFile("UserModels.mo");
+      translated := translateModel(UserModels.Test);
+      built := buildModel(UserModels.Test);
+      failed := simulate(UserModels.Fails);
+      noValue := val(x, 1.0);
+      after := 1;
+    """, context)
+    @test result.variables["missing"] === false
+    @test occursin("Error: Modelica file does not exist", result.variables["firstErrors"])
+    @test occursin(":1:", result.variables["firstErrors"])            # where it failed
+    @test result.variables["noErrors"] == ""                          # getErrorString cleared them
+    @test result.variables["translated"] === true
+    @test result.variables["built"] == ["UserModels.Test", ""]
+    @test count(c -> c[1] === :translate, MockTranslate.calls) == 2
+    @test result.variables["failed"].resultFile == ""
+    @test startswith(result.variables["failed"].messages, "Simulation failed")
+    @test isnan(result.variables["noValue"]) && result.variables["after"] == 1
+    @test result.context.lastSolution === nothing
+    #= stopOnError: the first failure stops the script =#
+    strict = ScriptContext(MockTranslate; cwd=directory, output=devnull, stopOnError=true)
+    @test_throws MosExecutionError MosScripting.run("loadFile(\"NoSuchFile.mo\");", strict)
+  end
+end
+
 @testset "MOS syntax diagnostics" begin
   separatorError = try
     MosScripting.run("x := 1 y := 2", fresh_context())

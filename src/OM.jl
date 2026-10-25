@@ -513,6 +513,107 @@ function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector
 end
 
 """
+    componentInterface(modelName, [modelFile]; component, MSL = modelFile === nothing,
+                       MSL_Version = "MSL:3.2.3", libraries = String[]) -> NamedTuple
+
+The interface of `component` (its name in the model: `"spring"`, `"engine.damper"`) in the
+flattened `modelName`, as plain values (no frontend types):
+
+- `class`: the full name of the component's class;
+- `connectors`: its own connectors, name => (class, variables), each variable a flat name and its
+  role (`:flow`, `:stream`, `:input`, `:output` or `:potential`);
+- `variables`: the flat names of all its variables;
+- `equations`: the flat model's equations that read it, as flat Modelica;
+- `declaration`: where it is declared (`info`: `fileName`, `lineNumberStart`, `columnNumberStart`,
+  `lineNumberEnd`, `columnNumberEnd`), the name of the class declaring it (`parent`) and that class's
+  span (`parent_info`).
+
+An error if the model has no component of that name.
+
+# Examples
+```julia
+OM.componentInterface("Modelica.Mechanics.Rotational.Examples.First"; component = "spring")
+```
+"""
+function componentInterface(modelName::String, modelFile::Union{Nothing, String} = nothing; component::String,
+                            MSL::Bool = modelFile === nothing, MSL_Version::String = "MSL:3.2.3",
+                            libraries::Vector{String} = String[])::NamedTuple
+  local fm::OMFrontend.Frontend.FlatModel = modelFile === nothing ?
+    first(flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)) :
+    first(flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, libraries = libraries))
+  return _componentInterface(fm, component)
+end
+
+"The parts of a component reference, outermost first."
+function _crefParts(cref::OMFrontend.Frontend.ComponentRef)::Vector{OMFrontend.Frontend.ComponentRef}
+  local F::Module = OMFrontend.Frontend
+  local parts::Vector{OMFrontend.Frontend.ComponentRef} = OMFrontend.Frontend.ComponentRef[]
+  local c::OMFrontend.Frontend.ComponentRef = cref
+  while F.isvariant(c, F.COMPONENT_REF_CREF)
+    pushfirst!(parts, c)
+    c = c.restCref
+  end
+  return parts
+end
+
+"The full name of the class of the component `node`."
+_classPath(node::OMFrontend.Frontend.InstNode)::String =
+  OMFrontend.Frontend.AbsynUtil.pathString(OMFrontend.Frontend.scopePath(OMFrontend.Frontend.classInstance(
+    OMFrontend.Frontend.component(node)); includeRoot = true))
+
+"A source position as a plain named tuple (`fileName`, line and column of its start and end)."
+_sourceSpan(info::MetaModelica.SourceInfo)::NamedTuple =
+  (fileName = String(info.fileName), lineNumberStart = Int(info.lineNumberStart),
+   columnNumberStart = Int(info.columnNumberStart), lineNumberEnd = Int(info.lineNumberEnd),
+   columnNumberEnd = Int(info.columnNumberEnd))
+
+"The interface of `component` in the flat model `fm` (`componentInterface`)."
+function _componentInterface(fm::OMFrontend.Frontend.FlatModel, component::String)::NamedTuple
+  local F::Module = OMFrontend.Frontend
+  local depth::Int = count(==('.'), component) + 1
+  local connectors::Dict{String, Tuple{String, Vector{Tuple{String, Symbol}}}} =
+    Dict{String, Tuple{String, Vector{Tuple{String, Symbol}}}}()
+  local variables::Vector{String} = String[]
+  local class::Union{Nothing, String} = nothing
+  local declaration::Union{Nothing, NamedTuple} = nothing
+  for v in fm.variables
+    local name::String = F.toString(v.name)
+    startswith(name, component * ".") || continue
+    push!(variables, name)
+    local parts::Vector{OMFrontend.Frontend.ComponentRef} = _crefParts(v.name)
+    length(parts) > depth || continue
+    if class === nothing
+      class = _classPath(parts[depth].node)
+      #= Where it is declared: its own source span and the enclosing class's. =#
+      local node::OMFrontend.Frontend.InstNode = parts[depth].node
+      local parent::OMFrontend.Frontend.InstNode = F.parent(node)
+      declaration = (info = _sourceSpan(F.InstNode_info(node)), parent = String(F.name(parent)),
+                     parent_info = _sourceSpan(F.InstNode_info(parent)))
+    end
+    #= Only the component's own connectors: the part right below it is a connector
+       (sub-components' connectors carry flow attributes too). =#
+    local conn::OMFrontend.Frontend.ComponentRef = parts[depth + 1]
+    F.isConnector(F.component(conn.node)) || continue
+    local cty::Integer = v.attributes.connectorType
+    local role::Symbol = F.isFlow(cty) ? :flow : F.isStream(cty) ? :stream :
+      v.attributes.direction == 2 ? :input : v.attributes.direction == 3 ? :output : :potential
+    local cname::String = String(F.name(conn.node))
+    local entry::Tuple{String, Vector{Tuple{String, Symbol}}} =
+      get!(() -> (_classPath(conn.node), Tuple{String, Symbol}[]), connectors, cname)
+    push!(entry[2], (name, role))
+  end
+  isempty(variables) && throw(ArgumentError("$(fm.name) has no component $component"))
+  local prefix::String = "'" * component * "."
+  local equations::Vector{String} = String[]
+  for eq in fm.equations
+    local s::String = F.toFlatString(eq)
+    occursin(prefix, s) && push!(equations, s)
+  end
+  return (class = class, connectors = connectors, variables = variables, equations = equations,
+          declaration = declaration)
+end
+
+"""
     explainIndexReduction(modelName, modelFile; MSL=false, MSL_Version="MSL:3.2.3", libraries=String[])
     explainIndexReduction(modelName; MSL_Version="MSL:3.2.3", libraries=String[])
 
@@ -1370,11 +1471,16 @@ end
 _registerGUIAPIDelegates!()
 
 """
-    runScript(path; context=nothing, output=stdout, maxLoopIterations=1_000_000)
+    runScript(path; context=nothing, output=stdout, maxLoopIterations=1_000_000, stopOnError=nothing)
         -> MosScripting.ScriptResult
 
 Execute an OpenModelica-style `.mos` script. Relative paths used by scripting
-commands are resolved from the script's directory. A supplied
+commands are resolved from the script's directory. As in omc, a failing model
+command (`loadFile`, `loadModel`, `simulate`, `translateModel`, `buildModel`, ...)
+records its message for `getErrorString()` and returns its failure value (`false`,
+an empty `SimulationResult`), and the script goes on; `stopOnError = true` stops at
+it with a `MosExecutionError` instead (the context's setting when `nothing`; a new
+context goes on). A supplied
 `MosScripting.ScriptContext` may be reused to preserve variables, loaded
 libraries, and the last simulation between scripts.
 
@@ -1390,11 +1496,13 @@ result.variables
 function runScript(path::AbstractString;
                    context::Union{Nothing, MosScripting.ScriptContext}=nothing,
                    output::IO=stdout,
-                   maxLoopIterations::Integer=1_000_000)
+                   maxLoopIterations::Integer=1_000_000,
+                   stopOnError::Union{Nothing, Bool}=nothing)
   return MosScripting.runfile(path, @__MODULE__;
                               context=context,
                               output=output,
-                              maxLoopIterations=maxLoopIterations)
+                              maxLoopIterations=maxLoopIterations,
+                              stopOnError=stopOnError)
 end
 
 #= Precompilation script=#
