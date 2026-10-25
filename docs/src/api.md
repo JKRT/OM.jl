@@ -13,6 +13,16 @@ OM.getMTKProblem
 OM.resimulate
 ```
 
+## Tunable parameters
+
+```@docs
+OM.isTunable
+OM.pristineParameters
+OM.eventCount
+OM.canonicalName
+OM.IMTK_MODE
+```
+
 ## Libraries
 
 ```@docs
@@ -29,6 +39,7 @@ OM.libraries
 OM.exportCSV
 OM.writeModelToFile
 OM.exportModelica
+OM.componentInterface
 ```
 
 ## Scripting
