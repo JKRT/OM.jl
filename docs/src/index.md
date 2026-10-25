@@ -23,8 +23,14 @@ six-axis `RobotR3` system.
   your own; with examples.
 - **[Large array models](arrays.md)** — models with thousands of components:
   arrays are kept, the generated code does not grow with them.
+- **[Scripting in Julia](julia.md)** — the usual scripting tasks the Julia way:
+  results, parameter sweeps, testing many models, less output.
 - **[Scripting (`.mos`)](scripting.md)** — run OpenModelica-style `.mos` scripts
   through `OM.runScript`.
+- **[Coverage](coverage.md)** — how much of the MSL runs and validates, and where
+  the reports are.
+- **[Troubleshooting](troubleshooting.md)** — slow first calls, MSL versions,
+  translation and initialization failures, diagnostics, memory.
 - **[API reference](api.md)** — the public functions (`simulate`, `translate`,
   `flatten`, library loading, result export).
 
