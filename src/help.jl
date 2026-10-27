@@ -25,8 +25,11 @@ const HELP_SECTIONS = [
     "key = OM.loadInstalledLibrary(name; version)" => "load one, with the libraries it uses",
     "key = OM.loadLibrary(\"Lib.mo\")" => "your library in one file",
     "key = OM.loadPackage(\"Lib\")" => "your library as a folder (package.mo)",
-    "...; libraries = [key, \"Lib.mo\", \"Lib\"]" => "keys or paths: simulate, translate, flatten",
-    "" => "A model using Modelica without loading it gets the bundled MSL 4.1.0.",
+    "OM.loadedLibraries()" => "the loaded ones: later calls see them",
+    "OM.unloadLibrary(key)" => "unload one, and forget its models",
+    "...; libraries = [key, \"Lib.mo\", \"Lib\"]" => "keys or paths for one call only",
+    "" => "Loaded libraries stay until unloaded; two of one name (Modelica 3.2.3, 4.1.0) are an error.",
+    "" => "A loaded Modelica is the MSL; else a model using Modelica gets the bundled MSL 4.1.0.",
   ],
   "Inspect" => [
     "OM.exportModelica(name, file)" => "the flat model as Modelica text",
@@ -44,7 +47,7 @@ const HELP_SECTIONS = [
   ],
   "Settings and debugging" => [
     "...; mode = OM.MTK_MODE" => "backend: IMTK_MODE (default), MTK, DE",
-    "OM.DEFAULT_MSL_VERSION" => "the MSL used without MSL_Version: 4.1.0",
+    "OM.DEFAULT_MSL_VERSION" => "the MSL without MSL_Version or a loaded one: 4.1.0",
     "OM.clearCaches!()" => "forget compiled models and caches",
     "OM.setDebug(frontend = true, backend = true)" => "debug logging; setDebug() ends it",
     "...; warnMissingStartValues = true" => "warn of start values left at 0.0",
@@ -70,17 +73,22 @@ sol = OM.simulate("HeatedMass", ex("HeatedMass.mo"); MSL = true, MSL_Version = "
 # A library model with other parameters: MoreTorque extends PID_Controller(PI(yMax = 20))
 sol = OM.simulate("MoreTorque", ex("MoreTorque.mo"); stopTime = 4.0)
 
-# A library of your own in one file, used by a model in another file
+# A library of your own in one file, used by a model in another file: loaded, later calls see it
+OM.loadLibrary(ex("Controllers.mo"))
+sol = OM.simulate("TankLevel", ex("TankLevel.mo"); stopTime = 30.0)
+OM.loadedLibraries()                   # ["Controllers"]
+OM.unloadLibrary("Controllers")        # unloaded; or, for one call only:
 sol = OM.simulate("TankLevel", ex("TankLevel.mo"); libraries = [ex("Controllers.mo")],
                   stopTime = 30.0)
 
 # A library of your own as a folder with package.mo, using the MSL
 sol = OM.simulate("Heating.Room"; libraries = [ex("Heating")], stopTime = 21600.0)
 
-# An installed library, with the libraries it uses
+# An installed library, with the libraries it uses (its Modelica 4.1.0 too, until unloaded)
 OM.installLibrary("Buildings"; version = "13.0.0")   # once
 key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
-sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
+sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add")
+OM.unloadLibrary(key)
 
 # Parameters changed without translating again
 name = "Modelica.Mechanics.Rotational.Examples.First"

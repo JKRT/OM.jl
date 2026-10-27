@@ -31,8 +31,14 @@ let sol = OM.simulate("MoreTorque", ex("MoreTorque.mo"); stopTime = 4.0)
   report("MoreTorque.mo: PID_Controller with PI(yMax = 20)", sol, "max speed error", maxError(sol), "0.343 with the 12 N.m limit")
 end
 
+let key = OM.loadLibrary(ex("Controllers.mo"))   # loaded: later calls see it without `libraries`
+  local sol = OM.simulate("TankLevel", ex("TankLevel.mo"); stopTime = 30.0)
+  report("TankLevel.mo on the loaded library Controllers.mo", sol, "h(30)", valuesOf(sol, "h")[end], "the set point 1.0")
+  OM.unloadLibrary(key)
+end
+
 let sol = OM.simulate("TankLevel", ex("TankLevel.mo"); libraries = [ex("Controllers.mo")], stopTime = 30.0)
-  report("TankLevel.mo on the library Controllers.mo", sol, "h(30)", valuesOf(sol, "h")[end], "the set point 1.0")
+  report("TankLevel.mo, Controllers.mo for this call only", sol, "h(30)", valuesOf(sol, "h")[end], "the set point 1.0")
 end
 
 let sol = OM.simulate("Heating.Room"; libraries = [ex("Heating")], stopTime = 21600.0, saveat = 10.0)
@@ -42,9 +48,10 @@ let sol = OM.simulate("Heating.Room"; libraries = [ex("Heating")], stopTime = 21
 end
 
 if haskey(OM.libraries(), "Buildings")
-  local key = OM.loadInstalledLibrary("Buildings")
-  local sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
+  local key = OM.loadInstalledLibrary("Buildings")   # with its Modelica: unloaded after, for the MSL 3.2.3 runs
+  local sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add")
   report("Buildings ... Validation.Add, installed", sol, "add1.y(end)", valuesOf(sol, "add1.y")[end], "2.0 + 1.0")
+  OM.unloadLibrary(key)
 else
   println("Buildings is not installed: OM.installLibrary(\"Buildings\"; version = \"13.0.0\") installs it")
 end

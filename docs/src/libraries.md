@@ -2,13 +2,15 @@
 
 OM.jl flattens a model together with the Modelica libraries it uses. A library
 comes from one of three places: the MSL bundled with OM.jl, an installed library
-(OM.jl's own or OpenModelica's), or a file or directory of your own.
+(OM.jl's own or OpenModelica's), or a file or directory of your own. A library you
+load stays loaded for the session, as in omc ([below](#Loaded-libraries-stay-loaded)).
 
 ## The bundled MSL: 4.1.0 and 3.2.3
 
 OMFrontend ships MSL 4.1.0 and 3.2.3 as single files (`lib/Modelica/MSL_4_1_0.mo`,
 `MSL_3_2_3.mo`). A model given by name, or a model file with `MSL = true`, uses MSL 4.1.0
-(`OM.DEFAULT_MSL_VERSION`); `MSL_Version` selects 3.2.3:
+(`OM.DEFAULT_MSL_VERSION`) unless a library with the package Modelica is loaded; `MSL_Version`
+selects 3.2.3:
 
 ```julia
 OM.simulate("Modelica.Blocks.Examples.PID_Controller"; stopTime = 4.0)                            # MSL 4.1.0
@@ -33,24 +35,23 @@ with its `package.mo` (for example `Modelica 4.1.0+maint.om`).
 ```julia
 OM.libraries()            # name => [(version, path, source), ...]
 key = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")
-OM.simulate("Modelica.Blocks.Examples.PID_Controller"; libraries = [key], stopTime = 4.0)
+OM.simulate("Modelica.Blocks.Examples.PID_Controller"; stopTime = 4.0)   # the loaded Modelica 4.1.0
 ```
 
 - `version` matches exactly first, then as a prefix (`"4.1"` finds `4.1.0+maint.om`).
   Without `version`, the first one `libraries()` lists is loaded.
 - The libraries named in the package's `uses` annotation are loaded with it, and
-  `libraries = [key]` brings them along (for MSL 4.1.0: ModelicaServices 4.1.0 and
-  Complex 4.1.0). Each is looked up before the library is parsed: an installed version
+  unloaded with it (for MSL 4.1.0: ModelicaServices 4.1.0 and Complex 4.1.0). Each is looked up before the library is parsed: an installed version
   that matches exactly or as a prefix; else the newest installed one of the same major
   version (a library that uses Modelica 4.0.0 gets an installed 4.1.0), with a note in the
   log; for Modelica, ModelicaServices and Complex, else the bundled MSL of that major
   version. When one is not available, the load stops with an error that names it
   (`autodeps = false` loads the library alone).
-- `loadInstalledLibrary` returns the library's key (`"Modelica_4_1_0"`). The parsed
-  library stays in memory for the session and is kept on disk in
+- `loadInstalledLibrary` returns the library's key (`"Modelica_4_1_0"`). The library
+  stays loaded until `OM.unloadLibrary(key)`; its parse is kept on disk in
   `~/.julia/cache/OMFrontend`, so a later session loads it without parsing.
-- The same key works for `OM.flatten` and `OM.translate`, and for a model in a file:
-  `OM.simulate("M", "M.mo"; libraries = [key])`.
+- Every later `OM.flatten`, `OM.translate` and `OM.simulate` uses it, also for a model in
+  a file: `OM.simulate("M", "M.mo")`. `libraries = [key]` names it as well.
 
 ## Installing a library
 
@@ -95,13 +96,46 @@ Other ways to install:
 ## Your own libraries
 
 Load a library from a single `.mo` file or a package directory, or pass its path in
-`libraries` directly:
+`libraries` for one call:
 
 ```julia
 key = OM.loadLibrary("MyLib.mo")            # a single file
 key = OM.loadPackage("path/to/MyLib")       # a directory with package.mo
-OM.simulate("MyLib.Examples.Test"; libraries = ["path/to/MyLib"])
+OM.simulate("MyLib.Examples.Test")          # loaded: no libraries needed
+OM.simulate("MyLib.Examples.Test"; libraries = ["path/to/MyLib"])   # for this call only
 ```
+
+## Loaded libraries stay loaded
+
+A library loaded with `loadLibrary`, `loadPackage`, `loadInstalledLibrary` or `loadMSL` stays
+loaded for the session, as the classes omc loads: later `translate`, `simulate`, `flatten` and
+`exportModelica` calls see it without `libraries`.
+
+```julia
+OM.loadLibrary("Controllers.mo")
+OM.simulate("TankLevel", "TankLevel.mo"; stopTime = 30.0)   # TankLevel uses Controllers
+OM.loadedLibraries()                                       # ["Controllers"]
+OM.unloadLibrary("Controllers")
+```
+
+- `OM.loadedLibraries()` lists the keys in load order, each followed by the libraries it uses
+  (`["Modelica_4_1_0", "Complex_4_1_0", "ModelicaServices_4_1_0"]`).
+- Two loaded libraries may not share a top-level name. Loading Modelica 3.2.3 while 4.1.0 is
+  loaded stops with an error that names both: `Library 'Modelica_3_2_3' has the top-level class
+  Modelica, as the loaded library 'Modelica_4_1_0' does: unload one of them first
+  (unloadLibrary("Modelica_4_1_0")).` Loading the same library again (an edited file) replaces it.
+- A loaded library with the package Modelica is the MSL of every call that uses one: a model by
+  name, `MSL = true`, a model that uses Modelica without loading it. An `MSL_Version` of another
+  version is an error that names it; leave `MSL_Version` out to use it.
+- A model's own file comes first: its top-level classes hide a loaded library's of the same name.
+- `libraries = [...]` adds libraries for one call; a path there is not loaded into the session. A
+  library there with a top-level class of a loaded one (another version) is an error.
+- `OM.unloadLibrary(key)` unloads the library and the ones only it used. The models translated
+  while one of them was loaded are forgotten (a `simulate` translates them again), and so are
+  their parses in memory (not on disk: loading one again is fast). A library loaded only because
+  another one uses it goes with that one.
+- A `.mos` script's `loadFile` and `loadModel` load for the script (its `ScriptContext`), as an omc
+  session of its own: they do not stay loaded after it.
 
 ## Examples
 
@@ -132,8 +166,8 @@ for v in ("MSL:3.2.3", "MSL:4.1.0")
 end
 ```
 
-A simulate by name translates again when the library changes (another `MSL_Version` or `libraries`), and reuses
-the translation when it is the same.
+A simulate by name translates again when the library changes (another `MSL_Version`, `libraries` or loaded
+libraries), and reuses the translation when it is the same.
 
 ### Your own model on the MSL
 
@@ -214,8 +248,8 @@ end TankLevel;
 ```julia
 sol = OM.simulate("TankLevel", "TankLevel.mo"; libraries = ["Controllers.mo"], stopTime = 30.0)
 OM.OMBackend.getVariableValues(sol, "h")[end]        # 1.0002: the level overshoots to 1.113, then settles
-key = OM.loadLibrary("Controllers.mo")               # "Controllers": the same, loaded once
-sol = OM.simulate("TankLevel", "TankLevel.mo"; libraries = [key], stopTime = 30.0)
+OM.loadLibrary("Controllers.mo")                     # "Controllers": loaded for the session
+sol = OM.simulate("TankLevel", "TankLevel.mo"; stopTime = 30.0)
 ```
 
 ### A library of your own as a folder, using the MSL
@@ -265,9 +299,9 @@ extrema(T[sol.t .> 6000.0])                          # (293.65, 294.65): T_set +
 ```
 
 The room reaches 294.65 K after about 4900 s; from then on the thermostat's `when` equations switch the heater at
-each band edge. `OM.loadPackage("Heating")` loads the folder once and returns its key, `"Heating"`. The MSL comes
-with it as above (4.1.0); for OpenModelica's installed MSL add its key:
-`libraries = ["Heating", OM.loadInstalledLibrary("Modelica"; version = "4.1.0")]`.
+each band edge. `OM.loadPackage("Heating")` loads the folder for the session and returns its key, `"Heating"`. The
+MSL comes with it as above (4.1.0); for OpenModelica's installed MSL, load it first:
+`OM.loadInstalledLibrary("Modelica"; version = "4.1.0")`.
 
 ### A parameter sweep over an MSL model
 
@@ -316,15 +350,16 @@ end Smoothing;
 
 ```julia
 msl = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")   # with ModelicaServices and Complex
-sol = OM.simulate("Smoothing", "Smoothing.mo"; libraries = [msl], stopTime = 1.0)
+sol = OM.simulate("Smoothing", "Smoothing.mo"; stopTime = 1.0)
 OM.OMBackend.getVariableValues(sol, "lag.y")[end]               # 0.9179 = 1 - exp(-0.5 / 0.2)
+OM.unloadLibrary(msl)                                           # the bundled MSL again
 ```
 
 ### A model of an installed library
 
 ```julia
 key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")  # with the Modelica 4.1.0 it uses
-sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
+sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add")
 OM.OMBackend.getVariableValues(sol, "add1.y")[end]              # 3.0: add1.u1 (2.0) + add1.u2 (1.0)
 ```
 
@@ -396,7 +431,10 @@ Sources 1.0.0 does not stand in for 2.0.0: another major version.
 |-----------|-----------------|------------|
 | `loadInstalledLibrary("X")`, X not installed | Error: `Library 'X' not found. Run libraries() to see what is available.` | Install it (above). |
 | The version is not installed | Error: `Library 'Modelica' version '5.0.0' not found. Available: [...]`, listing the installed versions | Install that version, or pick one from the list. |
-| `MSL_Version` of a version that is not bundled (`"MSL:4.0.0"`) | Logs `Valid versions are 3.2.3 and 4.1.0`, then fails with `KeyError: key "MSL_4_0_0" not found` | Use `loadInstalledLibrary` and `libraries = [key]`. |
+| `MSL_Version` of a version that is not bundled (`"MSL:4.0.0"`) | Logs `Valid versions are 3.2.3 and 4.1.0`, then fails with `KeyError: key "MSL_4_0_0" not found` | Use `loadInstalledLibrary`. |
+| Loading a library with a top-level name of a loaded one (Modelica 3.2.3 while 4.1.0 is loaded) | Error: `Library 'Modelica_3_2_3' has the top-level class Modelica, as the loaded library 'Modelica_4_1_0' does: unload one of them first (unloadLibrary("Modelica_4_1_0")).` | `OM.unloadLibrary` the loaded one, then load the other. |
+| `MSL_Version` of another version than a loaded Modelica's | Error: `MSL_Version "MSL:3.2.3" asks for Modelica 3.2.3, but the loaded library 'Modelica_4_1_0' is Modelica 4.1.0: leave MSL_Version out to use it, or unload it first (unloadLibrary("Modelica_4_1_0")).` | Leave `MSL_Version` out, or unload the loaded Modelica. |
+| `unloadLibrary` of a library loaded only as one another uses | Error: `Library 'Complex_4_1_0' is loaded as a library 'Modelica_4_1_0' uses: unload that one.` | Unload the library that uses it. |
 | A `libraries` entry that is neither a loaded key nor a path | Error: `Library not found: '...'. Pass a cache key from loadLibrary, a .mo file path, or a package directory.` | Load the library first, or pass its path. |
 | A library in the `uses` annotation is not installed, in no version of the same major version | The load stops before parsing: `Library 'TestLib 1.0.0' uses libraries that are not installed: LibB 1.0.0 (installed: 2.0.0). Install them (...), or load it with autodeps = false.` | Install the dependency, then load the library again. |
 | `installLibrary` of a URL that is not a public repository | `Could not clone <url> at tag v1.0.0 or 1.0.0: fatal: could not read Username for 'https://github.com': terminal prompts disabled. ...` | Check the URL (GitHub asks for credentials for a repository that does not exist). |
