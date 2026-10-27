@@ -47,8 +47,9 @@ sol = OM.simulate("LotkaVolterra"; MSL = false, stopTime = 30.0)
 
 | `.mos` | Julia |
 |---|---|
-| `loadFile("M.mo")` | pass the file: `OM.simulate("M", "M.mo")`; a package that other models use: `OM.loadLibrary("Lib/package.mo")` |
-| `loadModel(Modelica, {"4.1.0"})` | `MSL_Version = "MSL:4.1.0"` (an installed library: `OM.loadInstalledLibrary("Buildings")`) |
+| `loadFile("M.mo")` | pass the file: `OM.simulate("M", "M.mo")`; a package that other models use: `OM.loadLibrary("Lib/package.mo")`, loaded for the session as in omc |
+| `loadModel(Modelica, {"4.1.0"})` | `MSL_Version = "MSL:4.1.0"` per call, or loaded for the session: `OM.loadInstalledLibrary("Modelica"; version = "4.1.0")` (any installed library: `OM.loadInstalledLibrary("Buildings")`) |
+| `deleteClass(Lib)` | `OM.unloadLibrary("Lib")` (the key `OM.loadedLibraries()` lists) |
 | `simulate(M, stopTime = 1)` | `sol = OM.simulate("M", "M.mo"; stopTime = 1.0)` |
 | `translateModel(M)`, `buildModel(M)` | `OM.translate("M", "M.mo")` |
 | `instantiateModel(M)` | `OM.exportModelica("M", "M.mo")` (the flat model as text), `OM.flatten` (as data) |

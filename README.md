@@ -48,14 +48,15 @@ OM.simulate("Modelica.Blocks.Examples.PID_Controller"; MSL_Version = "MSL:4.1.0"
 OM.installLibrary("ExternData"; version = "3.2.0", url = "https://github.com/modelica-3rdparty/ExternData")
 key = OM.loadInstalledLibrary("ExternData")
 
-# A model of an installed library (Buildings is registered: no url needed)
+# A model of an installed library (Buildings is registered: no url needed). A loaded library stays
+# loaded, as in omc: later calls see it without `libraries` (OM.loadedLibraries(), OM.unloadLibrary)
 OM.installLibrary("Buildings"; version = "13.0.0")
 key = OM.loadInstalledLibrary("Buildings")
-sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
+sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add")
 
 # Your own model on an installed library (Smoothing.mo uses Modelica.Blocks; the guide shows it)
 msl = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")
-sol = OM.simulate("Smoothing", "Smoothing.mo"; libraries = [msl])
+sol = OM.simulate("Smoothing", "Smoothing.mo")
 
 # What is installed: OM.jl's directory and OpenModelica's
 OM.libraries()

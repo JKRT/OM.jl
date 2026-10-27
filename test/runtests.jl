@@ -40,6 +40,7 @@ ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
     #= Translate and run some "advanced" models. Does not check the results =#
     @testset "Libraries:" begin
       include("libraries.jl")
+      include("loadedLibraryTests.jl")
     end
     @info "Starting Extension Sanity Tests..."
     @testset "Extensions:" begin

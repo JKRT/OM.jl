@@ -892,12 +892,23 @@ end
 "Resolve a command path against the context's logical working directory."
 _resolve_path(context::ScriptContext, path) = isabspath(_name(path)) ? normpath(_name(path)) : normpath(context.cwd, _name(path))
 
+"""
+The module whose function `fn` loads a library for the script: OM's frontend, whose `loadLibrary` and
+`loadInstalledLibrary` parse it without loading it into the OM session (`OM.loadedLibraries`), so it does
+not stay loaded after the script (the script passes it along itself); else `api` itself (a mock).
+"""
+function _script_loader(api::Module, fn::Symbol)::Module
+  isdefined(api, :OMFrontend) || return api
+  local frontend::Module = getfield(api, :OMFrontend)
+  return isdefined(frontend, fn) ? frontend : api
+end
+
 "Implement `loadFile` by loading a Modelica source and recording its cache key."
 function _command_load_file(context::ScriptContext, positional, keywords)
   isempty(positional) && error("loadFile requires a path")
   path = _resolve_path(context, positional[1])
   isfile(path) || error("Modelica file does not exist: $path")
-  key = context.api.loadLibrary(path)
+  key = _script_loader(context.api, :loadLibrary).loadLibrary(path)
   path in context.loadedFiles || push!(context.loadedFiles, path)
   context.sourceFiles[key] = path
   key in context.libraries || push!(context.libraries, key)
@@ -986,7 +997,7 @@ function _load_installed_library!(context::ScriptContext, name::String, version,
   end
 
   key = try
-    context.api.loadInstalledLibrary(name; version=normalizedVersion)
+    _script_loader(context.api, :loadInstalledLibrary).loadInstalledLibrary(name; version=normalizedVersion)
   catch error
     dependency || rethrow()
     @warn "Could not load declared library dependency" library=name version=normalizedVersion exception=(error, catch_backtrace())

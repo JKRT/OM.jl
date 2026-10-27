@@ -29,6 +29,8 @@ OM.IMTK_MODE
 OM.loadLibrary
 OM.loadPackage
 OM.loadInstalledLibrary
+OM.loadedLibraries
+OM.unloadLibrary
 OM.installLibrary
 OM.libraries
 ```
