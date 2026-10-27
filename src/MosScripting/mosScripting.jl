@@ -1221,7 +1221,7 @@ function _default_commands()
     empty!(context.loadedFiles)
     empty!(context.sourceFiles)
     empty!(context.libraries)
-    context.mslVersion = "MSL:4.0.0"
+    context.mslVersion = "MSL:" * _newest_bundled_msl(context.api)
     context.mslLoaded = false
     context.lastSolution = nothing
     context.lastModel = nothing

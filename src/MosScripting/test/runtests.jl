@@ -144,6 +144,18 @@ end
   end
 end
 
+module MockClear
+clearCaches!() = nothing
+end
+
+#= clear() returns to the MSL a new script starts with (the newest bundled), not one that is not bundled. =#
+@testset "clear() keeps a bundled MSL" begin
+  context = ScriptContext(MockClear; output=devnull)
+  MosScripting.run("loadModel(Modelica, {\"3.2.3\"}); clear();", context)
+  @test context.mslVersion == ScriptContext(MockClear; output=devnull).mslVersion == "MSL:4.1.0"
+  @test !context.mslLoaded
+end
+
 @testset "MOS syntax diagnostics" begin
   separatorError = try
     MosScripting.run("x := 1 y := 2", fresh_context())

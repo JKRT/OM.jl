@@ -1,14 +1,16 @@
 # Examples
 
 The examples run in the OM.jl project environment (`julia --project` in the
-repository), which also provides Plots and DifferentialEquations.
+repository), which also provides Plots and DifferentialEquations. MSL models run
+on MSL 4.1.0, the default (`MSL_Version = "MSL:3.2.3"` picks the other bundled
+version); the showcase at the end runs on 3.2.3.
 
 ## A simple pendulum
 
 ```julia
 using OM
 sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                  MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+                  MSL_Version = "MSL:4.1.0", stopTime = 1.0)
 ```
 
 ## Your own model, with events
@@ -115,7 +117,7 @@ sol = DE.solve(prob, DE.Rodas5P(); callback = callbacks)
 longer = DE.solve(DE.remake(prob; tspan = (0.0, 60.0)), DE.Rodas5P(); callback = callbacks)
 ```
 
-MSL models work the same way after `OM.translate(name; MSL_Version = "MSL:3.2.3")`.
+MSL models work the same way after `OM.translate(name; MSL_Version = "MSL:4.1.0")`.
 
 ## An MSL model with friction events
 
@@ -124,7 +126,7 @@ lock as they are engaged and released:
 
 ```julia
 name = "Modelica.Mechanics.Rotational.Examples.CoupledClutches"
-cc = OM.simulate(name; MSL_Version = "MSL:3.2.3", stopTime = 1.5)
+cc = OM.simulate(name; MSL_Version = "MSL:4.1.0", stopTime = 1.5)
 
 p = plot(; xlabel = "time [s]", ylabel = "angular velocity [rad/s]")
 for n in ("J1.w", "J2.w", "J3.w", "J4.w")
@@ -144,7 +146,7 @@ double-scroll attractor.
 
 ```julia
 name = "Modelica.Electrical.Analog.Examples.ChuaCircuit"
-chua = OM.simulate(name; MSL_Version = "MSL:3.2.3", stopTime = 5000.0, saveat = 1.0)
+chua = OM.simulate(name; MSL_Version = "MSL:4.1.0", stopTime = 5000.0, saveat = 1.0)
 plot(OM.OMBackend.getVariableValues(chua, "C1.v"), OM.OMBackend.getVariableValues(chua, "C2.v");
      xlabel = "C1.v [V]", ylabel = "C2.v [V]", label = "")
 ```
@@ -154,7 +156,7 @@ plot(OM.OMBackend.getVariableValues(chua, "C1.v"), OM.OMBackend.getVariableValue
 ## A model from another library: Buildings
 
 Libraries besides the MSL are installed once and passed by their key (more in
-[Libraries](libraries.md)). The first
+[Libraries](libraries.md), with examples of libraries of your own). The first
 step of the Buildings library's space-cooling tutorial: a room with an air
 volume, a wall to the outside and an air supply.
 
@@ -190,6 +192,8 @@ models. These examples cover closed kinematic loops, electric drives, friction,
 controllers, and hybrid events. They are useful end-to-end demonstrations of
 the frontend, backend, ModelingToolkit code generation, and SciML simulation
 pipeline.
+
+Both run on MSL 3.2.3.
 
 !!! note "First-run compilation"
     These are intentionally demanding models. Their first translation and

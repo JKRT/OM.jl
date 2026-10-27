@@ -95,24 +95,27 @@ end
 ```
 runModelMTK(model, file;
            MSL = false,
+           MSL_Version = OM.DEFAULT_MSL_VERSION,
            timeSpan = (0.0, 1.0))
 ```
 Given a model and a file run the model in the file.
-If MSL is true we use the MSL. Timespan is used to set the time.
+If MSL is true we use the MSL (`MSL_Version`). Timespan is used to set the time.
 """
 function runModelMTK(model,
                      file;
                      MSL = false,
+                     MSL_Version = OM.DEFAULT_MSL_VERSION,
                      timeSpan = (0.0, 1.0),
                      solver = OMBackend.defaultSolver(), kwargs...)
   @info "Translating : " model
-  OM.translate(model, file; MSL = MSL)
+  OM.translate(model, file; MSL = MSL, MSL_Version = MSL_Version)
   @info "Simulating:"
   return OM.simulate(model,
               file;
               startTime = first(timeSpan),
               stopTime = last(timeSpan),
               MSL = MSL,
+              MSL_Version = MSL_Version,
               mode = OMBackend.MTK_MODE,
               solver = solver, kwargs...)
 end

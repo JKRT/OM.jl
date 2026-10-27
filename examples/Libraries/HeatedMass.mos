@@ -1,0 +1,5 @@
+// The MSL 4.1.0 and HeatedMass.mo loaded, HeatedMass simulated, the mass temperature at the end
+loadModel(Modelica, {"4.1.0"}); getErrorString();
+loadFile("HeatedMass.mo"); getErrorString();
+simulate(HeatedMass, stopTime = 1000); getErrorString();
+val(mass.T, 1000)

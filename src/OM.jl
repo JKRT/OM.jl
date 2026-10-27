@@ -80,6 +80,12 @@ condition).
 """
 const ModelicaAssertionError = OMBackend.CodeGeneration.ModelicaAssertionError
 
+"""
+The MSL version `translate`, `simulate`, `flatten`, `exportModelica` and the other functions use when
+no `MSL_Version` is given: the bundled `"MSL:4.1.0"`. The other bundled version is `"MSL:3.2.3"`.
+"""
+const DEFAULT_MSL_VERSION = "MSL:4.1.0"
+
 function printWelcomeMessage()
   printstyled("Open", bold=true, color=:light_blue)
   printstyled("Modelica", bold=true, color=:white)
@@ -87,7 +93,7 @@ function printWelcomeMessage()
   println()
   print("Running ")
   Pkg.status("OM")
-  println("For help run OM.help()")
+  println("For help run OM.help(), for examples OM.help(:examples)")
 end
 
 if isinteractive()
@@ -106,58 +112,7 @@ function listAvailableModels()
   println(OMBackend.availableModels())
 end
 
-"""
-    help()
-
-Print a summary of the main OM.jl workflow functions.
-"""
-function help()
-  printstyled("OM.jl Workflow\n", bold=true)
-  println()
-  printstyled("  Translate and simulate:\n", color=:cyan)
-  println("    OM.translate(modelName, file)        Compile a Modelica model")
-  println("    OM.simulate(modelName)               Simulate a compiled model")
-  println("    OM.simulate(modelName, file)         Translate + simulate in one step")
-  println("    OM.resimulate(modelName)             Re-simulate with different parameters")
-  println()
-  printstyled("  Inspect and export:\n", color=:cyan)
-  println("    OM.exportCSV(modelName, sol)         Export results to CSV (OMEdit compatible)")
-  println("    OM.writeModelToFile(name, file, out) Write generated Julia code to file")
-  println("    OM.exportModelica(name, file)        Get flat Modelica as a string")
-  println("    OM.listAvailableModels()             List compiled models")
-  println()
-  printstyled("  Intermediate representations:\n", color=:cyan)
-  println("    OM.flatten(name, file)                Flatten to FlatModel (default)")
-  println("    OM.flatten(name, file; repr=:DAE)     Flatten to DAE representation")
-  println("    OM.flatten(name, file; MSL=true)      Flatten with MSL")
-  println("    OM.flatten(name, file; libraries=[])  Flatten with user libraries")
-  println("    OM.flatten(name; MSL_Version=...)     Flatten an MSL model by name")
-  println("    OM.parseFile(file)                    Parse a Modelica file to AST")
-  println("    OM.translateToSCode(file)             Parse and convert to SCode")
-  println("    OM.runScript(file)                    Execute an OpenModelica .mos script")
-  println()
-  printstyled("  Debugging:\n", color=:cyan)
-  println("    OM.explainIndexReduction(name, file) Which states and why (index reduction)")
-  println("    OM.LogBackend()                      Enable backend debug logging")
-  println("    OM.LogFrontend()                     Enable frontend debug logging")
-  println("    ...; warnMissingStartValues=true     Show warnings for implicit 0.0 start values")
-  println()
-  printstyled("  Libraries:\n", color=:cyan)
-  println("    OM.libraries()                        List installed Modelica libraries")
-  println("    OM.installLibrary(name; version=...)  Download and install a library")
-  println("    OM.loadInstalledLibrary(name; ...)    Load an installed library by name")
-  println("    OM.loadLibrary(path)                  Load a single .mo file")
-  println("    OM.loadPackage(dir)                   Load a directory-based package")
-  println("    OM.translate(n, f; libraries=[...])   Translate with user libraries")
-  println("    OM.simulate(n, f; libraries=[...])    Simulate with user libraries")
-  println()
-  printstyled("  MSL support:\n", color=:cyan)
-  println("    OM.loadInstalledLibrary(\"Modelica\"; version=\"4.0.0\")")
-  println("    OM.translate(name, file; MSL=true)   Translate with MSL")
-  println("    OM.translate(name; MSL_Version=...)   Translate an MSL model by name")
-  println("    OM.simulate(name; MSL_Version=...)    Simulate an MSL model by name")
-  println("    OM.writeModelToFile(name, path)       Write generated code to file")
-end
+include("help.jl")
 
 """
     clearCaches!(; models=true, implementations=true, wrappers=true, extractors=true)
@@ -442,7 +397,7 @@ end
 
 """
     flatten(modelName, modelFile; repr=:FM, scalarize=true, MSL=false,
-            MSL_Version="MSL:3.2.3", libraries=String[])
+            MSL_Version="MSL:4.1.0", libraries=String[])
 
 Flatten a Modelica model from a file. Returns a Tuple of the flattened
 representation and the function cache.
@@ -452,7 +407,7 @@ representation and the function cache.
 - `scalarize`: scalarize arrays (default `true`; `false` keeps array variables, array
   equations and for-equations, as omc's `-d=-nfScalarize`; only applies to `:FM`)
 - `MSL`: load the Modelica Standard Library alongside the model file
-- `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
+- `MSL_Version`: MSL version string (default `"MSL:4.1.0"`)
 - `libraries`: cache keys or file/directory paths for user libraries
 
 # Examples
@@ -467,7 +422,7 @@ function flatten(modelName::String, modelFile::String;
                  repr::Symbol = :FM,
                  scalarize::Bool = true,
                  MSL = false,
-                 MSL_Version = "MSL:3.2.3",
+                 MSL_Version = DEFAULT_MSL_VERSION,
                  libraries::Vector{String} = String[])::Tuple
   resolvedLibs = _resolveLibraries(libraries)
   if !isempty(resolvedLibs) || MSL
@@ -488,7 +443,7 @@ function flatten(modelName::String, modelFile::String;
 end
 
 """
-    flatten(modelName; MSL_Version="MSL:3.2.3", libraries=String[], scalarize=true)
+    flatten(modelName; MSL_Version="MSL:4.1.0", libraries=String[], scalarize=true)
 
 Flatten a model by name: an MSL model, or one of `libraries`. Returns a Tuple of
 the flattened representation and the function cache.
@@ -506,7 +461,7 @@ key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
 OM.flatten("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
 ```
 """
-function flatten(modelName::String; MSL_Version = "MSL:3.2.3", libraries::Vector{String} = String[],
+function flatten(modelName::String; MSL_Version = DEFAULT_MSL_VERSION, libraries::Vector{String} = String[],
                  scalarize::Bool = true)::Tuple
   isempty(libraries) || return flatten(modelName, ""; libraries = libraries, scalarize = scalarize)
   return OMFrontend.flattenModelWithMSL(modelName; MSL_Version = MSL_Version, scalarize = scalarize)
@@ -514,7 +469,7 @@ end
 
 """
     componentInterface(modelName, [modelFile]; component, MSL = modelFile === nothing,
-                       MSL_Version = "MSL:3.2.3", libraries = String[]) -> NamedTuple
+                       MSL_Version = "MSL:4.1.0", libraries = String[]) -> NamedTuple
 
 The interface of `component` (its name in the model: `"spring"`, `"engine.damper"`) in the
 flattened `modelName`, as plain values (no frontend types):
@@ -536,7 +491,7 @@ OM.componentInterface("Modelica.Mechanics.Rotational.Examples.First"; component 
 ```
 """
 function componentInterface(modelName::String, modelFile::Union{Nothing, String} = nothing; component::String,
-                            MSL::Bool = modelFile === nothing, MSL_Version::String = "MSL:3.2.3",
+                            MSL::Bool = modelFile === nothing, MSL_Version::String = DEFAULT_MSL_VERSION,
                             libraries::Vector{String} = String[])::NamedTuple
   local fm::OMFrontend.Frontend.FlatModel = modelFile === nothing ?
     first(flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)) :
@@ -614,8 +569,8 @@ function _componentInterface(fm::OMFrontend.Frontend.FlatModel, component::Strin
 end
 
 """
-    explainIndexReduction(modelName, modelFile; MSL=false, MSL_Version="MSL:3.2.3", libraries=String[])
-    explainIndexReduction(modelName; MSL_Version="MSL:3.2.3", libraries=String[])
+    explainIndexReduction(modelName, modelFile; MSL=false, MSL_Version="MSL:4.1.0", libraries=String[])
+    explainIndexReduction(modelName; MSL_Version="MSL:4.1.0", libraries=String[])
 
 What the backend's index reduction does to a model and why, as a report: the equations it
 differentiates and how often, the candidates of each choice of states with their StateSelect
@@ -628,13 +583,13 @@ OM.explainIndexReduction("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendu
 OM.explainIndexReduction("PendulumCartesian", "Pendulum.mo")
 ```
 """
-function explainIndexReduction(modelName::String, modelFile::String; MSL::Bool = false, MSL_Version::String = "MSL:3.2.3",
+function explainIndexReduction(modelName::String, modelFile::String; MSL::Bool = false, MSL_Version::String = DEFAULT_MSL_VERSION,
                                libraries::Vector{String} = String[])
   local (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, libraries = libraries)
   return OMBackend.explainIndexReduction(fm; functionList = OMFrontend.cacheToFunctionList(cache))
 end
 
-function explainIndexReduction(modelName::String; MSL_Version::String = "MSL:3.2.3", libraries::Vector{String} = String[])
+function explainIndexReduction(modelName::String; MSL_Version::String = DEFAULT_MSL_VERSION, libraries::Vector{String} = String[])
   local (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)
   return OMBackend.explainIndexReduction(fm; functionList = OMFrontend.cacheToFunctionList(cache))
 end
@@ -716,11 +671,11 @@ to `translate(modelName, modelFile; ...)` followed by
 # Keyword arguments
 - `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0).
 - `MSL`: set `true` to also load the Modelica Standard Library.
-- `MSL_Version`: MSL version string (default `"MSL:3.2.3"`).
+- `MSL_Version`: MSL version string (default `"MSL:4.1.0"`).
 - `libraries`: cache keys or file/directory paths for user libraries (see
   `loadLibrary` / `loadPackage` / `loadInstalledLibrary`).
 - `solver`: ODE solver (default `OMBackend.defaultSolver()`: Rodas5P with finite-difference Jacobians).
-- `mode`: backend mode (default `OMBackend.MTK_MODE`).
+- `mode`: backend mode (default `IMTK_MODE`).
 - `warnMissingStartValues`: override missing-start-value warnings.
 - `eliminateNonDynamic`: elimination of non-dynamic variables before
   MTK code generation, reducing ODEProblem compilation time. Accepts:
@@ -750,7 +705,7 @@ function simulate(modelName::String,
                   startTime= 0.0,
                   stopTime= 1.0,
                   MSL = false,
-                  MSL_Version = "MSL:3.2.3",
+                  MSL_Version = DEFAULT_MSL_VERSION,
                   libraries::Vector{String} = String[],
                   solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
@@ -800,19 +755,19 @@ _builtAtTranslate(modelName::String)::Bool =
   haskey(OMBackend.IMTKGen.BUILT, OMBackend.canonicalName(modelName))
 
 """
-    simulate(modelName; MSL_Version="MSL:3.2.3", startTime=0.0, stopTime=1.0, ...)
+    simulate(modelName; MSL_Version="MSL:4.1.0", startTime=0.0, stopTime=1.0, ...)
 
 Translate and simulate a model by name, an MSL model or one of `libraries`.
 Defaults to `MSL=true`.
 
 # Keyword arguments
 - `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0)
-- `MSL_Version`: MSL version string (default `"MSL:3.2.3"`)
+- `MSL_Version`: MSL version string (default `"MSL:4.1.0"`)
 - `libraries`: the libraries the model is in, instead of the MSL: cache keys
   (`loadInstalledLibrary`, `loadLibrary`, `loadPackage`) or file/directory paths.
   The libraries an installed library uses come along with its key.
 - `solver`: ODE solver (default `OMBackend.defaultSolver()`: Rodas5P with finite-difference Jacobians)
-- `mode`: backend mode (default `OMBackend.MTK_MODE`)
+- `mode`: backend mode (default `IMTK_MODE`)
 - `warnMissingStartValues`: override missing-start-value warnings
 - `eliminateNonDynamic`: elimination of non-dynamic variables before
   MTK code generation, reducing ODEProblem compilation time. Accepts:
@@ -835,15 +790,15 @@ Defaults to `MSL=true`.
 
 # Example
 ```julia
+sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum"; stopTime=1.0)
+# On MSL 3.2.3:
 sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
                   MSL_Version="MSL:3.2.3", stopTime=1.0)
 # With observed filter for faster compilation:
-sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                  MSL_Version="MSL:3.2.3", stopTime=1.0,
+sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum"; stopTime=1.0,
                   observedFilter=["^rev_", "^body_"])
 # Force re-translation (e.g. after code generation changes):
-sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                  MSL_Version="MSL:3.2.3", overwriteCache=true)
+sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum"; overwriteCache=true)
 # A model of an installed library:
 key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
 sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add"; libraries = [key])
@@ -853,7 +808,7 @@ function simulate(modelName::String;
                   startTime = 0.0,
                   stopTime = 1.0,
                   MSL = true,
-                  MSL_Version = "MSL:3.2.3",
+                  MSL_Version = DEFAULT_MSL_VERSION,
                   libraries::Vector{String} = String[],
                   solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
@@ -987,13 +942,13 @@ _eventCount(cbs::Union{Tuple, AbstractVector})::Int = sum(_eventCount, cbs; init
 Translate a Modelica model from a file and load it in memory.
 The model can be simulated at a later stage by calling `simulate` with the name of the model.
 
-If `MSL = true` the compiler will use the Modelica Standard Library (MSL) version 3.2.3 by default.
-The bundled versions are `MSL:3.2.3` and `MSL:4.1.0`.
+If `MSL = true` the compiler will use the Modelica Standard Library (MSL) version 4.1.0 by default.
+The bundled versions are `MSL:4.1.0` and `MSL:3.2.3`.
 
 # Keyword arguments
 
 - `MSL::Bool = false`: whether to load the MSL alongside the model file.
-- `MSL_Version::String = "MSL:3.2.3"`: which MSL version to use.
+- `MSL_Version::String = "MSL:4.1.0"`: which MSL version to use (`DEFAULT_MSL_VERSION`).
 - `libraries::Vector{String} = String[]`: cache keys or file paths for user
   libraries to load alongside the model. Load libraries first with
   `OM.loadLibrary` or pass `.mo` file paths directly.
@@ -1024,7 +979,7 @@ OM.translate("MyModel", "model.mo"; eliminateNonDynamic=true)
 function translate(modelName::String,
                    modelFile::String;
                    MSL = false,
-                   MSL_Version = "MSL:3.2.3",
+                   MSL_Version = DEFAULT_MSL_VERSION,
                    libraries::Vector{String} = String[],
                    mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
@@ -1072,13 +1027,13 @@ function translate(modelName::String,
 end
 
 """
-    translate(modelName; MSL_Version="MSL:3.2.3", libraries=String[], mode, eliminateNonDynamic=nothing)
+    translate(modelName; MSL_Version="MSL:4.1.0", libraries=String[], mode, eliminateNonDynamic=nothing)
 
 Translate a model by name, an MSL model or one of `libraries`, and load it in memory.
 
 # Keyword arguments
 
-- `MSL_Version::String = "MSL:3.2.3"`: which MSL version to use.
+- `MSL_Version::String = "MSL:4.1.0"`: which MSL version to use (`DEFAULT_MSL_VERSION`).
 - `libraries`: the libraries the model is in, instead of the MSL: cache keys
   (`loadInstalledLibrary`, `loadLibrary`, `loadPackage`) or file/directory paths.
   The libraries an installed library uses come along with its key.
@@ -1100,16 +1055,15 @@ Translate a model by name, an MSL model or one of `libraries`, and load it in me
 # Examples
 
 ```julia
-OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-             MSL_Version="MSL:3.2.3")
+OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
 
 # With non-dynamic variable elimination for faster ODEProblem compilation:
 OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-             MSL_Version="MSL:3.2.3", eliminateNonDynamic=true)
+             eliminateNonDynamic=true)
 ```
 """
 function translate(modelName::String;
-                   MSL_Version = "MSL:3.2.3",
+                   MSL_Version = DEFAULT_MSL_VERSION,
                    libraries::Vector{String} = String[],
                    mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
@@ -1166,7 +1120,7 @@ function logScalarizedFallback(fm::OMFrontend.Frontend.FlatModel)::Nothing
 end
 
 """
-    writeModelToFile(modelName, modelFile, filePath; MSL=false, MSL_Version="MSL:3.2.3",
+    writeModelToFile(modelName, modelFile, filePath; MSL=false, MSL_Version="MSL:4.1.0",
                      mode=OMBackend.DEFAULT_BACKEND_MODE[], keepComments=true, keepBeginBlocks=true)
 
 Translate a file-based Modelica model and write the generated Julia code to
@@ -1185,7 +1139,7 @@ OM.writeModelToFile("MyModel", "MyModel.mo", "/tmp/MyModel_debug.jl")
 """
 function writeModelToFile(modelName::String, modelFile::String, filePath::String;
                           MSL = false,
-                          MSL_Version = "MSL:3.2.3",
+                          MSL_Version = DEFAULT_MSL_VERSION,
                           mode = OMBackend.DEFAULT_BACKEND_MODE[],
                           keepComments = true,
                           keepBeginBlocks = true)
@@ -1195,7 +1149,7 @@ function writeModelToFile(modelName::String, modelFile::String, filePath::String
 end
 
 """
-    writeModelToFile(modelName, filePath; MSL_Version="MSL:3.2.3",
+    writeModelToFile(modelName, filePath; MSL_Version="MSL:4.1.0",
                      mode=OMBackend.DEFAULT_BACKEND_MODE[], keepComments=true, keepBeginBlocks=true)
 
 Translate an MSL model by name and write the generated Julia code to
@@ -1205,11 +1159,11 @@ the file-based form.
 # Example
 ```julia
 OM.writeModelToFile("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum",
-                    "/tmp/pendulum_debug.jl"; MSL_Version="MSL:3.2.3")
+                    "/tmp/pendulum_debug.jl")
 ```
 """
 function writeModelToFile(modelName::String, filePath::String;
-                          MSL_Version = "MSL:3.2.3",
+                          MSL_Version = DEFAULT_MSL_VERSION,
                           mode = OMBackend.DEFAULT_BACKEND_MODE[],
                           keepComments = true,
                           keepBeginBlocks = true)
@@ -1290,14 +1244,14 @@ toString(flatModel) = OMFrontend.toString(flatModel)
 #Base.string(flatModel) = toString
 
 """
-    exportModelica(modelName, file; MSL=false, MSL_Version="MSL:4.0.0",
+    exportModelica(modelName, file; MSL=false, MSL_Version="MSL:4.1.0",
                    libraries=String[], printBindingTypes=false, scalarize=false)
 
 Returns the flat Modelica representation as a String.
 
 # Keyword arguments
 - `MSL`: load the Modelica Standard Library alongside the model file
-- `MSL_Version`: MSL version string (default `"MSL:4.0.0"`)
+- `MSL_Version`: MSL version string (default `"MSL:4.1.0"`; bundled: 4.1.0 and 3.2.3)
 - `libraries`: cache keys or file/directory paths for user libraries
 - `printBindingTypes`: include type annotations in bindings (debugging only)
 - `scalarize`: enable scalarization (default `false`). Note that the omc of
@@ -1315,7 +1269,7 @@ function exportModelica(modelName::String,
                         file::String;
                         printBindingTypes = false,
                         MSL = false,
-                        MSL_Version = "MSL:4.0.0",
+                        MSL_Version = DEFAULT_MSL_VERSION,
                         libraries::Vector{String} = String[],
                         scalarize = false)
   local fmStr::String
@@ -1333,19 +1287,18 @@ function exportModelica(modelName::String,
 end
 
 """
-    exportModelica(modelName; MSL_Version="MSL:3.2.3", printBindingTypes=false, scalarize=false)
+    exportModelica(modelName; MSL_Version="MSL:4.1.0", printBindingTypes=false, scalarize=false)
 
 Export flat Modelica for an MSL model by name.
 
 # Examples
 ```julia
-OM.exportModelica("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                  MSL_Version="MSL:3.2.3")
+OM.exportModelica("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
 ```
 """
 function exportModelica(modelName::String;
                         printBindingTypes = false,
-                        MSL_Version = "MSL:3.2.3",
+                        MSL_Version = DEFAULT_MSL_VERSION,
                         scalarize = false)
   local fmStr::String
   try
@@ -1406,7 +1359,7 @@ LogFrontend() = setDebug(frontend=true)
 
 Load the requested MSL version into the frontend library cache and return
 its SCode program. Accepted values are `"MSL:3.2.3"` / `"MSL_3_2_3"` /
-`"3.2.3"` and `"MSL:4.0.0"` / `"MSL_4_0_0"` / `"4.0.0"`.
+`"3.2.3"` and `"MSL:4.1.0"` / `"MSL_4_1_0"` / `"4.1.0"`.
 
 For most workflows prefer `loadInstalledLibrary("Modelica"; version = ...)`,
 which discovers installed Modelica libraries on disk and is consistent with

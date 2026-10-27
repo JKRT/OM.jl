@@ -10,7 +10,7 @@ The typical user flow is a single call:
 ```julia
 using OM
 sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-                  MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+                  MSL_Version = "MSL:4.1.0", stopTime = 1.0)
 ```
 
 The [examples showcase](examples.md#Showcase:-validated-multibody-systems)
