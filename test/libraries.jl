@@ -16,6 +16,7 @@ end
     runModelMTK("ElectricalComponentTestMSL.SimpleCircuit"
                 ,"./Models/MSL/ElectricalComponentTest.mo"
                 ;MSL = true,
+                MSL_Version = "MSL:3.2.3",   # SineVoltage(freqHz): MSL 3.2.3's name (4.x: f)
                 timeSpan=(0.0, 1.0))
     true
   end

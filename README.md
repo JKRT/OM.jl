@@ -3,6 +3,10 @@ A Modelica Environment in Julia.
 
 Documentation: <https://jkrt.github.io/OM.jl/dev/> (installation, examples, [Modelica libraries](https://jkrt.github.io/OM.jl/dev/libraries/), large array models, [scripting in Julia](https://jkrt.github.io/OM.jl/dev/julia/) and with `.mos`, [coverage](https://jkrt.github.io/OM.jl/dev/coverage/), [troubleshooting](https://jkrt.github.io/OM.jl/dev/troubleshooting/), API).
 
+In the REPL, `OM.help()` lists the main functions by task and `OM.help(:examples)` shows worked examples:
+models of the MSL, of libraries of your own and of installed ones (their files are in
+[`examples/Libraries`](examples/Libraries)).
+
 Please leave a star or make an issue to support the repository!
 * Note that this package is still under development
 
@@ -239,7 +243,7 @@ flatModelica = OM.exportModelica("Influenza", "./Models/Influenza.mo")
 print(modelName)
 ```
 ### Using different versions of the Modelica Standard Library
-MSL 3.2.3 and 4.1.0 are bundled; `MSL_Version` picks one for a model in a file:
+MSL 4.1.0 (the default) and 3.2.3 are bundled; `MSL_Version` picks one for a model in a file:
 
 ```julia
 jl = OM.translate("<model_using_msl_4>", "<filepath>"; MSL = true, MSL_Version = "MSL:4.1.0")
