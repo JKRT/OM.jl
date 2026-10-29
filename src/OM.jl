@@ -538,7 +538,10 @@ flattened `modelName`, as plain values (no frontend types):
 - `equations`: the flat model's equations that read it, as flat Modelica;
 - `declaration`: where it is declared (`info`: `fileName`, `lineNumberStart`, `columnNumberStart`,
   `lineNumberEnd`, `columnNumberEnd`), the name of the class declaring it (`parent`) and that class's
-  span (`parent_info`).
+  span (`parent_info`);
+- `graphics`: its class's icon as Modelica text, to draw a replacement like it: `coordinateSystem`
+  (`"coordinateSystem(...)"`, or empty), `items` (the graphic items, its base classes' first, as tools
+  draw them) and `placements` (connector => its `"Placement(...)"` annotation).
 
 An error if the model has no component of that name.
 
@@ -587,6 +590,7 @@ function _componentInterface(fm::OMFrontend.Frontend.FlatModel, component::Strin
     Dict{String, Tuple{String, Vector{Tuple{String, Symbol}}}}()
   local variables::Vector{String} = String[]
   local class::Union{Nothing, String} = nothing
+  local classNode::Union{Nothing, OMFrontend.Frontend.InstNode} = nothing
   local declaration::Union{Nothing, NamedTuple} = nothing
   for v in fm.variables
     local name::String = F.toString(v.name)
@@ -601,6 +605,7 @@ function _componentInterface(fm::OMFrontend.Frontend.FlatModel, component::Strin
       local parent::OMFrontend.Frontend.InstNode = F.parent(node)
       declaration = (info = _sourceSpan(F.InstNode_info(node)), parent = String(F.name(parent)),
                      parent_info = _sourceSpan(F.InstNode_info(parent)))
+      classNode = F.classInstance(F.component(node))
     end
     #= Only the component's own connectors: the part right below it is a connector
        (sub-components' connectors carry flow attributes too). =#
@@ -622,7 +627,133 @@ function _componentInterface(fm::OMFrontend.Frontend.FlatModel, component::Strin
     occursin(prefix, s) && push!(equations, s)
   end
   return (class = class, connectors = connectors, variables = variables, equations = equations,
-          declaration = declaration)
+          declaration = declaration, graphics = _classGraphics(classNode, collect(keys(connectors))))
+end
+
+"Operators of annotation expressions, as Modelica."
+const _ABSYN_OPERATORS = Dict{DataType, String}(
+  Absyn.ADD => "+", Absyn.SUB => "-", Absyn.MUL => "*", Absyn.DIV => "/", Absyn.POW => "^", Absyn.UMINUS => "-",
+  Absyn.UPLUS => "+", Absyn.AND => "and", Absyn.OR => "or", Absyn.NOT => "not ", Absyn.LESS => "<",
+  Absyn.LESSEQ => "<=", Absyn.GREATER => ">", Absyn.GREATEREQ => ">=", Absyn.EQUAL => "==", Absyn.NEQUAL => "<>")
+
+"The value of a MetaModelica option (`SOME`), or `nothing`."
+_someValue(x::Any)::Any = x isa MetaModelica.SOME ? x.data : nothing
+
+"A component reference as Modelica text."
+function _absynCrefText(c::Absyn.ComponentRef)::String
+  c isa Absyn.CREF_FULLYQUALIFIED && return "." * _absynCrefText(c.componentRef)
+  c isa Absyn.CREF_IDENT && return c.name * _absynSubscriptsText(c.subscripts)
+  c isa Absyn.CREF_QUAL && return c.name * _absynSubscriptsText(c.subscripts) * "." * _absynCrefText(c.componentRef)
+  return "_"
+end
+
+"Subscripts as Modelica text, empty without any."
+function _absynSubscriptsText(subscripts::Any)::String
+  local s::Vector{String} = String[x isa Absyn.SUBSCRIPT ? _absynText(x.subscript) : ":" for x in subscripts]
+  return isempty(s) ? "" : "[" * join(s, ", ") * "]"
+end
+
+"""
+An Absyn expression as Modelica text: the subset annotations use (literals, names, operators, arrays,
+calls with named arguments, if-expressions). An `ArgumentError` for anything else.
+"""
+function _absynText(e::Absyn.Exp)::String
+  e isa Absyn.INTEGER && return string(e.value)
+  e isa Absyn.REAL && return string(e.value)
+  e isa Absyn.STRING && return "\"" * e.value * "\""
+  e isa Absyn.BOOL && return e.value ? "true" : "false"
+  e isa Absyn.CREF && return _absynCrefText(e.componentRef)
+  (e isa Absyn.UNARY || e isa Absyn.LUNARY) && return _ABSYN_OPERATORS[typeof(e.op)] * _absynText(e.exp)
+  (e isa Absyn.BINARY || e isa Absyn.LBINARY || e isa Absyn.RELATION) &&
+    return "(" * _absynText(e.exp1) * " " * _ABSYN_OPERATORS[typeof(e.op)] * " " * _absynText(e.exp2) * ")"
+  e isa Absyn.ARRAY && return "{" * join((_absynText(x) for x in e.arrayExp), ", ") * "}"
+  e isa Absyn.MATRIX && return "[" * join((join((_absynText(x) for x in row), ", ") for row in e.matrix), "; ") * "]"
+  e isa Absyn.TUPLE && return "(" * join((_absynText(x) for x in e.expressions), ", ") * ")"
+  e isa Absyn.IFEXP && return "(if " * _absynText(e.ifExp) * " then " * _absynText(e.trueBranch) * " else " *
+                              _absynText(e.elseBranch) * ")"
+  if e isa Absyn.CALL
+    local fa::Absyn.FunctionArgs = e.functionArgs
+    fa isa Absyn.FUNCTIONARGS || throw(ArgumentError("an iterator in an annotation"))
+    local args::Vector{String} = String[_absynText(x) for x in fa.args]
+    append!(args, String[n.argName * " = " * _absynText(n.argValue) for n in fa.argNames])
+    return _absynCrefText(e.function_) * "(" * join(args, ", ") * ")"
+  end
+  throw(ArgumentError("an expression the annotation writer does not know: $(typeof(e))"))
+end
+
+"A modifier as Modelica text, `(a = 1, b(c = 2)) = value`; empty for none."
+function _scodeModText(m::SCode.Mod)::String
+  m isa SCode.MOD || return ""
+  local subs::Vector{String} = String[(sm.mod isa SCode.MOD && sm.mod.eachPrefix isa SCode.EACH ? "each " : "") *
+                                      sm.ident * _scodeModText(sm.mod) for sm in m.subModLst]
+  local b::Any = _someValue(m.binding)
+  return (isempty(subs) ? "" : "(" * join(subs, ", ") * ")") * (b === nothing ? "" : " = " * _absynText(b))
+end
+
+"The annotation `name` (`Icon`, `Placement`) of an SCode comment, or `nothing`."
+function _scodeAnnotation(cmt::SCode.Comment, name::String)::Union{Nothing, SCode.Mod}
+  local ann::Any = _someValue(cmt.annotation_)
+  ann === nothing && return nothing
+  local m::SCode.Mod = OMFrontend.Frontend.SCodeUtil.lookupAnnotation(ann, name)
+  return m isa SCode.MOD ? m : nothing
+end
+
+"The submodifier `name` of a modifier, or `nothing`."
+function _scodeSubMod(m::SCode.Mod, name::String)::Union{Nothing, SCode.Mod}
+  m isa SCode.MOD || return nothing
+  for sm in m.subModLst
+    sm.ident == name && return sm.mod
+  end
+  return nothing
+end
+
+"""
+The icon of the class `cls` (`componentInterface`'s `graphics`): its coordinate system and graphic
+items, its base classes' items first, and the Placement annotations of the `connectors` it or a
+base class declares. An item the annotation writer cannot write is left out.
+"""
+function _classGraphics(cls::Union{Nothing, OMFrontend.Frontend.InstNode}, connectors::Vector{String})::NamedTuple
+  local F::Module = OMFrontend.Frontend
+  local items::Vector{String} = String[]
+  local coordinateSystem::String = ""
+  local placements::Dict{String, String} = Dict{String, String}()
+  local visit!(node::OMFrontend.Frontend.InstNode, depth::Int)::Nothing = begin
+    depth > 32 && return nothing                          # a cycle would be an error of the library
+    local def::SCode.Element = F.definition(node)
+    def isa SCode.CLASS || return nothing
+    local scope::OMFrontend.Frontend.InstNode = F.parent(node)
+    local cd::SCode.ClassDef = def.classDef
+    if cd isa SCode.PARTS
+      for el in cd.elementLst
+        if el isa SCode.EXTENDS
+          visit!(F.lookupClassName(el.baseClassPath, scope, el.info), depth + 1)
+        elseif el isa SCode.COMPONENT && el.name in connectors && !haskey(placements, el.name)
+          local p::Union{Nothing, SCode.Mod} = _scodeAnnotation(el.comment, "Placement")
+          p === nothing || (placements[el.name] = "Placement" * _scodeModText(p))
+        end
+      end
+    elseif cd isa SCode.DERIVED && cd.typeSpec isa Absyn.TPATH
+      visit!(F.lookupClassName(cd.typeSpec.path, scope, def.info), depth + 1)
+    end
+    local icon::Union{Nothing, SCode.Mod} = _scodeAnnotation(def.cmt, "Icon")
+    icon === nothing && return nothing
+    local cs::Union{Nothing, SCode.Mod} = _scodeSubMod(icon, "coordinateSystem")
+    cs === nothing || (coordinateSystem = "coordinateSystem" * _scodeModText(cs))   # the most derived wins
+    local g::Union{Nothing, SCode.Mod} = _scodeSubMod(icon, "graphics")
+    local b::Any = g === nothing ? nothing : _someValue(g.binding)
+    if b isa Absyn.ARRAY
+      for x in b.arrayExp
+        try
+          push!(items, _absynText(x))
+        catch err
+          err isa ArgumentError || rethrow()
+        end
+      end
+    end
+    return nothing
+  end
+  cls === nothing || visit!(cls, 0)
+  return (coordinateSystem = coordinateSystem, items = items, placements = placements)
 end
 
 """

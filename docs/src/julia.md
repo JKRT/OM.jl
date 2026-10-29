@@ -158,6 +158,10 @@ OM.componentInterface("Modelica.Mechanics.Rotational.Examples.First";
                       component = "spring", MSL_Version = "MSL:4.1.0")  # connectors, variables, equations
 ```
 
+`componentInterface` also gives the component's icon as Modelica text (`graphics`: the coordinate
+system, the graphic items with its base classes' first, and each connector's `Placement`), for a
+replacement that looks like the component in a graphical editor.
+
 ## Your own solver and the SciML ecosystem
 
 `OM.getMTKProblem` returns the problem of a translated model and its event
