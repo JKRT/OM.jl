@@ -57,3 +57,14 @@ six-axis `RobotR3` system.
 | ModelingToolkit problem -> SciML solver -> solution / CSV      |
 +----------------------------------------------------------------+
 ```
+
+## Citing OM.jl
+
+If you use OM.jl, please cite the journal paper and the thesis (BibTeX in `CITATION.bib` of the repository):
+
+- Tinnerholm, J., Pop, A., & Sjölund, M. (2022). A Modular, Extensible, and Modelica-Standard-Compliant OpenModelica
+  Compiler Framework in Julia Supporting Structural Variability. *Electronics*, 11(11), 1772.
+  [doi:10.3390/electronics11111772](https://doi.org/10.3390/electronics11111772)
+- Tinnerholm, J. (2025). *Dynamic and Variable-Structure System Modeling for Equation-Based Languages: Applications,
+  Methods and Tools*. PhD thesis, Linköping University. Linköping Studies in Science and Technology, Dissertations
+  No. 2491. [doi:10.3384/9789181183375](https://doi.org/10.3384/9789181183375)
