@@ -538,7 +538,11 @@ flattened `modelName`, as plain values (no frontend types):
 - `equations`: the flat model's equations that read it, as flat Modelica;
 - `declaration`: where it is declared (`info`: `fileName`, `lineNumberStart`, `columnNumberStart`,
   `lineNumberEnd`, `columnNumberEnd`), the name of the class declaring it (`parent`) and that class's
-  span (`parent_info`).
+  span (`parent_info`);
+- `graphics`: its class's icon as Modelica text, to draw a replacement like it
+  (`OMFrontend.componentGraphics`): `coordinateSystem` (`"coordinateSystem(...)"`, or empty), `items`
+  (the graphic items, its base classes' first, as tools draw them) and `placements` (connector => its
+  `"Placement(...)"` annotation).
 
 An error if the model has no component of that name.
 
@@ -622,7 +626,7 @@ function _componentInterface(fm::OMFrontend.Frontend.FlatModel, component::Strin
     occursin(prefix, s) && push!(equations, s)
   end
   return (class = class, connectors = connectors, variables = variables, equations = equations,
-          declaration = declaration)
+          declaration = declaration, graphics = OMFrontend.componentGraphics(fm, component))
 end
 
 """

@@ -11,5 +11,16 @@
   @test itf.declaration.parent == "First"
   @test itf.declaration.info.lineNumberStart > itf.declaration.parent_info.lineNumberStart
   @test endswith(itf.declaration.info.fileName, ".mo")
+  #= The class's icon, its base classes' items first, and its connectors' placements (declared in the base class
+     PartialCompliant), as Modelica text. =#
+  @test itf.graphics.coordinateSystem == "coordinateSystem(preserveAspectRatio = true, extent = {{-100, -100}, {100, 100}})"
+  @test any(startswith("Line(points = {{-100, 0}, {-58, 0}"), itf.graphics.items)
+  @test any(==("Text(extent = {{-150, 80}, {150, 40}}, textString = \"%name\", textColor = {0, 0, 255})"), itf.graphics.items)
+  @test itf.graphics.placements == Dict("flange_a" => "Placement(transformation(extent = {{-110, -10}, {-90, 10}}))",
+                                        "flange_b" => "Placement(transformation(extent = {{90, -10}, {110, 10}}))")
+  #= A block: the placements of its RealInputs and RealOutput, rotated ones too. =#
+  local pid = OM.componentInterface("Modelica.Blocks.Examples.PID_Controller"; component = "PI").graphics
+  @test pid.placements["u_m"] == "Placement(transformation(origin = {0, -120}, extent = {{20, -20}, {-20, 20}}, rotation = 270))"
+  @test startswith(first(pid.items), "Rectangle(extent = {{-100, -100}, {100, 100}}")
   @test_throws ArgumentError OM.componentInterface("Modelica.Mechanics.Rotational.Examples.First"; component = "nope")
 end
