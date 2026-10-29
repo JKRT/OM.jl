@@ -12,8 +12,8 @@ This folder holds the test models and driver for the DOCC feature described in:
 
 Related work:
 
-* Tinnerholm et al., **"An equation-based Just-In-Time compiler for Modelica in Julia"**, *Electronics* 11(11), 1772 (2022). DOI: `10.3390/electronics11111772`.
-* Tinnerholm, **PhD dissertation** (Linköping University, 2025). URN: `urn:nbn:se:liu:diva-219400`.
+* Tinnerholm, Pop, Sjölund, **"A Modular, Extensible, and Modelica-Standard-Compliant OpenModelica Compiler Framework in Julia Supporting Structural Variability"**, *Electronics* 11(11), 1772 (2022). DOI: `10.3390/electronics11111772`.
+* Tinnerholm, **"Dynamic and Variable-Structure System Modeling for Equation-Based Languages: Applications, Methods and Tools"**, PhD dissertation, Linköping University (2025), Linköping Studies in Science and Technology, Dissertations No. 2491. DOI: `10.3384/9789181183375`.
 
 ## What is DOCC?
 
