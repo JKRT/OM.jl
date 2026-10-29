@@ -192,6 +192,19 @@ end
     @test !haskey(CG.EXTERNAL_OBJECTS, cname)
   end
 
+  #= A failed build freed its tables (forgetBuild) while its module stayed evaluated: the module's own simulate read
+     the freed table and failed on that ("... was freed with the build", or rows not finite) instead of the build's
+     error (MSL FullRobot with an observed filter). The module is evaluated again first. =#
+  @testset "A failed build's tables: the simulate fails on the build's error" begin
+    for scalarize in (false, true)
+      local err = try brSimulate("TableAtFailedBuild"; stopTime = 1.0, scalarize = scalarize); nothing catch e; e end
+      @test err isa Exception
+      local msg = err === nothing ? "" : sprint(showerror, err)
+      @test occursin("DAE init", msg)
+      @test !occursin("freed", msg)
+    end
+  end
+
   #= Two models' tables of one name in one process: each reads its own. The generated functions
      differed only in the table object, which printed without its pointer, so the global cache
      of RuntimeGeneratedFunctions gave the second model the first one's (0.05 for 1.0). =#

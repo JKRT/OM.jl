@@ -461,6 +461,17 @@ package BuildingsRepro
     Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
   end TableInit3;
 
+  model TableAtFailedBuild "TableInit3 with an initial equation no start satisfies: the build fails after its module made the table"
+    parameter Real table[2, 2] = [0, 0; 1, 2];
+    parameter TimeTable41 tab = TimeTable41("NoName", "NoName", table, 0.0, {2}, 1, 2, 0.0, 3, false, ",", 0);
+    Real y = getTimeTableValue(tab, 1, time, 1e60, 1e60);
+    Real x(start = 1);
+  initial equation
+    x * x = -1;
+  equation
+    der(x) = y - x;
+  end TableAtFailedBuild;
+
   model ExternalObjectVariable "An external object declared without parameter (Buildings: Spawn adapters, schedules, plotters)"
     parameter Real table[2, 2] = [0, 0; 1, 2];
     TimeTable41 tab = TimeTable41("NoName", "NoName", table, 0.0, {2}, 1, 2, 0.0, 3, false, ",", 0);
