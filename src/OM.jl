@@ -1130,9 +1130,9 @@ function translate(modelName::String,
   return _forgettingOnFailure(modelName) do
     _withTunableParameters(tunableParameters) do
       withDirectRHS(directRHS) do
-        #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
-           in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
-           MTK or DE mode gets that backend. =#
+        #= Arrays kept (the default mode): the model lowered with its arrays (its index reduced in array
+           form, OMBACKEND_ARRAY_INDEX_REDUCTION) to the array code, else its scalarized form, else the
+           scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
         local keep = !scalarize && mode == OMBackend.IMTK_MODE
         (fm, cache) = flatten(modelName, modelFile;
                               MSL = MSL, MSL_Version = MSL_Version,
@@ -1144,8 +1144,6 @@ function translate(modelName::String,
         _recordLoadedLibraries(modelName)
         if keep
           local keptFunctions = OMFrontend.cacheToFunctionList(cache)
-          local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
-          arrays === nothing || return arrays
           local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
                                                            warnMissingStartValues, eliminateNonDynamic, observedFilter,
                                                            checkSimCode)
@@ -1219,9 +1217,9 @@ function translate(modelName::String;
   return _forgettingOnFailure(modelName) do
     _withTunableParameters(tunableParameters) do
       withDirectRHS(directRHS) do
-        #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
-           in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
-           MTK or DE mode gets that backend. =#
+        #= Arrays kept (the default mode): the model lowered with its arrays (its index reduced in array
+           form, OMBACKEND_ARRAY_INDEX_REDUCTION) to the array code, else its scalarized form, else the
+           scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
         local keep = !scalarize && mode == OMBackend.IMTK_MODE
         (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
                               scalarize = !keep)
@@ -1232,8 +1230,6 @@ function translate(modelName::String;
         _recordLoadedLibraries(modelName)
         if keep
           local keptFunctions = OMFrontend.cacheToFunctionList(cache)
-          local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
-          arrays === nothing || return arrays
           local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
                                                            warnMissingStartValues, eliminateNonDynamic, observedFilter,
                                                            checkSimCode)
@@ -1259,7 +1255,7 @@ end
     logScalarizedFallback(fm)
 
 The log line of `translate` falling back to the scalarizing flatten for a model it tried with its
-arrays kept, with the reasons the array code generation and the array index reduction gave.
+arrays kept, with the reasons the array index reduction and the array code after it gave.
 """
 function logScalarizedFallback(fm::OMFrontend.Frontend.FlatModel)::Nothing
   local name = OMBackend.canonicalName(fm.name)

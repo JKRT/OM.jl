@@ -10,8 +10,6 @@ precompile(Tuple{typeof(OMFrontend.Frontend.symbol), OMFrontend.Frontend.OPERATO
 precompile(Tuple{typeof(OMFrontend.Frontend.symbol), OMFrontend.Frontend.OPERATOR{Int64}})
 precompile(Tuple{typeof(OMFrontend.Frontend.matchExpressions_cast), OMFrontend.Frontend.CALL_EXPRESSION, OMFrontend.Frontend.NFType, OMFrontend.Frontend.INTEGER_EXPRESSION{Int64}, OMFrontend.Frontend.NFType, Bool})
 precompile(Tuple{typeof(OMFrontend.Frontend.foldExpList), Array{OMFrontend.Frontend.NFEquationImpl, 1}, Function, Int64})
-precompile(Tuple{typeof(OMBackend.CodeGeneration.ArrayODEGen._vtype), OMFrontend.Frontend.VARIABLE})
-precompile(Tuple{typeof(OMBackend.CodeGeneration.ArrayODEGen._relationOp), Int64})
 precompile(Tuple{typeof(OMBackend.CodeGeneration.ArrayODEGen._topLevelInitial), OMBackend.CodeGeneration.ArrayODEGen.Rel})
 precompile(Tuple{typeof(OMBackend.CodeGeneration.ArrayODEGen._canonical), OMBackend.CodeGeneration.ArrayODEGen.Lit})
 precompile(Tuple{typeof(OMBackend.CodeGeneration.ArrayODEGen._abstracted), OMBackend.CodeGeneration.ArrayODEGen.Lit, Array{Int64, 1}})
