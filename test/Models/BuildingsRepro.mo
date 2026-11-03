@@ -179,6 +179,81 @@ package BuildingsRepro
   equation
     der(x) = s;
   end FunctionAsArgument;
+  model ValueReadingStartComputed
+    "A parameter with a value (its if takes the literal branch) whose binding reads a parameter computed at the start in the branch without array code"
+    parameter Real lim[2] = spanC(0, 2);
+    parameter Boolean b = true;
+    parameter Real Q = if b then 1.0 else simpson(function scaledSquare(k = lim[2]), 0, 1);
+    Real v[2](each start = 0, each fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    der(v) = {1, 2};
+    der(x) = Q + lim[2];
+  end ValueReadingStartComputed;
+  model StructuralReadingStartComputed
+    "A structural parameter with a value (an if-equation's condition) whose binding reads a parameter computed at the start"
+    parameter Real lim[2] = spanC(1, 3);
+    parameter Boolean b = true;
+    parameter Boolean use = if b then true else lim[1] > 0;
+    Real v[2](each start = 0, each fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    der(v) = {1, 2};
+    if use then
+      der(x) = lim[2];
+    else
+      der(x) = -lim[2];
+    end if;
+  end StructuralReadingStartComputed;
+  model ChainOfStartComputed "q and r computed at the start from lim (spanC)"
+    parameter Real lim[2] = spanC(1, 3);
+    parameter Real q = 2 * lim[2];
+    parameter Real r = q + lim[1];
+    Real v[2](each start = 0, each fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    der(v) = {1, 2};
+    der(x) = r;
+  end ChainOfStartComputed;
+  function scalC "A scalar external C function: its result is computed at the start"
+    input Real a;
+    output Real y;
+  external "C" y = scalC(a)
+    annotation(Include = "double scalC(double a) { return 3.0 * a; }");
+  end scalC;
+  model OverrideThroughStartComputed "lim[2] = b evaluates, lim[1] does not: q = 2 lim[2] has a value; an override of b changes lim and q"
+    parameter Real b = 5;
+    parameter Real lim[2] = {scalC(1), b};
+    parameter Real q = lim[2] * 2;
+    Real v[2](each start = 0, each fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    der(v) = {1, 2};
+    der(x) = q + lim[1];
+  end OverrideThroughStartComputed;
+  model StructuralChangedByOverride "use (an if-equation's condition) has a value; an override of b would change it"
+    parameter Real lim[2] = spanC(1, 3);
+    parameter Boolean b = true;
+    parameter Boolean use = if b then true else lim[1] < 0;
+    Real v[2](each start = 0, each fixed = true);
+    Real x(start = 0, fixed = true);
+  equation
+    der(v) = {1, 2};
+    if use then
+      der(x) = lim[2];
+    else
+      der(x) = -lim[2];
+    end if;
+  end StructuralChangedByOverride;
+  model StartOfStartComputed "x(start = s), s = scalC(a) computed at the start (the frontend refused the start's binding)"
+    parameter Real a = 1;
+    parameter Real s = scalC(a);
+    Real v[2](each start = 0, each fixed = true);
+    Real x(start = s, fixed = true);
+  equation
+    der(v) = {1, 2};
+    der(x) = 1;
+  end StartOfStartComputed;
 
   function cube "With a derivative annotation; an algorithm, not one expression (Buildings' equalPercentage)"
     input Real x;

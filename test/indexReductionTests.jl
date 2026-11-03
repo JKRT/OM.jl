@@ -200,8 +200,10 @@ end
       @test [sol(t; idxs = Symbol(v)) for t in (1.0, 3.0, 6.0)] ≈ [scalarized(t; idxs = Symbol(v)) for t in (1.0, 3.0, 6.0)] rtol = 1e-6
     end
   end
-  @testset "the scalarizing fallback is logged with the arrays-kept paths' reasons" begin
-    @test_logs (:info, r"\[translate\] .*arrays not kept, scalarized in the frontend \(fallback\): array code generation: .*; array index reduction: ") match_mode = :any OM.translate("IndexReduction.RigidInertias", INDEX_REDUCTION_FILE)
+  @testset "the scalarizing fallback is logged with the arrays-kept path's reasons" begin
+    #= one arrays-kept path (the flat model's array code generation is gone): the array index reduction's reason, then
+       the array code's after it where that was tried =#
+    @test_logs (:info, r"\[translate\] .*arrays not kept, scalarized in the frontend \(fallback\): array index reduction: no for-equations") match_mode = :any OM.translate("IndexReduction.RigidInertias", INDEX_REDUCTION_FILE)
   end
   @testset "index 3: a Cartesian pendulum up to its bottom" begin
     #= a static choice (y, vy) holds while x stays away from 0 (omc: dynamic state sets) =#

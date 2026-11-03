@@ -68,7 +68,8 @@ end
     @test startswith(err.message, "n reached 3")
     local (warnings, sol) = _warningsOf("InWhenWarning")
     @test sol.retcode == ReturnCode.Success
-    @test count(w -> occursin("n beyond 2", w), warnings) == 2   # at 0.6 and 0.85
+    #= Violated at 0.6 and 0.85: reported once, at 0.6, as OpenModelica 1.27.1 reports it. =#
+    @test count(w -> occursin("n beyond 2", w), warnings) == 1
     #= The cluster lowering runs only the assignments: the when must not be lost
        with its assert (the assert is reported as not checked). =#
     local s = _simulateOrError("InWhenOnRelation")
