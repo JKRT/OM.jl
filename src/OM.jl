@@ -37,16 +37,23 @@ import DAE
 #= Frontend Components =#
 import OMBackend
 import OMFrontend
-import Plots
-#= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
-using DifferentialEquations
-using DiffEqBase
+#= The packages loaded after OMBackend define methods that invalidate the code compiled into OMBackend's,
+   OMFrontend's and the symbolic packages' images (CSV's Durations and DataStrings: 50k method instances, SymbolicUtils'
+   and OMFrontend's among them), which every session then compiled again at its first model (MSL First's translate:
+   7.7 of 10.6 s). Loaded here under @recompile_invalidations, the invalidated code is compiled again into OM's image. =#
+using PrecompileTools: @recompile_invalidations
+@recompile_invalidations begin
+  import Plots
+  #= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
+  using DifferentialEquations
+  using DiffEqBase
+  #= Auxilary Julia packages =#
+  import CSV
+  import DataFrames
+end
 #= Utility packages =#
 using ImmutableList
 using MetaModelica
-#= Auxilary Julia packages =#
-import CSV
-import DataFrames
 import Pkg
 
 #= OpenModelica-compatible .mos scripting engine. Kept as a submodule so the
