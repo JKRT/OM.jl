@@ -6,9 +6,7 @@ authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
 [deps]
 Absyn = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
 ArrayUtil = "53cd29f2-c28d-11e9-1567-bd5452eeb1a0"
-CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
 DAE = "0174eeea-c361-11e9-3d0d-a9ca8048aff6"
-DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
 DifferentialEquations = "0c46a032-eb83-5123-abaf-570d42b7fbaa"
 DoubleEnded = "1bc4e7c2-c1e1-11e9-03fe-315bbef43fde"

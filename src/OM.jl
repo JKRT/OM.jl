@@ -37,19 +37,16 @@ import DAE
 #= Frontend Components =#
 import OMBackend
 import OMFrontend
-#= The packages loaded after OMBackend define methods that invalidate the code compiled into OMBackend's,
-   OMFrontend's and the symbolic packages' images (CSV's Durations and DataStrings: 50k method instances, SymbolicUtils'
-   and OMFrontend's among them), which every session then compiled again at its first model (MSL First's translate:
-   7.7 of 10.6 s). Loaded here under @recompile_invalidations, the invalidated code is compiled again into OM's image. =#
+#= The packages loaded after OMBackend may define methods that invalidate the code compiled into OMBackend's and
+   OMFrontend's images, which every session would then compile again at its first model. Loaded under
+   @recompile_invalidations, the invalidated code is compiled again into OM's image. (CSV and DataFrames, 50k
+   invalidated method instances through CSV's Durations and DataStrings, are not loaded: exportCSV writes its file.) =#
 using PrecompileTools: @recompile_invalidations
 @recompile_invalidations begin
   import Plots
   #= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
   using DifferentialEquations
   using DiffEqBase
-  #= Auxilary Julia packages =#
-  import CSV
-  import DataFrames
 end
 #= Utility packages =#
 using ImmutableList
@@ -324,70 +321,124 @@ end
 Write an OMEdit-compatible CSV with the state variables of `sol` and, when
 available, the observed (algebraic / alias) variables. If `filePath` is
 omitted, the file is written to `<modelName>_res.csv` in the current
-directory. Returns the path written by `CSV.write`.
+directory. Returns the path written.
 
 To view the result in OMEdit, choose `File > Open Result(s) file`.
 """
 function exportCSV(modelName, sol; filePath = nothing)
   sol.prob.p isa OMBackend.CodeGeneration.ArrayODEGen.ArrayModelParameters &&
     return _exportCSVArrayModel(modelName, sol, filePath)
-  local df1 = DataFrames.DataFrame(sol)
-  local finalDf
-  vals = Any[]
+  local (names::Vector{String}, columns::Vector{AbstractVector}) = _stateColumns(sol)
+  local vals::Vector{Pair{String, AbstractVector}} = Pair{String, AbstractVector}[]
   #= Get algebraic variables that have been removed by optimization. =#
   try
     local observed = OMBackend.MTK_getObserved(sol, modelName)
     #= Try direct sol indexing first (works for models with states).
        If any variable is missing, fall back to symbolic evaluation for
        purely algebraic (0-unknown) models. =#
-    local directFailed = false
+    local directFailed::Bool = false
     for v in observed
-      local name = String(v.lhs)
-      local valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
+      local name::String = String(v.lhs)
+      local valVec::Union{Nothing, AbstractVector} = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
       if valVec === nothing
         directFailed = true
         break
       end
-      push!(vals, (name => valVec))
+      push!(vals, name => valVec)
     end
     if directFailed
       empty!(vals)
-      local obsMap = OMBackend.MTK_evaluateAllObserved(sol, observed, modelName)
+      local obsMap::Union{Nothing, Dict{String, Vector{Float64}}} = OMBackend.MTK_evaluateAllObserved(sol, observed, modelName)
       if obsMap !== nothing
         for v in observed
-          local name = String(v.lhs)
+          local name::String = String(v.lhs)
           if haskey(obsMap, name)
-            push!(vals, (name => obsMap[name]))
+            push!(vals, name => obsMap[name])
           end
         end
       end
     end
-    DataFrames.rename!(df1, Dict(:timestamp => "time"))
-    finalDf = hcat(df1, DataFrames.DataFrame(vals))
   catch e
     @warn "Could not export observed variables, exporting state variables only" exception=(e, catch_backtrace())
-    finalDf = df1
+    empty!(vals)
+  end
+  for (name, valVec) in vals
+    push!(names, name)
+    push!(columns, valVec)
   end
   modelName = replace(modelName, "."=>"_")
-  local finalFileName = if filePath === nothing
+  local finalFileName::String = if filePath === nothing
     string(modelName,"_res.csv")
   else
     filePath
   end
-  CSV.write(finalFileName, finalDf)
+  return _writeCSV(finalFileName, names, columns)
 end
 
 #= A solution of the array path (OMBackend.ArrayODEGen): time, then the states, algebraic and
    discrete variables by their Modelica names. =#
 function _exportCSVArrayModel(modelName, sol, filePath)
   local m = sol.prob.p.model
-  local df = DataFrames.DataFrame("time" => sol.t)
+  local names::Vector{String} = String["time"]
+  local columns::Vector{AbstractVector} = AbstractVector[sol.t]
   for name in Base.invokelatest(() -> vcat(m.STATE_NAMES, m.ALGEBRAIC_NAMES, m.DISCRETE_NAMES))
-    df[!, name] = OMBackend.getVariableValues(sol, name)
+    push!(names, name)
+    push!(columns, OMBackend.getVariableValues(sol, name))
   end
-  local finalFileName = filePath === nothing ? string(replace(modelName, "." => "_"), "_res.csv") : filePath
-  CSV.write(finalFileName, df)
+  local finalFileName::String = filePath === nothing ? string(replace(modelName, "." => "_"), "_res.csv") : filePath
+  return _writeCSV(finalFileName, names, columns)
 end
+
+"""
+    _stateColumns(sol) -> (names, columns)
+
+The time and the states of `sol` as columns, named as a solution's table names them (RecursiveArrayTools' Tables
+interface): `time`, then each state by its symbol, `value<i>` where the solution has no symbols (`value` for a
+scalar state).
+"""
+function _stateColumns(sol::DiffEqBase.SciMLBase.AbstractTimeseriesSolution)::Tuple{Vector{String}, Vector{AbstractVector}}
+  local syms::Vector = DiffEqBase.SciMLBase.variable_symbols(sol)
+  local scalarState::Bool = !(eltype(sol.u) <: AbstractArray)
+  local n::Int = isempty(sol.u) ? length(syms) : length(first(sol.u))
+  local names::Vector{String} = String["time"]
+  local columns::Vector{AbstractVector} = AbstractVector[sol.t]
+  for i in 1:n
+    push!(names, !isempty(syms) ? String(Symbol(syms[i])) : scalarState ? "value" : string("value", i))
+    push!(columns, [u[i] for u in sol.u])
+  end
+  return (names, columns)
+end
+
+"""
+    _writeCSV(path, names, columns) -> path
+
+The columns `columns` (of one length) under the header `names` as a CSV file: comma-separated, a name quoted where
+it holds a comma, a double quote or a line break (its quotes doubled), the values as `print` writes them.
+"""
+function _writeCSV(path::String, names::Vector{String}, columns::Vector{AbstractVector})::String
+  local rows::Int = isempty(columns) ? 0 : length(first(columns))
+  all(c::AbstractVector -> length(c) == rows, columns) ||
+    throw(DimensionMismatch("CSV columns of different lengths: $(join(map(length, columns), ", "))"))
+  open(path, "w") do io::IOStream
+    join(io, (_csvField(n) for n in names), ',')
+    write(io, '\n')
+    for r in 1:rows
+      for (k, c) in enumerate(columns)
+        k > 1 && write(io, ',')
+        _writeCSVValue(io, c, r)
+      end
+      write(io, '\n')
+    end
+  end
+  return path
+end
+
+"A CSV header field: quoted where it holds a comma, a double quote or a line break."
+_csvField(s::String)::String =
+  any(c::Char -> c in (',', '"', '\n', '\r'), s) ? string('"', replace(s, "\"" => "\"\""), '"') : s
+
+"The value `r` of the column `c`, its element type known (a function barrier for the columns' vector)."
+_writeCSVValue(io::IOStream, c::AbstractVector, r::Int)::Nothing = (print(io, c[r]); nothing)
 
 """
     exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false)
@@ -404,19 +455,20 @@ subsolutions across mode transitions. Each subsolution is written to
   `filePath` (or `<modelName>_res.csv` if `filePath` is `nothing`).
 """
 function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false)
-  local dfs = Any[]
+  local tables::Vector{Tuple{Vector{String}, Vector{AbstractVector}}} = Tuple{Vector{String}, Vector{AbstractVector}}[]
   for sol in sols
-    df = DataFrames.DataFrame(sol)
-    DataFrames.rename!(df, Dict(:timestamp=> "time"))
-    local vals = Any[]
+    local (names::Vector{String}, columns::Vector{AbstractVector}) = _stateColumns(sol)
     #= Get algebraic variables that have been removed by optimization. =#
     local observed = OMBackend.MTK_getObserved(sol, modelName)
     for v in observed
-      name = String(v.lhs)
-      valVec = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
-      push!(vals, (name => valVec))
+      local name::String = String(v.lhs)
+      local valVec::Union{Nothing, AbstractVector} = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
+      #= one getVariableValues did not find (it warned) is left out =#
+      valVec === nothing && continue
+      push!(names, name)
+      push!(columns, valVec)
     end
-    push!(dfs, hcat(df, DataFrames.DataFrame(vals)))
+    push!(tables, (names, columns))
   end
   modelName = replace(modelName, "."=>"_")
   local outDir = filePath !== nothing ? dirname(abspath(filePath)) : pwd()
@@ -426,14 +478,14 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
   else
     filePath
   end
-  for (i, df) in enumerate(dfs)
+  for (i, (names, columns)) in enumerate(tables)
     local partFile = "$(prefix)_part$(i).csv"
-    CSV.write(partFile, df)
+    _writeCSV(partFile, names, columns)
     println("Wrote $partFile")
   end
   if coalesce
     open(finalFileName, "w") do out
-      for (i, df) in enumerate(dfs)
+      for i in eachindex(tables)
         local partFile = "$(prefix)_part$(i).csv"
         open(partFile) do inp
           i > 1 && readuntil(inp, '\n')  # skip header for parts after the first
@@ -443,7 +495,7 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
     end
     println("Wrote coalesced CSV to: $finalFileName")
   end
-  println("Wrote CSV to $(length(dfs)) file(s):")
+  println("Wrote CSV to $(length(tables)) file(s):")
 end
 
 """
