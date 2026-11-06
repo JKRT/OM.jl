@@ -344,7 +344,7 @@ end
   end
 
   @testset "An array of components whose dimensions differ per element (rooms, walls: SingleLayer's nSta)" begin
-    @test_broken brSucceeds("RaggedComponentArray"; stopTime = 1.0)
+    @test brSucceeds("RaggedComponentArray"; stopTime = 1.0)
   end
 
   @testset "A record's constructor called with a function's locals (3 models: ground temperature)" begin
