@@ -1113,21 +1113,23 @@ The bundled versions are `MSL:4.1.0` and `MSL:3.2.3`.
   `pristineParameters`. A parameter the compiler needs as a constant (an array size, a structural
   condition) stays folded (`isTunable` is false).
 - `warnMissingStartValues`: control warnings for missing start values.
-- `eliminateNonDynamic::EliminationSetting = nothing`:
-  opt-in elimination of variables that do not influence the dynamic states.
-  Accepts `nothing` (no elimination, default), `true` (eliminate using backward
-  reachability from state derivatives), or an `EliminationOptions` instance for
-  fine-grained control. Eliminated equations are bookkept in the `SIM_CODE` for
-  later reconstruction (e.g. 3D visualization). This optimization is
-  automatically skipped for models with structural transitions (VSS models).
+- `eliminateNonDynamic::EliminationSetting = true`: elimination of variables that do not
+  influence the dynamic states, before MTK code generation (shorter ODEProblem compilation). Accepts:
+  - `true` (default): eliminate the variables not reachable backward from the state derivatives
+  - `nothing` or `false`: no elimination
+  - `EliminationOptions(...)`: fine-grained control (see `EliminationOptions`)
+
+  Eliminated equations are bookkept in the `SIM_CODE` for later reconstruction (e.g. 3D
+  visualization). This optimization is automatically skipped for models with structural
+  transitions (VSS models).
 
 # Examples
 
 ```julia
 OM.translate("CircuitExamples.Circuit", "circuit.mo")
 
-# With non-dynamic variable elimination for faster ODEProblem compilation:
-OM.translate("MyModel", "model.mo"; eliminateNonDynamic=true)
+# Without the elimination of non-dynamic variables (on by default):
+OM.translate("MyModel", "model.mo"; eliminateNonDynamic=false)
 ```
 """
 function translate(modelName::String,
@@ -1183,7 +1185,7 @@ function translate(modelName::String,
 end
 
 """
-    translate(modelName; MSL_Version=nothing, libraries=String[], mode, eliminateNonDynamic=nothing)
+    translate(modelName; MSL_Version=nothing, libraries=String[], mode, eliminateNonDynamic=true)
 
 Translate a model by name, an MSL model or one of `libraries`, and load it in memory.
 
@@ -1201,22 +1203,24 @@ Translate a model by name, an MSL model or one of `libraries`, and load it in me
   `pristineParameters`. A parameter the compiler needs as a constant (an array size, a structural
   condition) stays folded (`isTunable` is false).
 - `warnMissingStartValues`: control warnings for missing start values.
-- `eliminateNonDynamic::EliminationSetting = nothing`:
-  opt-in elimination of variables that do not influence the dynamic states.
-  Accepts `nothing` (no elimination, default), `true` (eliminate using backward
-  reachability from state derivatives), or an `EliminationOptions` instance for
-  fine-grained control. Eliminated equations are bookkept in the `SIM_CODE` for
-  later reconstruction (e.g. 3D visualization). This optimization is
-  automatically skipped for models with structural transitions (VSS models).
+- `eliminateNonDynamic::EliminationSetting = true`: elimination of variables that do not
+  influence the dynamic states, before MTK code generation (shorter ODEProblem compilation). Accepts:
+  - `true` (default): eliminate the variables not reachable backward from the state derivatives
+  - `nothing` or `false`: no elimination
+  - `EliminationOptions(...)`: fine-grained control (see `EliminationOptions`)
+
+  Eliminated equations are bookkept in the `SIM_CODE` for later reconstruction (e.g. 3D
+  visualization). This optimization is automatically skipped for models with structural
+  transitions (VSS models).
 
 # Examples
 
 ```julia
 OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
 
-# With non-dynamic variable elimination for faster ODEProblem compilation:
+# Without the elimination of non-dynamic variables (on by default):
 OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-             eliminateNonDynamic=true)
+             eliminateNonDynamic=false)
 ```
 """
 function translate(modelName::String;
