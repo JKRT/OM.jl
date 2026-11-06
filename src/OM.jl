@@ -65,6 +65,22 @@ See `OMBackend.SimCode.EliminationOptions` for the available fields.
 const EliminationOptions = OMBackend.SimCode.EliminationOptions
 
 """
+    EliminationSetting
+
+The values the `eliminateNonDynamic` keyword of `translate` / `simulate` takes: `nothing` or `false` (no
+elimination), `true` (the default `EliminationOptions`), or an `EliminationOptions`.
+"""
+const EliminationSetting = Union{Nothing, Bool, EliminationOptions}
+
+"""
+    ObservedFilter
+
+The values the `observedFilter` keyword of `translate` / `simulate` takes: `nothing` (every observed variable kept)
+or the names (`String`s) or patterns (`Regex`es) of the observed variables to keep.
+"""
+const ObservedFilter = Union{Nothing, Vector{String}, Vector{Regex}}
+
+"""
 The backend modes the `mode` keyword of `translate` and `simulate` takes: `IMTK_MODE` (the default:
 the ModelingToolkit system built and simplified at translate time, its build kept for every
 simulation), `MTK_MODE` (built at each simulate), `DE_MODE` (DifferentialEquations.jl directly,
@@ -717,8 +733,8 @@ The settings `observedFilter` and `eliminateNonDynamic` as a translation records
 them (`_reusableTranslation`): a filter's patterns as strings, the elimination as its options (`true` the default
 options, `false` none).
 """
-function translationSettings(observedFilter::Union{Nothing, Vector{String}, Vector{Regex}},
-                             eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions})::TranslationSettings
+function translationSettings(observedFilter::ObservedFilter,
+                             eliminateNonDynamic::EliminationSetting)::TranslationSettings
   local patterns::Union{Nothing, Vector{String}} = observedFilter === nothing ? nothing :
     String[p isa Regex ? p.pattern : p for p in observedFilter]
   local options::Union{Nothing, EliminationOptions} = eliminateNonDynamic === true ? EliminationOptions() :
@@ -842,8 +858,8 @@ function simulate(modelName::String,
                   solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
-                  eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                  observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                  eliminateNonDynamic::EliminationSetting = true,
+                  observedFilter::ObservedFilter = nothing,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
                   scalarize::Bool = SCALARIZE[],
@@ -949,8 +965,8 @@ function simulate(modelName::String;
                   solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
-                  eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                  observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                  eliminateNonDynamic::EliminationSetting = true,
+                  observedFilter::ObservedFilter = nothing,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
                   scalarize::Bool = SCALARIZE[],
@@ -1097,7 +1113,7 @@ The bundled versions are `MSL:4.1.0` and `MSL:3.2.3`.
   `pristineParameters`. A parameter the compiler needs as a constant (an array size, a structural
   condition) stays folded (`isTunable` is false).
 - `warnMissingStartValues`: control warnings for missing start values.
-- `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
+- `eliminateNonDynamic::EliminationSetting = nothing`:
   opt-in elimination of variables that do not influence the dynamic states.
   Accepts `nothing` (no elimination, default), `true` (eliminate using backward
   reachability from state derivatives), or an `EliminationOptions` instance for
@@ -1121,8 +1137,8 @@ function translate(modelName::String,
                    libraries::Vector{String} = String[],
                    mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
-                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                   eliminateNonDynamic::EliminationSetting = true,
+                   observedFilter::ObservedFilter = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[],
@@ -1185,7 +1201,7 @@ Translate a model by name, an MSL model or one of `libraries`, and load it in me
   `pristineParameters`. A parameter the compiler needs as a constant (an array size, a structural
   condition) stays folded (`isTunable` is false).
 - `warnMissingStartValues`: control warnings for missing start values.
-- `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
+- `eliminateNonDynamic::EliminationSetting = nothing`:
   opt-in elimination of variables that do not influence the dynamic states.
   Accepts `nothing` (no elimination, default), `true` (eliminate using backward
   reachability from state derivatives), or an `EliminationOptions` instance for
@@ -1208,8 +1224,8 @@ function translate(modelName::String;
                    libraries::Vector{String} = String[],
                    mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
-                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                   eliminateNonDynamic::EliminationSetting = true,
+                   observedFilter::ObservedFilter = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[],

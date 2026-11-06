@@ -35,7 +35,7 @@ end
 
 @testset "Translation reuse by observed filter and elimination" begin
   local name = "TranslateReuse_Model"
-  local reusable(f::Union{Nothing, Vector{String}, Vector{Regex}}, e::Union{Nothing, Bool, OM.EliminationOptions})::Bool =
+  local reusable(f::OM.ObservedFilter, e::OM.EliminationSetting)::Bool =
     OM._reusableTranslation(name, false, "MSL:3.2.3", String[], OM.translationSettings(f, e))
   try
     OMBackend.COMPILED_MODELS_MTK[name] = (Expr(:block), false, UInt64(0))
