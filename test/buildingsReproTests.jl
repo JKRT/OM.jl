@@ -344,7 +344,12 @@ end
   end
 
   @testset "An array of components whose dimensions differ per element (rooms, walls: SingleLayer's nSta)" begin
-    @test brSucceeds("RaggedComponentArray"; stopTime = 1.0)
+    #= nSta = if lay.stateAtSurface_a or lay.stateAtSurface_b then 2 else 1: each element its own (2, 1, 2), as omc's =#
+    for scalarize in (false, true)
+      local sol = brSimulate("RaggedComponentArray"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test [brValue(sol, v, 1.0) for v in ("lay[1].T[2]", "lay[2].T[1]", "lay[3].T[2]")] ≈ fill(exp(-1), 3) rtol = 1e-6
+    end
   end
 
   @testset "A record's constructor called with a function's locals (3 models: ground temperature)" begin
@@ -451,6 +456,46 @@ end
       @test sol.retcode == ReturnCode.Success
       @test brValue(sol, "x", 1.0) ≈ 1.0 rtol = 1e-6
     end
+    #= Q has a value (the literal branch) but its binding reads lim, computed at the start (spanC), in the branch
+       without array code: Q keeps its value (the translation computed it without lim; it was computed again at the
+       start without a rule and failed); omc x(1) = 3 =#
+    for scalarize in (false, true)
+      local sol = brSimulate("ValueReadingStartComputed"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test brValue(sol, "x", 1.0) ≈ 3.0 rtol = 1e-6
+    end
+    #= the same as an if-equation's condition (structural): kept on the array route; omc x(1) = 2 =#
+    local su = brSimulate("StructuralReadingStartComputed"; stopTime = 1.0)
+    @test su.retcode == ReturnCode.Success && brArrayPath("StructuralReadingStartComputed")
+    @test brValue(su, "x", 1.0) ≈ 2.0 rtol = 1e-6
+    #= q, r computed at the start after lim (omc x(1) = 5); an element override of lim: lim's rule first, then the
+       element (lim[1] stayed the placeholder 0: x(1) = 8), as the whole array's override {1, 4} gives =#
+    local ch = brSimulate("ChainOfStartComputed"; stopTime = 1.0)
+    @test brArrayPath("ChainOfStartComputed")
+    @test brValue(ch, "x", 1.0) ≈ 5.0 rtol = 1e-6
+    local ch2 = brSimulate("ChainOfStartComputed"; stopTime = 1.0, parameters = Dict{String, Any}("lim[2]" => 4.0))
+    @test brValue(ch2, "x", 1.0) ≈ 9.0 rtol = 1e-6
+    #= an override of b, read by a start-computed lim: lim and q (it has a value) follow (q kept its value: 13); omc 13
+       and with -override=b=7 17 =#
+    @test brValue(brSimulate("OverrideThroughStartComputed"; stopTime = 1.0), "x", 1.0) ≈ 13.0 rtol = 1e-6
+    local ob = brSimulate("OverrideThroughStartComputed"; stopTime = 1.0, parameters = Dict{String, Any}("b" => 7.0))
+    @test brArrayPath("OverrideThroughStartComputed") && ob.retcode == ReturnCode.Success
+    @test brValue(ob, "x", 1.0) ≈ 17.0 rtol = 1e-6
+    #= an override that would change a structural parameter is refused (it ran with the translated if-equation: x = 2,
+       omc -2); one that leaves it as it is runs =#
+    @test brValue(brSimulate("StructuralChangedByOverride"; stopTime = 1.0), "x", 1.0) ≈ 2.0 rtol = 1e-6
+    @test_throws ErrorException brSimulate("StructuralChangedByOverride"; stopTime = 1.0, parameters = Dict{String, Any}("b" => false))
+    #= a start that reads a parameter computed at the start: its start rule at each start (the frontend refused the
+       start's binding as of higher variability: OpenModelica allows a non-structural parameter); omc x(0) = 3, with
+       -override=a=2 6 =#
+    for scalarize in (true, false)
+      local ss = brSimulate("StartOfStartComputed"; stopTime = 1.0, scalarize = scalarize)
+      @test ss.retcode == ReturnCode.Success
+      @test brValue(ss, "x", 0.0) ≈ 3.0 rtol = 1e-9
+    end
+    @test brArrayPath("StartOfStartComputed")
+    local sa = brSimulate("StartOfStartComputed"; stopTime = 1.0, parameters = Dict{String, Any}("a" => 2.0))
+    @test brValue(sa, "x", 0.0) ≈ 6.0 rtol = 1e-9
   end
 
   @testset "-x of an array of unknown size in a function (Borefields TemperatureResponseMatrix)" begin
@@ -600,8 +645,10 @@ end
     local sol = brSimulate("TransposeOfThreeDimensions"; stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success
     @test brValue(sol, "x", 1.0) ≈ 38.0 rtol = 1e-6
-    #= the ModelingToolkit path packs the 3-dimensional argument into a matrix (BoundsError) =#
-    @test_broken brSucceeds("TransposeOfThreeDimensions"; stopTime = 1.0, scalarize = true)
+    #= the ModelingToolkit path: the 3-dimensional argument's rows stacked (by hvcat it was a matrix: BoundsError) =#
+    local solS = brSimulate("TransposeOfThreeDimensions"; stopTime = 1.0, scalarize = true)
+    @test solS.retcode == ReturnCode.Success
+    @test brValue(solS, "x", 1.0) ≈ 38.0 rtol = 1e-6
   end
 
   @testset "A call of a function with a derivative annotation on the array path (15 models: psychrometrics, splice)" begin
@@ -651,20 +698,24 @@ end
     local sol = brSimulate("CallOfSmallDifferenceOfLargeStates"; stopTime = 1.0, scalarize = true)
     @test sol.retcode == ReturnCode.Success
     @test abs(brValue(sol, "p1", 1.0) - brValue(sol, "p2", 1.0)) < 1e-3
-    #= the array path's Jacobian is still finite differences in the states =#
+    #= the array path too =#
     local solA = brSimulate("CallOfSmallDifferenceOfLargeStates"; stopTime = 1.0)
     @test solA.retcode == ReturnCode.Success
-    @test_broken abs(brValue(solA, "p1", 1.0) - brValue(solA, "p2", 1.0)) < 1e-3
+    @test abs(brValue(solA, "p1", 1.0) - brValue(solA, "p2", 1.0)) < 1e-3
     #= and the array path's module does not answer for the next translate with scalarize: the
        code is the same (no arrays), its build was reused =#
     local solB = brSimulate("CallOfSmallDifferenceOfLargeStates"; stopTime = 1.0, scalarize = true)
     @test abs(brValue(solB, "p1", 1.0) - brValue(solB, "p2", 1.0)) < 1e-3
   end
 
-  @testset "A medium's constant array of records the frontend folds, an element by an iterator in a reduction (open)" begin
-    #= the MSL Media mixtures' form, folded into record values: the element is passed whole to
-       the function, which takes the record's fields (MSL Media: mslTests "MSL Media") =#
-    @test_broken brSucceeds("RecordArrayElementInReduction"; stopTime = 1.0, scalarize = true)
+  @testset "A medium's constant array of records the frontend folds, an element by an iterator in a reduction" begin
+    #= the MSL Media mixtures' form, folded into record values `{GasData(...), ...}[i]`: the element, a record value,
+       passed by its fields (the function takes them); h = 0.25 h_A + 0.75 h_B, 3.5 at T = 1, 9 at T = 2 =#
+    for scalarize in (false, true)
+      local sol = brSimulate("RecordArrayElementInReduction"; stopTime = 1.0, scalarize = scalarize)
+      @test sol.retcode == ReturnCode.Success
+      @test [brValue(sol, "medium.h", 0.0), brValue(sol, "medium.h", 1.0)] ≈ [3.5, 9.0] rtol = 1e-6
+    end
   end
 
   @testset "A symbolic Jacobian entry that overflows (3 MSL AIMC_Conveyor, 3 Buildings Carnot chillers)" begin
@@ -935,12 +986,11 @@ end
     local sol = brSimulate("MaxOfOneElementFieldInRecordArray"; stopTime = 1.0, scalarize = true)
     @test sol.retcode == ReturnCode.Success
     @test brValue(sol, "y", 1.0) ≈ 5 rtol = 1e-9
-    #= Arrays kept: dat.W (Real[2]) keeps one binding for its elements (dat.power.P[1],
-       sum(dat.V) per element); the backend does not evaluate it per element (dat[2].W
-       uninitialized). Open. =#
+    #= Arrays kept: dat.W (Real[2]) keeps one binding for its elements (dat.power.P[1], sum(dat.V) per element), each
+       element's value evaluated =#
     local solA = brSimulate("MaxOfOneElementFieldInRecordArray"; stopTime = 1.0, scalarize = false)
     @test solA.retcode == ReturnCode.Success
-    @test_broken brValue(solA, "y", 1.0) ≈ 5 rtol = 1e-9
+    @test brValue(solA, "y", 1.0) ≈ 5 rtol = 1e-9
   end
 end
 

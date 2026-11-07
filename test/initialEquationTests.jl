@@ -417,9 +417,10 @@ const IEQ_MSL_MODELS = [
          the algebraic `vs = vd + vc`) turns from a hard start into a guess;
          the 0.0 default for states without a start then replaced it: vc(0)
          = 0 (the MSL diode rectifiers' capacitors). Values from OpenModelica
-         1.27.1; the diode blocks until 0.0435. =#
+         1.27.1 at its tolerance 1e-6 (at SciML's default reltol 1e-3 the array
+         code takes two steps to 0.03, 5e-4 off); the diode blocks until 0.0435. =#
       local sol = OM.simulate("InitialEquationTests.IEQ10_StartKeptBesideDiscreteInit",
-                              "./Models/InitialEquationTests.mo"; stopTime = 0.03)
+                              "./Models/InitialEquationTests.mo"; stopTime = 0.03, reltol = 1e-6)
       @test sol.retcode == ReturnCode.Success
       @test [sol(0.0; idxs = :vc), sol(0.0; idxs = :s), sol(0.0; idxs = :off)] ≈ [10.0, -8.0, 1.0] atol = 1e-6
       @test [sol(0.01; idxs = :vc), sol(0.03; idxs = :vc)] ≈ [9.0479625, 7.4067552] atol = 1e-4
@@ -432,7 +433,7 @@ const IEQ_MSL_MODELS = [
          and a later phase moved vc to 2 (the MSL diode rectifiers' capacitors and their
          means' x = 0, y = 0). Values from OpenModelica 1.27.1, as IEQ10's. =#
       local sol = OM.simulate("InitialEquationTests.IEQ11_DiodeStartsInWrongMode",
-                              "./Models/InitialEquationTests.mo"; stopTime = 0.03)
+                              "./Models/InitialEquationTests.mo"; stopTime = 0.03, reltol = 1e-6)
       @test sol.retcode == ReturnCode.Success
       @test [sol(0.0; idxs = :vc), sol(0.0; idxs = :s), sol(0.0; idxs = :off)] ≈ [10.0, -8.0, 1.0] atol = 1e-6
       @test [sol(0.01; idxs = :vc), sol(0.03; idxs = :vc)] ≈ [9.0479625, 7.4067552] atol = 1e-4

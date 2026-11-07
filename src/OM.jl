@@ -65,6 +65,22 @@ See `OMBackend.SimCode.EliminationOptions` for the available fields.
 const EliminationOptions = OMBackend.SimCode.EliminationOptions
 
 """
+    EliminationSetting
+
+The values the `eliminateNonDynamic` keyword of `translate` / `simulate` takes: `nothing` or `false` (no
+elimination), `true` (the default `EliminationOptions`), or an `EliminationOptions`.
+"""
+const EliminationSetting = Union{Nothing, Bool, EliminationOptions}
+
+"""
+    ObservedFilter
+
+The values the `observedFilter` keyword of `translate` / `simulate` takes: `nothing` (every observed variable kept)
+or the names (`String`s) or patterns (`Regex`es) of the observed variables to keep.
+"""
+const ObservedFilter = Union{Nothing, Vector{String}, Vector{Regex}}
+
+"""
 The backend modes the `mode` keyword of `translate` and `simulate` takes: `IMTK_MODE` (the default:
 the ModelingToolkit system built and simplified at translate time, its build kept for every
 simulation), `MTK_MODE` (built at each simulate), `DE_MODE` (DifferentialEquations.jl directly,
@@ -218,6 +234,7 @@ function unloadLibrary(key::String)::Vector{String}
     delete!(TRANSLATED_WITH, name)
     delete!(LIBRARIES_AT_TRANSLATE, name)
     delete!(SCALARIZED_AT_TRANSLATE, name)
+    delete!(SETTINGS_AT_TRANSLATE, name)
     push!(forgotten, name)
   end
   @info "Unloaded $(join(removed, ", "))" * (isempty(forgotten) ? "" : "; forgot the models $(join(sort!(forgotten), ", "))")
@@ -703,18 +720,70 @@ function _recordLoadedLibraries(modelName::String)::Nothing
 end
 
 """
-    _reusableTranslation(internalName, scalarize, MSL_Version, libraries) -> Bool
+The settings of a translation that a simulate by name takes as well (`translationSettings`): the observed filter's
+patterns, and the elimination of non-dynamic variables as its options' reachability and patterns; `nothing` for no
+filter, no elimination.
+"""
+const TranslationSettings = Tuple{Union{Nothing, Vector{String}}, Union{Nothing, Tuple{Bool, Vector{String}, Vector{String}}}}
+
+"""
+    translationSettings(observedFilter, eliminateNonDynamic) -> TranslationSettings
+
+The settings `observedFilter` and `eliminateNonDynamic` as a translation records them and a simulate by name compares
+them (`_reusableTranslation`): a filter's patterns as strings, the elimination as its options (`true` the default
+options, `false` none).
+"""
+function translationSettings(observedFilter::ObservedFilter,
+                             eliminateNonDynamic::EliminationSetting)::TranslationSettings
+  local patterns::Union{Nothing, Vector{String}} = observedFilter === nothing ? nothing :
+    String[p isa Regex ? p.pattern : p for p in observedFilter]
+  local options::Union{Nothing, EliminationOptions} = eliminateNonDynamic === true ? EliminationOptions() :
+    eliminateNonDynamic isa EliminationOptions ? eliminateNonDynamic : nothing
+  local elimination::Union{Nothing, Tuple{Bool, Vector{String}, Vector{String}}} = options === nothing ? nothing :
+    (options.reachability, String[r.pattern for r in options.patterns], String[r.pattern for r in options.keepPatterns])
+  return (patterns, elimination)
+end
+
+#= The settings each model was last translated with that a simulate takes as well (by canonical name): a simulate by
+   name with others translates again. They were ignored: the coverage runner's reference filter, passed to its
+   simulate after the translate of its backend phase, never applied. =#
+const SETTINGS_AT_TRANSLATE = Dict{String, TranslationSettings}()
+
+"""
+    _reusableTranslation(internalName, scalarize, MSL_Version, libraries, settings) -> Bool
 
 Whether a simulate by name can use the model's translation from earlier in the session: it was translated (or
-taken by the array path), with the same scalarize setting, and with the same MSL version, libraries and loaded
-libraries where its translate by name recorded them.
+taken by the array path), with the same scalarize setting, the same observed filter and elimination (`settings`,
+`translationSettings`), and with the same MSL version, libraries and loaded libraries where its translate by name
+recorded them.
 """
 function _reusableTranslation(internalName::String, scalarize::Bool, MSL_Version::Union{Nothing, String},
-                              libraries::Vector{String})::Bool
+                              libraries::Vector{String}, settings::TranslationSettings)::Bool
   (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) || return false
   get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize || return false
+  get(SETTINGS_AT_TRANSLATE, internalName, settings) == settings || return false
   local key::Tuple{Union{Nothing, String}, Vector{String}, Vector{String}} = (MSL_Version, libraries, loadedLibraries())
   return get(LIBRARIES_AT_TRANSLATE, internalName, key) == key
+end
+
+"""
+    _forgettingOnFailure(f, modelName)
+
+`f()`, a translate of `modelName`; where it throws, the model's translation and what the translate recorded
+(SCALARIZED_AT_TRANSLATE, SETTINGS_AT_TRANSLATE, LIBRARIES_AT_TRANSLATE) are forgotten first: the records, written
+before the backend failed, named an earlier translate's code, which a simulate by name then reused.
+"""
+function _forgettingOnFailure(f::Function, modelName::String)
+  try
+    return f()
+  catch
+    local name::String = OMBackend.canonicalName(modelName)
+    OMBackend.forgetModel(name)
+    delete!(SCALARIZED_AT_TRANSLATE, name)
+    delete!(SETTINGS_AT_TRANSLATE, name)
+    delete!(LIBRARIES_AT_TRANSLATE, name)
+    rethrow()
+  end
 end
 
 """
@@ -789,8 +858,8 @@ function simulate(modelName::String,
                   solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
-                  eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                  observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                  eliminateNonDynamic::EliminationSetting = true,
+                  observedFilter::ObservedFilter = nothing,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
                   scalarize::Bool = SCALARIZE[],
@@ -868,6 +937,9 @@ Defaults to `MSL=true`.
   is already compiled (default `false`). Useful when code generation logic has
   changed and the cached compiled model is stale.
 
+A translation of the model from earlier in the session is reused when it had the same `scalarize`, MSL version,
+libraries, `observedFilter` and `eliminateNonDynamic`; else the model is translated again.
+
 # Example
 ```julia
 sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum"; stopTime=1.0)
@@ -893,15 +965,16 @@ function simulate(modelName::String;
                   solver = OMBackend.defaultSolver(),
                   mode = OMBackend.DEFAULT_BACKEND_MODE[],
                   warnMissingStartValues = nothing,
-                  eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                  observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                  eliminateNonDynamic::EliminationSetting = true,
+                  observedFilter::ObservedFilter = nothing,
                   directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                   overwriteCache::Bool = false,
                   scalarize::Bool = SCALARIZE[],
                   kwargs...)
   return _withSimulationSettings(directRHS, startTime) do
     internalName = OMBackend.canonicalName(modelName)
-    alreadyCompiled = _reusableTranslation(internalName, scalarize, _mslVersion(MSL_Version), libraries)
+    alreadyCompiled = _reusableTranslation(internalName, scalarize, _mslVersion(MSL_Version), libraries,
+                                           translationSettings(observedFilter, eliminateNonDynamic))
     local rebuilt = false
     if (!alreadyCompiled || overwriteCache) && (MSL || !isempty(libraries))
       rebuilt = _freshBuildAtTranslate!(modelName, mode, overwriteCache)
@@ -1040,21 +1113,23 @@ The bundled versions are `MSL:4.1.0` and `MSL:3.2.3`.
   `pristineParameters`. A parameter the compiler needs as a constant (an array size, a structural
   condition) stays folded (`isTunable` is false).
 - `warnMissingStartValues`: control warnings for missing start values.
-- `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
-  opt-in elimination of variables that do not influence the dynamic states.
-  Accepts `nothing` (no elimination, default), `true` (eliminate using backward
-  reachability from state derivatives), or an `EliminationOptions` instance for
-  fine-grained control. Eliminated equations are bookkept in the `SIM_CODE` for
-  later reconstruction (e.g. 3D visualization). This optimization is
-  automatically skipped for models with structural transitions (VSS models).
+- `eliminateNonDynamic::EliminationSetting = true`: elimination of variables that do not
+  influence the dynamic states, before MTK code generation (shorter ODEProblem compilation). Accepts:
+  - `true` (default): eliminate the variables not reachable backward from the state derivatives
+  - `nothing` or `false`: no elimination
+  - `EliminationOptions(...)`: fine-grained control (see `EliminationOptions`)
+
+  Eliminated equations are bookkept in the `SIM_CODE` for later reconstruction (e.g. 3D
+  visualization). This optimization is automatically skipped for models with structural
+  transitions (VSS models).
 
 # Examples
 
 ```julia
 OM.translate("CircuitExamples.Circuit", "circuit.mo")
 
-# With non-dynamic variable elimination for faster ODEProblem compilation:
-OM.translate("MyModel", "model.mo"; eliminateNonDynamic=true)
+# Without the elimination of non-dynamic variables (on by default):
+OM.translate("MyModel", "model.mo"; eliminateNonDynamic=false)
 ```
 """
 function translate(modelName::String,
@@ -1064,52 +1139,53 @@ function translate(modelName::String,
                    libraries::Vector{String} = String[],
                    mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
-                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                   eliminateNonDynamic::EliminationSetting = true,
+                   observedFilter::ObservedFilter = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[],
                    tunableParameters::Vector{String} = String[])
-  return _withTunableParameters(tunableParameters) do
-    withDirectRHS(directRHS) do
-      #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
-         in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
-         MTK or DE mode gets that backend. =#
-      local keep = !scalarize && mode == OMBackend.IMTK_MODE
-      (fm, cache) = flatten(modelName, modelFile;
-                            MSL = MSL, MSL_Version = MSL_Version,
-                            libraries = libraries,
-                            scalarize = !keep)
-      SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
-      delete!(LIBRARIES_AT_TRANSLATE, OMBackend.canonicalName(modelName))
-      _recordLoadedLibraries(modelName)
-      if keep
-        local keptFunctions = OMFrontend.cacheToFunctionList(cache)
-        local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
-        arrays === nothing || return arrays
-        local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
-                                                         warnMissingStartValues, eliminateNonDynamic, observedFilter,
-                                                         checkSimCode)
-        reduced === nothing || return reduced
-        logScalarizedFallback(fm)
-        (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version,
-                              libraries = libraries, scalarize = true)
+  return _forgettingOnFailure(modelName) do
+    _withTunableParameters(tunableParameters) do
+      withDirectRHS(directRHS) do
+        #= Arrays kept (the default mode): the model lowered with its arrays (its index reduced in array
+           form, OMBACKEND_ARRAY_INDEX_REDUCTION) to the array code, else its scalarized form, else the
+           scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+        local keep = !scalarize && mode == OMBackend.IMTK_MODE
+        (fm, cache) = flatten(modelName, modelFile;
+                              MSL = MSL, MSL_Version = MSL_Version,
+                              libraries = libraries,
+                              scalarize = !keep)
+        SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+        SETTINGS_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = translationSettings(observedFilter, eliminateNonDynamic)
+        delete!(LIBRARIES_AT_TRANSLATE, OMBackend.canonicalName(modelName))
+        _recordLoadedLibraries(modelName)
+        if keep
+          local keptFunctions = OMFrontend.cacheToFunctionList(cache)
+          local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
+                                                           warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                                           checkSimCode)
+          reduced === nothing || return reduced
+          logScalarizedFallback(fm)
+          (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version,
+                                libraries = libraries, scalarize = true)
+        end
+        functionList = OMFrontend.cacheToFunctionList(cache)
+        OMBackend.translate(fm;
+                            functionList = functionList,
+                            BackendMode = mode,
+                            warnMissingStartValues = warnMissingStartValues,
+                            eliminateNonDynamic = eliminateNonDynamic,
+                            observedFilter = observedFilter,
+                            checkSimCode = checkSimCode,
+                            scalarized = true)
       end
-      functionList = OMFrontend.cacheToFunctionList(cache)
-      OMBackend.translate(fm;
-                          functionList = functionList,
-                          BackendMode = mode,
-                          warnMissingStartValues = warnMissingStartValues,
-                          eliminateNonDynamic = eliminateNonDynamic,
-                          observedFilter = observedFilter,
-                          checkSimCode = checkSimCode,
-                          scalarized = true)
     end
   end
 end
 
 """
-    translate(modelName; MSL_Version=nothing, libraries=String[], mode, eliminateNonDynamic=nothing)
+    translate(modelName; MSL_Version=nothing, libraries=String[], mode, eliminateNonDynamic=true)
 
 Translate a model by name, an MSL model or one of `libraries`, and load it in memory.
 
@@ -1127,22 +1203,24 @@ Translate a model by name, an MSL model or one of `libraries`, and load it in me
   `pristineParameters`. A parameter the compiler needs as a constant (an array size, a structural
   condition) stays folded (`isTunable` is false).
 - `warnMissingStartValues`: control warnings for missing start values.
-- `eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = nothing`:
-  opt-in elimination of variables that do not influence the dynamic states.
-  Accepts `nothing` (no elimination, default), `true` (eliminate using backward
-  reachability from state derivatives), or an `EliminationOptions` instance for
-  fine-grained control. Eliminated equations are bookkept in the `SIM_CODE` for
-  later reconstruction (e.g. 3D visualization). This optimization is
-  automatically skipped for models with structural transitions (VSS models).
+- `eliminateNonDynamic::EliminationSetting = true`: elimination of variables that do not
+  influence the dynamic states, before MTK code generation (shorter ODEProblem compilation). Accepts:
+  - `true` (default): eliminate the variables not reachable backward from the state derivatives
+  - `nothing` or `false`: no elimination
+  - `EliminationOptions(...)`: fine-grained control (see `EliminationOptions`)
+
+  Eliminated equations are bookkept in the `SIM_CODE` for later reconstruction (e.g. 3D
+  visualization). This optimization is automatically skipped for models with structural
+  transitions (VSS models).
 
 # Examples
 
 ```julia
 OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
 
-# With non-dynamic variable elimination for faster ODEProblem compilation:
+# Without the elimination of non-dynamic variables (on by default):
 OM.translate("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum";
-             eliminateNonDynamic=true)
+             eliminateNonDynamic=false)
 ```
 """
 function translate(modelName::String;
@@ -1150,44 +1228,45 @@ function translate(modelName::String;
                    libraries::Vector{String} = String[],
                    mode = OMBackend.DEFAULT_BACKEND_MODE[],
                    warnMissingStartValues = nothing,
-                   eliminateNonDynamic::Union{Nothing, Bool, EliminationOptions} = true,
-                   observedFilter::Union{Nothing, Vector{String}, Vector{Regex}} = nothing,
+                   eliminateNonDynamic::EliminationSetting = true,
+                   observedFilter::ObservedFilter = nothing,
                    directRHS::Bool = OMBackend.DIRECT_RHS_GENERATION[],
                    checkSimCode::Bool = true,
                    scalarize::Bool = SCALARIZE[],
                    tunableParameters::Vector{String} = String[])
-  return _withTunableParameters(tunableParameters) do
-    withDirectRHS(directRHS) do
-      #= Arrays kept (the default mode): the array-preserving translation, else the index reduced
-         in array form (OMBACKEND_ARRAY_INDEX_REDUCTION), else the scalarizing flatten. An explicit
-         MTK or DE mode gets that backend. =#
-      local keep = !scalarize && mode == OMBackend.IMTK_MODE
-      (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
-                            scalarize = !keep)
-      SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
-      LIBRARIES_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = (_mslVersion(MSL_Version), copy(libraries),
-                                                                    loadedLibraries())
-      _recordLoadedLibraries(modelName)
-      if keep
-        local keptFunctions = OMFrontend.cacheToFunctionList(cache)
-        local arrays = OMBackend.translateArrays(fm; functionList = keptFunctions)
-        arrays === nothing || return arrays
-        local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
-                                                         warnMissingStartValues, eliminateNonDynamic, observedFilter,
-                                                         checkSimCode)
-        reduced === nothing || return reduced
-        logScalarizedFallback(fm)
-        (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
+  return _forgettingOnFailure(modelName) do
+    _withTunableParameters(tunableParameters) do
+      withDirectRHS(directRHS) do
+        #= Arrays kept (the default mode): the model lowered with its arrays (its index reduced in array
+           form, OMBACKEND_ARRAY_INDEX_REDUCTION) to the array code, else its scalarized form, else the
+           scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+        local keep = !scalarize && mode == OMBackend.IMTK_MODE
+        (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
+                              scalarize = !keep)
+        SCALARIZED_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = scalarize
+        SETTINGS_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = translationSettings(observedFilter, eliminateNonDynamic)
+        LIBRARIES_AT_TRANSLATE[OMBackend.canonicalName(modelName)] = (_mslVersion(MSL_Version), copy(libraries),
+                                                                      loadedLibraries())
+        _recordLoadedLibraries(modelName)
+        if keep
+          local keptFunctions = OMFrontend.cacheToFunctionList(cache)
+          local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
+                                                           warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                                           checkSimCode)
+          reduced === nothing || return reduced
+          logScalarizedFallback(fm)
+          (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
+        end
+        functionList = OMFrontend.cacheToFunctionList(cache)
+        OMBackend.translate(fm;
+                            functionList = functionList,
+                            BackendMode = mode,
+                            warnMissingStartValues = warnMissingStartValues,
+                            eliminateNonDynamic = eliminateNonDynamic,
+                            observedFilter = observedFilter,
+                            checkSimCode = checkSimCode,
+                            scalarized = true)
       end
-      functionList = OMFrontend.cacheToFunctionList(cache)
-      OMBackend.translate(fm;
-                          functionList = functionList,
-                          BackendMode = mode,
-                          warnMissingStartValues = warnMissingStartValues,
-                          eliminateNonDynamic = eliminateNonDynamic,
-                          observedFilter = observedFilter,
-                          checkSimCode = checkSimCode,
-                          scalarized = true)
     end
   end
 end
@@ -1196,7 +1275,7 @@ end
     logScalarizedFallback(fm)
 
 The log line of `translate` falling back to the scalarizing flatten for a model it tried with its
-arrays kept, with the reasons the array code generation and the array index reduction gave.
+arrays kept, with the reasons the array index reduction and the array code after it gave.
 """
 function logScalarizedFallback(fm::OMFrontend.Frontend.FlatModel)::Nothing
   local name = OMBackend.canonicalName(fm.name)
