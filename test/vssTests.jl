@@ -12,6 +12,20 @@
                                    )
         end
 
+        #= Two modes, each with a when- and an if-equation. The modes are generated into one module, so
+           each mode's generated helpers must be its own: with shared names a mode was built with the
+           other's events ("a_x(t) is not present in the system", 2026-11-08). =#
+        let sols = (OM.translate("TwoModesEvents", "./Models/VSS/TwoModesEvents.mo");
+                    OM.simulate("TwoModesEvents"; startTime = 0.0, stopTime = 1.2, solver = FBDF()))
+          @test all(s -> s.retcode == OMBackend.DifferentialEquations.ReturnCode.Success, sols)
+          @test isapprox(_resolveSymbolInSol(sols[2], :b_countB), 10.0; atol = 1.0e-6)
+          @test isapprox(_resolveSymbolInSol(sols[2], :b_z), 1.7; atol = 1.0e-3)
+          #= The first mode's when- and if-equations are not handled: its when does not fire, its state
+             stays at the start value (OMBackend master 0.8.4 too, 2026-11-08). =#
+          @test_broken isapprox(_resolveSymbolInSol(sols[1], :a_countA), 1.0; atol = 1.0e-6)
+          @test_broken isapprox(_resolveSymbolInSol(sols[1], :a_x), exp(-0.5); atol = 1.0e-3)
+        end
+
         @test true == begin
           OM.translate("VariablePowerSourcePackage.PowerSource", "./Models/VSS/VariablePowerSource.mo");
           sols = OM.simulate("VariablePowerSourcePackage.PowerSource"; startTime = 0.0, stopTime = 24.0, solver = FBDF());

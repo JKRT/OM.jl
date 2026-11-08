@@ -275,7 +275,9 @@ julia> OM.exportCSV("HelloWorld", sol)
 ```
 You can then open `HelloWorld_res.csv` using OMEdit and view the simulation results.
 
-Furthermore, you can of course you can use the Plots.jl package to plot as well.
+Furthermore, you can of course you can use the Plots.jl package to plot as well. CSV.jl and DataFrames.jl
+are not dependencies of OM (`exportCSV` writes the file itself): add them to your environment to read
+the file back (`] add CSV DataFrames`).
 
 ```julia
 julia> begin
@@ -285,7 +287,7 @@ import DataFrames
 using Plots
 sol = OM.simulate("HelloWorld", "./Models/HelloWorld.mo")
 OM.exportCSV("modelName", sol; filePath = "filename.csv")
-f = CSV.read("./filename.csv", DataFrame)
+f = CSV.read("./filename.csv", DataFrames.DataFrame)
 DataFrames.DataFrame(f)
 plot(f.time, f.x)
 end

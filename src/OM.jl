@@ -338,7 +338,7 @@ function exportCSV(modelName, sol; filePath = nothing)
        purely algebraic (0-unknown) models. =#
     local directFailed::Bool = false
     for v in observed
-      local name::String = String(v.lhs)
+      local name::String = string(v.lhs)
       local valVec::Union{Nothing, AbstractVector} = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
       if valVec === nothing
         directFailed = true
@@ -351,7 +351,7 @@ function exportCSV(modelName, sol; filePath = nothing)
       local obsMap::Union{Nothing, Dict{String, Vector{Float64}}} = OMBackend.MTK_evaluateAllObserved(sol, observed, modelName)
       if obsMap !== nothing
         for v in observed
-          local name::String = String(v.lhs)
+          local name::String = string(v.lhs)
           if haskey(obsMap, name)
             push!(vals, name => obsMap[name])
           end
@@ -375,8 +375,10 @@ function exportCSV(modelName, sol; filePath = nothing)
   return _writeCSV(finalFileName, names, columns)
 end
 
-#= A solution of the array path (OMBackend.ArrayODEGen): time, then the states, algebraic and
-   discrete variables by their Modelica names. =#
+"""
+exportCSV for a solution of the array path (OMBackend.ArrayODEGen): time, then the states, algebraic and discrete
+variables by their Modelica names.
+"""
 function _exportCSVArrayModel(modelName, sol, filePath)
   local m = sol.prob.p.model
   local names::Vector{String} = String["time"]
@@ -461,7 +463,7 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
     #= Get algebraic variables that have been removed by optimization. =#
     local observed = OMBackend.MTK_getObserved(sol, modelName)
     for v in observed
-      local name::String = String(v.lhs)
+      local name::String = string(v.lhs)
       local valVec::Union{Nothing, AbstractVector} = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
       #= one getVariableValues did not find (it warned) is left out =#
       valVec === nothing && continue
