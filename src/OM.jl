@@ -32,8 +32,8 @@
 module OM
 
 import OMParser.Absyn
-import SCode
-import DAE
+import OMFrontend.SCode
+import OMFrontend.DAE
 #= Frontend Components =#
 import OMBackend
 import OMFrontend

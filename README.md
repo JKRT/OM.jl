@@ -87,10 +87,9 @@ git submodule foreach "git checkout master && git pull"
 Using same procedure as above for:
   - ArrayUtil.jl
   - ListUtil.jl
-Once this is done develop SCode and last but not least the DAE.
 
 ## Core modules
-    - Develop the OpenModelicaParser.jl
+    - Develop OMParser.jl
     - Develop OMFrontend.jl
     - Develop OMBackend.jl
     - Develop the OM package
@@ -329,11 +328,9 @@ OM.jl is composed of several submodules, each in its own directory:
 
 | Submodule | Description |
 |-----------|-------------|
-| **SCode.jl** | Simplified code representation (intermediate form between Absyn and the frontend) |
 | **OMParser.jl** | Modelica parser (`OMParser.Parser`) and the abstract syntax tree it produces (`OMParser.Absyn`, formerly the package Absyn.jl) |
-| **OMFrontend.jl** | The new frontend (NF) that performs instantiation, typing, flattening, and simplification |
+| **OMFrontend.jl** | The new frontend (NF) that performs instantiation, typing, flattening, and simplification; holds the SCode (`OMFrontend.SCode`) and DAE (`OMFrontend.DAE`) data structures, formerly the packages SCode.jl and DAE.jl |
 | **OMBackend.jl** | Backend that lowers the flat model to its own IR (OMJLIR), runs its passes, matches and sorts it into the simulation code, and generates and simulates the system via ModelingToolkit.jl |
-| **DAE.jl** | Data structures of the frontend's DAE form (`OMFrontend.instantiateSCodeToDAE`); the backend does not use it |
 | **MetaModelica.jl** | Julia implementation of MetaModelica language constructs (uniontypes, pattern matching, immutable lists) |
 | **ImmutableList.jl** | Immutable cons-list implementation used throughout the compiler |
 | **ArrayUtil.jl** | Array utility functions (fold, map, etc.) |

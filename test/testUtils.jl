@@ -12,8 +12,8 @@ using DifferentialEquations
 using Logging
 
 import OMParser.Absyn
-import SCode
-import DAE
+import OMFrontend.SCode
+import OMFrontend.DAE
 import OMParser
 import OMFrontend
 import OMBackend

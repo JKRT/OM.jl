@@ -1,6 +1,6 @@
-    import DAE
+    import OMFrontend.DAE
     import DataStructures.OrderedCollections
-    import SCode
+    import OMFrontend.SCode
     import OMBackend
     import OMBackend.CodeGeneration
     using ModelingToolkit

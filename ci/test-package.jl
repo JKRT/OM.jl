@@ -35,10 +35,9 @@ if haskey(TOML.parsefile(joinpath(DIR, "Project.toml")), "sources")
   Pkg.test(; julia_args = JULIA_ARGS)
 else
   Pkg.activate(; temp = true)
-  # OMLibraryTesting depends on OM itself; it is not needed below OM.
-  siblings = [d for d in readdir(ROOT)
-              if endswith(d, ".jl") && d != "OMLibraryTesting.jl" &&
-                 isfile(joinpath(ROOT, d, "Project.toml"))]
+  # The siblings OM.jl develops (the [sources] of its Project.toml), not every checkout next to it: the
+  # submodules of packages folded into others (SCode.jl, DAE.jl into OMFrontend) stay out of the environment.
+  siblings = [String(src["path"]) for src in values(TOML.parsefile(joinpath(ROOT, "Project.toml"))["sources"])]
   Pkg.develop([Pkg.PackageSpec(path = joinpath(ROOT, d)) for d in siblings])
   Pkg.test(PKG; julia_args = JULIA_ARGS)
 end

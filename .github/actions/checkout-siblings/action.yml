@@ -1,6 +1,6 @@
 name: Check out OM.jl sibling packages
 description: >
-  Clone OM.jl and its sibling packages (ArrayUtil.jl, DAE.jl, ..., OMParser.jl) at
+  Clone OM.jl and its sibling packages (ArrayUtil.jl, ImmutableList.jl, ..., OMParser.jl) at
   the branch matching the change under test: for a pull request from a feature
   branch that branch (in the author's fork or upstream), else the PR base
   branch, else master; for a push the branch of the pull request it was merged
@@ -77,7 +77,7 @@ runs:
         PACKAGES: ${{ inputs.packages }}
         EXCLUDE: ${{ inputs.exclude }}
       run: |
-        all="ArrayUtil DAE DoubleEnded ImmutableList ListUtil MetaModelica OMBackend OMFrontend OMLibraryTesting OMParser OMRuntimeExternalC SCode"
+        all="ArrayUtil ImmutableList ListUtil MetaModelica OMBackend OMFrontend OMLibraryTesting OMParser OMRuntimeExternalC"
         [ "$PACKAGES" = all ] && PACKAGES=$all
         selected=()
         for p in $PACKAGES; do
