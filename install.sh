@@ -48,8 +48,8 @@ git -C "$OM_JL_DIR" submodule update --init --quiet -- $PACKAGES
 
 echo "Installing OM.jl into Julia's default environment..."
 
-# OMParser and OMRuntimeExternalC fix the paths of their native libraries when
-# they precompile: build them before anything precompiles.
+# OMRuntimeExternalC fixes the path of its native library when it precompiles:
+# build it before anything precompiles.
 JULIA_PKG_PRECOMPILE_AUTO=0 OM_JL_DIR="$OM_JL_DIR" julia --startup-file=no -e '
 import Pkg
 
@@ -76,7 +76,7 @@ add_registry_if_needed(Pkg.RegistrySpec(url = OPENMODELICA_REGISTRY_URL),
                        "OpenModelicaRegistry")
 
 Pkg.develop(path = ENV["OM_JL_DIR"])
-Pkg.build(["OMParser", "OMRuntimeExternalC"]; verbose = true)
+Pkg.build(["OMRuntimeExternalC"]; verbose = true)
 Pkg.precompile()
 '
 

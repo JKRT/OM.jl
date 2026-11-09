@@ -5,8 +5,8 @@
 # develop this checkout into Julia's default environment; `import OM` then works
 # in any Julia session. Without a checkout, use install.sh (it clones one).
 # For working in this checkout's own environment, use install_dev.jl instead.
-# Run as `julia install.jl`: OMParser and OMRuntimeExternalC must be built before
-# they precompile, so start Julia with JULIA_PKG_PRECOMPILE_AUTO=0 if you include
+# Run as `julia install.jl`: OMRuntimeExternalC must be built before it
+# precompiles, so start Julia with JULIA_PKG_PRECOMPILE_AUTO=0 if you include
 # this file from a REPL.
 
 import Pkg
@@ -48,8 +48,8 @@ function install()
   @info "Developing OM from this checkout" path = REPO_ROOT
   Pkg.develop(path = REPO_ROOT)
 
-  @info "Building native dependencies"
-  Pkg.build(["OMParser", "OMRuntimeExternalC"])
+  @info "Building the native dependency (OMRuntimeExternalC)"
+  Pkg.build(["OMRuntimeExternalC"])
 
   @info "Precompiling active environment"
   Pkg.precompile()
