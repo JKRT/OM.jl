@@ -6,7 +6,7 @@
   #= the OMJLIR model as the clock partitioning leaves it (before the clocked lowering):
      its base clocks and clocked partitions =#
   local partitioning = m -> OMBackend.Passes.runPasses!(
-    OMBackend.LowerFlatModel.lowerFlatModel(first(OM.flatten("ClockedPartitions." * m, file))); through = "partitionClocks")
+    OMBackend.lowerFlatModel(first(OM.flatten("ClockedPartitions." * m, file))); through = "partitionClocks")
   #= the partition of variable `v`: its base clock (as a Clock constructor) and sub-clock =#
   local clockOf = (p, v) -> begin
     local part = only(q for q in p.clocked if Symbol(v) in q.unknowns)
