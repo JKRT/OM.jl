@@ -1,6 +1,6 @@
 name = "OM"
 uuid = "2f925a0b-2436-437b-858e-49aee461894b"
-version = "0.9.3"
+version = "0.10.0"
 authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
 
 [deps]
@@ -42,16 +42,16 @@ ModelingToolkit = "11.21.0"
 SymbolicUtils = "4.24.1"
 julia = "1.13"
 ArrayUtil = "0.3.2"
-DAE = "1.2.0"
+DAE = "1.3"
 DoubleEnded = "0.2.3"
 ImmutableList = "0.6"
 ListUtil = "0.4.1"
 MetaModelica = "0.4.2, 0.5"
-OMBackend = "0.8.5"
-OMFrontend = "1.8.4"
+OMBackend = "0.9"
+OMFrontend = "1.9"
 OMParser = "1"
 OMRuntimeExternalC = "0.3.6"
-SCode = "1.3"
+SCode = "1.4"
 
 [extras]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
