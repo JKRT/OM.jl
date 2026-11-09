@@ -106,6 +106,8 @@ a structural condition) cannot be tunable, and `translate` says so.
 
 The Julia counterpart of a library test script is a loop with `try`: a model that
 fails raises an exception with its message and stack trace, and the loop goes on.
+The report is written with CSV.jl and DataFrames.jl, which OM does not depend on:
+add them to your environment first (`] add CSV DataFrames`).
 
 ```julia
 import CSV, DataFrames

@@ -56,6 +56,7 @@ ingroup(g) = TEST_GROUP == "all" || TEST_GROUP == g
   @info "Testing simulation results..."
   (ingroup("results") || ingroup("events")) && @testset "Simulation Results:" begin
     ingroup("results") && include("simulationResultTests.jl")
+    ingroup("results") && include("exportCSVTests.jl")
     ingroup("results") && include("recordTests.jl")
     ingroup("results") && include("matrixTests.jl")
     ingroup("results") && include("eventTests.jl")
