@@ -12,7 +12,6 @@ const OPENMODELICA_REGISTRY_URL = "https://github.com/OpenModelica/OpenModelicaR
 const REQUIRED_SUBMODULES = [
   "ImmutableList.jl",
   "MetaModelica.jl",
-  "Absyn.jl",
   "SCode.jl",
   "DAE.jl",
   "ArrayUtil.jl",
@@ -67,9 +66,6 @@ function install_dev()
 
   @info "Instantiating local OM.jl environment"
   Pkg.instantiate()
-
-  @info "Building native parser dependencies"
-  Pkg.build("OMParser")
 
   @info "Precompiling OM.jl checkout"
   Pkg.precompile()

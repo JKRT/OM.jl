@@ -23,13 +23,11 @@ function buildDeps()
   Pkg.add("MetaModelica")
   @info "Installed MetaModelica"
   #= Intermediate representations =#
-  Pkg.add("Absyn")
   Pkg.add("SCode")
   Pkg.add("DoubleEnded")
   Pkg.add("DAE")
   #= Frontend =#
   Pkg.add(url="https://github.com/OpenModelica/OMParser.jl.git")
-  Pkg.build("OMParser")
   Pkg.add("OMFrontend")
   Pkg.build("OMFrontend")
   #= Backend =#

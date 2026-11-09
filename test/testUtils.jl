@@ -11,7 +11,7 @@ using ADTypes
 using DifferentialEquations
 using Logging
 
-import Absyn
+import OMParser.Absyn
 import SCode
 import DAE
 import OMParser

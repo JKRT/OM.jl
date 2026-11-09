@@ -4,7 +4,6 @@ version = "0.9.3"
 authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
 
 [deps]
-Absyn = "ce2f92e2-a952-11e9-0543-8b443f216f1d"
 ArrayUtil = "53cd29f2-c28d-11e9-1567-bd5452eeb1a0"
 DAE = "0174eeea-c361-11e9-3d0d-a9ca8048aff6"
 DiffEqBase = "2b5f629d-d688-5b77-993f-72d75c75574e"
@@ -26,7 +25,6 @@ SCode = "350d45b0-c210-11e9-3b9e-fdad65bb3d46"
 SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
 [sources]
-Absyn = {path = "Absyn.jl"}
 ArrayUtil = {path = "ArrayUtil.jl"}
 DAE = {path = "DAE.jl"}
 DoubleEnded = {path = "DoubleEnded.jl"}
@@ -43,16 +41,15 @@ SCode = {path = "SCode.jl"}
 ModelingToolkit = "11.21.0"
 SymbolicUtils = "4.24.1"
 julia = "1.13"
-Absyn = "1.4"
 ArrayUtil = "0.3.2"
 DAE = "1.2.0"
 DoubleEnded = "0.2.3"
-ImmutableList = "0.4.2, 0.5"
+ImmutableList = "0.6"
 ListUtil = "0.4.1"
 MetaModelica = "0.4.2, 0.5"
 OMBackend = "0.8.5"
 OMFrontend = "1.8.4"
-OMParser = "0.2.2"
+OMParser = "1"
 OMRuntimeExternalC = "0.3.6"
 SCode = "1.3"
 

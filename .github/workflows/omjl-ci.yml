@@ -96,11 +96,6 @@ jobs:
           om-repository: ${{ inputs.om-repository }}
           line: ${{ inputs.line }}
 
-      - uses: actions/setup-java@v4  # ANTLR, if the parser is built from source
-        with:
-          distribution: zulu
-          java-version: "21"
-
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.julia }}
@@ -108,11 +103,6 @@ jobs:
       - uses: julia-actions/cache@v2
         with:
           include-matrix: false  # the groups share one depot
-
-      - name: OMParser library
-        env:
-          PACKAGE: ${{ inputs.package }}
-        run: OM.jl/ci/build-parser.sh
 
       - name: Set up OM.jl
         id: setup

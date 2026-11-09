@@ -83,7 +83,6 @@ git submodule foreach "git checkout master && git pull"
   - Dev it using the Julia package manager
   - Go to MetaModelica.jl
   - Dev it using the Julia package manager
-  - Go to Absyn.jl
 
 Using same procedure as above for:
   - ArrayUtil.jl
@@ -330,9 +329,8 @@ OM.jl is composed of several submodules, each in its own directory:
 
 | Submodule | Description |
 |-----------|-------------|
-| **Absyn.jl** | Abstract syntax tree representation for Modelica (output of the parser) |
 | **SCode.jl** | Simplified code representation (intermediate form between Absyn and the frontend) |
-| **OMParser.jl** | Modelica parser that produces Absyn |
+| **OMParser.jl** | Modelica parser (`OMParser.Parser`) and the abstract syntax tree it produces (`OMParser.Absyn`, formerly the package Absyn.jl) |
 | **OMFrontend.jl** | The new frontend (NF) that performs instantiation, typing, flattening, and simplification |
 | **OMBackend.jl** | Backend that lowers the flat model to its own IR (OMJLIR), runs its passes, matches and sorts it into the simulation code, and generates and simulates the system via ModelingToolkit.jl |
 | **DAE.jl** | Data structures of the frontend's DAE form (`OMFrontend.instantiateSCodeToDAE`); the backend does not use it |

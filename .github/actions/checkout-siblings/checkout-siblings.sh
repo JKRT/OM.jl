@@ -3,7 +3,7 @@
 #
 #   checkout-siblings.sh <dest dir> <package...>
 #
-# Each package (Absyn, DAE, ..., or OM for OM.jl itself) is cloned into
+# Each package (DAE, OMParser, ..., or OM for OM.jl itself) is cloned into
 # <dest dir>/<Package>.jl. The ref is the first branch that exists of
 #   pull request: <PR head branch> in the PR author's fork (fork PRs only),
 #                 <PR head branch>, <line>, master

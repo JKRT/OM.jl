@@ -40,19 +40,11 @@ jobs:
           path: OM.jl
           exclude: OM
 
-      - uses: actions/setup-java@v4  # ANTLR, if the parser is built from source
-        with:
-          distribution: zulu
-          java-version: "21"
-
       - uses: julia-actions/setup-julia@v2
         with:
           version: "1.13"
 
       - uses: julia-actions/cache@v2
-
-      - name: OMParser library
-        run: OM.jl/ci/build-parser.sh
 
       - name: Set up OM.jl
         run: julia --color=yes --project=OM.jl OM.jl/ci/setup.jl
