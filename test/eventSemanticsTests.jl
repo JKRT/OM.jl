@@ -122,13 +122,10 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     #= asserts check the state after the iteration =#
     local s4 = _eventSim("AssertAfterReinit")
     @test s4.retcode == ReturnCode.Success && s4(1.2; idxs = :w) ≈ 1.0
-    #= a DAE solver: the algebraic variables are solved again after the event.
-       Broken by an OrdinaryDiffEqBDF bug (2.4.13): DFBDF's perform_step! reads the order before
-       reinitFBDF! resets it after an event, so the first step after the reset runs at the old
-       order on a cleared history. A normal step is rejected and retried; the last reset lands
-       3e-10 before the stop time and that clipped step is accepted (z(3.0) = 2.46 or NaN, not
-       1.125). Reading the order after reinitFBDF! (as FBDF does) gives these values. =#
-    @test_broken begin
+    #= a DAE solver: the algebraic variables are solved again after the event. Needs
+       OrdinaryDiffEqBDF 2.4.14 (OMBackend's compat): up to 2.4.13 the first DFBDF step after a
+       reset ran at the old order on a cleared history (z(3.0) = 2.46 or NaN, not 1.125). =#
+    @test begin
       local s5 = OM.simulate("EventSemantics.DAEIfReinit", EVENT_FILE; stopTime = 3.0, reltol = 1e-8, abstol = 1e-10,
                              solver = OMBackend.OrdinaryDiffEqBDF.DFBDF(autodiff = ADTypes.AutoFiniteDiff()))
       [s5(1.2; idxs = :y), s5(1.4; idxs = :z), s5(3.0; idxs = :z)] ≈ [0.0, 0.375, 1.125]
