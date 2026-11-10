@@ -35,9 +35,7 @@ if haskey(TOML.parsefile(joinpath(DIR, "Project.toml")), "sources")
   Pkg.test(; julia_args = JULIA_ARGS)
 else
   Pkg.activate(; temp = true)
-  # The siblings OM.jl develops (the [sources] of its Project.toml) and the package under test, not every
-  # checkout next to it: the submodules of packages folded into others (SCode.jl, DAE.jl into OMFrontend) and of
-  # packages OM.jl no longer uses (DoubleEnded.jl) stay out of the environment unless they are under test.
+  # The siblings OM.jl develops (the [sources] of its Project.toml) and the package under test.
   siblings = unique!(push!(String[String(src["path"]) for src in values(TOML.parsefile(joinpath(ROOT, "Project.toml"))["sources"])],
                            "$PKG.jl"))
   Pkg.develop([Pkg.PackageSpec(path = joinpath(ROOT, d)) for d in siblings])
