@@ -31,11 +31,13 @@
 
 module OM
 
+#= OMBackend before OMFrontend: on Windows the first of them loaded decides the gettext runtime of the process, and
+   Plots (Glib) cannot be loaded after OMFrontend's OMRuntimeExternalC (see the head of OMBackend's src/OMBackend.jl). =#
+import OMBackend
 import OMParser.Absyn
 import OMFrontend.SCode
 import OMFrontend.DAE
 #= Frontend Components =#
-import OMBackend
 import OMFrontend
 #= The packages loaded after OMBackend may define methods that invalidate the code compiled into OMBackend's and
    OMFrontend's images, which every session would then compile again at its first model. Loaded under
