@@ -16,7 +16,7 @@ const OPENMODELICA_REGISTRY_URL = "https://github.com/OpenModelica/OpenModelicaR
 
 #= The package submodules ([sources]); OMLibraryTesting is only for the tests. =#
 const PACKAGES = ["ImmutableList.jl", "MetaModelica.jl",
-                  "ArrayUtil.jl", "ListUtil.jl", "OMParser.jl",
+                  "OMParser.jl",
                   "OMFrontend.jl", "OMBackend.jl", "OMRuntimeExternalC.jl"]
 
 function add_registry_if_needed(spec, name::AbstractString)
