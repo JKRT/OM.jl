@@ -124,12 +124,15 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test s4.retcode == ReturnCode.Success && s4(1.2; idxs = :w) ≈ 1.0
     #= a DAE solver: the algebraic variables are solved again after the event. Needs
        OrdinaryDiffEqBDF 2.4.14 (OMBackend's compat): up to 2.4.13 the first DFBDF step after a
-       reset ran at the old order on a cleared history (z(3.0) = 2.46 or NaN, not 1.125). =#
-    @test begin
-      local s5 = OM.simulate("EventSemantics.DAEIfReinit", EVENT_FILE; stopTime = 3.0, reltol = 1e-8, abstol = 1e-10,
-                             solver = OMBackend.OrdinaryDiffEqBDF.DFBDF(autodiff = ADTypes.AutoFiniteDiff()))
-      [s5(1.2; idxs = :y), s5(1.4; idxs = :z), s5(3.0; idxs = :z)] ≈ [0.0, 0.375, 1.125]
-    end
+       reset ran at the old order on a cleared history (z(3.0) = 2.46 or NaN, not 1.125). z is the time
+       v > 0.5 held, so its error is the event times' error: a few 1e-9 at reltol 1e-8 (macOS), more on
+       other platforms; checked to 1e-6, one value per test so a failure shows it. =#
+    local s5 = OM.simulate("EventSemantics.DAEIfReinit", EVENT_FILE; stopTime = 3.0, reltol = 1e-8, abstol = 1e-10,
+                           solver = OMBackend.OrdinaryDiffEqBDF.DFBDF(autodiff = ADTypes.AutoFiniteDiff()))
+    @test s5.retcode == ReturnCode.Success
+    @test s5(1.2; idxs = :y) == 0.0
+    @test s5(1.4; idxs = :z) ≈ 0.375 atol = 1e-6
+    @test s5(3.0; idxs = :z) ≈ 1.125 atol = 1e-6
     #= two whens that re-trigger each other: stopped with an error, as OpenModelica does =#
     local s6 = @test_logs (:error, r"did not settle") match_mode = :any _eventSim("Chatter"; stopTime = 2.0)
     @test s6.retcode == ReturnCode.Failure
