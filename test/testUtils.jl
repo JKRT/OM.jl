@@ -11,12 +11,13 @@ using ADTypes
 using DifferentialEquations
 using Logging
 
-import Absyn
-import SCode
-import DAE
+#= OMBackend before OMFrontend (Windows: Glib's gettext runtime before OMRuntimeExternalC's, see src/OM.jl). =#
+import OMBackend
+import OMParser.Absyn
+import OMFrontend.SCode
+import OMFrontend.DAE
 import OMParser
 import OMFrontend
-import OMBackend
 import OM
 
 using DifferentialEquations: ReturnCode, Rodas5P

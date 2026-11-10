@@ -122,17 +122,21 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     #= asserts check the state after the iteration =#
     local s4 = _eventSim("AssertAfterReinit")
     @test s4.retcode == ReturnCode.Success && s4(1.2; idxs = :w) ≈ 1.0
-    #= a DAE solver: the algebraic variables are solved again after the event.
-       Broken by an OrdinaryDiffEqBDF bug (2.4.13): DFBDF's perform_step! reads the order before
-       reinitFBDF! resets it after an event, so the first step after the reset runs at the old
-       order on a cleared history. A normal step is rejected and retried; the last reset lands
-       3e-10 before the stop time and that clipped step is accepted (z(3.0) = 2.46 or NaN, not
-       1.125). Reading the order after reinitFBDF! (as FBDF does) gives these values. =#
-    @test_broken begin
-      local s5 = OM.simulate("EventSemantics.DAEIfReinit", EVENT_FILE; stopTime = 3.0, reltol = 1e-8, abstol = 1e-10,
-                             solver = OMBackend.OrdinaryDiffEqBDF.DFBDF(autodiff = ADTypes.AutoFiniteDiff()))
-      [s5(1.2; idxs = :y), s5(1.4; idxs = :z), s5(3.0; idxs = :z)] ≈ [0.0, 0.375, 1.125]
-    end
+    #= a DAE solver: the algebraic variables are solved again after each event (v after the reinit at
+       t = 3: v + v^3 = 0.2; z the time v > 0.5 held). Stopped at 3.5, not at the third event (t = 3):
+       DFBDF's perform_step! (OrdinaryDiffEqBDF up to 2.4.14) reads the order before reinitFBDF! resets
+       it, so the first step after an event runs at the old order on a cleared history. A normal step
+       is rejected and retried; a step clipped to a stop time just after the event is accepted, and
+       z(3.0) was 2.46 or NaN, depending on where the event landed (platform). Checked to 1e-6 (the
+       event times' error at reltol 1e-8), one value per test so a failure shows it. =#
+    local s5 = OM.simulate("EventSemantics.DAEIfReinit", EVENT_FILE; stopTime = 3.5, reltol = 1e-8, abstol = 1e-10,
+                           solver = OMBackend.OrdinaryDiffEqBDF.DFBDF(autodiff = ADTypes.AutoFiniteDiff()))
+    @test s5.retcode == ReturnCode.Success
+    @test s5(1.2; idxs = :y) == 0.0
+    @test s5(1.4; idxs = :z) ≈ 0.375 atol = 1e-6
+    @test s5(3.2; idxs = :y) == 0.0
+    @test s5(3.2; idxs = :v) ≈ 0.19282993096291295 atol = 1e-6
+    @test s5(3.5; idxs = :z) ≈ 1.125 atol = 1e-6
     #= two whens that re-trigger each other: stopped with an error, as OpenModelica does =#
     local s6 = @test_logs (:error, r"did not settle") match_mode = :any _eventSim("Chatter"; stopTime = 2.0)
     @test s6.retcode == ReturnCode.Failure
