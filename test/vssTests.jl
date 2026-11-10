@@ -224,6 +224,25 @@
         @test sols[2](1.0; idxs = Symbol("x[2]")) ≈ 0.75 rtol = 1e-6
         OMBackend.forgetModel("RecompiledMSLTable")
       end
+      #= A sampled recompilation: the mode compiled at the first change is taken by the later
+         ones and by a second simulate (Runtime.RECOMPILED_MODES), with the same solution =#
+      @testset "A recompiled mode taken again" begin
+        local file = "./Models/VSS/RecompiledSampled.mo"
+        local cname = OMBackend.canonicalName("RecompiledSampled")
+        local modes() = count(key -> first(key) == cname, keys(OMBackend.Runtime.RECOMPILED_MODES))
+        OM.translate("RecompiledSampled", file)
+        local sols = OM.simulate("RecompiledSampled", file; stopTime = 0.9)
+        @test length(sols) == 4
+        @test modes() == 1
+        @test sols[1](0.25; idxs = :x) ≈ exp(-0.25) rtol = 1e-5
+        @test last(last(sols).u)[1] ≈ exp(-1.55) rtol = 1e-5
+        @test sols[3](0.6; idxs = :y) ≈ 2 * exp(-0.95) rtol = 1e-5
+        local again = OM.simulate("RecompiledSampled", file; stopTime = 0.9)
+        @test modes() == 1
+        @test length(again) == 4 && all(i -> again[i].t == sols[i].t && again[i].u == sols[i].u, 1:4)
+        OMBackend.forgetModel("RecompiledSampled")
+        @test modes() == 0
+      end
       #= The agentic switch with a stub agent (no agent server: AGENT_CALLBACK): at x > 5 the
          agent sets y = -1, the model is recompiled, x falls from 5 to 2 at t = 8 =#
       @testset "Agentic recompilation with a stub agent" begin
