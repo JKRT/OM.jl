@@ -31,8 +31,13 @@
 
 module OM
 
-#= OMBackend before OMFrontend: on Windows the first of them loaded decides the gettext runtime of the process, and
-   Plots (Glib) cannot be loaded after OMFrontend's OMRuntimeExternalC (see the head of OMBackend's src/OMBackend.jl). =#
+#= Plots (Glib) and JuliaFormatter first, then OMBackend, then OMFrontend: on Windows the first gettext runtime loaded
+   decides the gettext runtime of the process, and Glib's libraries cannot be loaded against the libintl-8.dll of
+   OMRuntimeExternalC, which OMBackend and OMFrontend both load (OMBackend.jl#101, the head of OMBackend's
+   src/OMBackend.jl). OMBackend does not load Plots itself (a weak dependency: its extensions OMBackendPlotsExt and
+   OMBackendJuliaFormatterExt load with Plots and JuliaFormatter), so OM does, before it. =#
+import Plots
+import JuliaFormatter
 import OMBackend
 import OMParser.Absyn
 import OMFrontend.SCode
@@ -45,7 +50,6 @@ import OMFrontend
    invalidated method instances through CSV's Durations and DataStrings, are not loaded: exportCSV writes its file.) =#
 using PrecompileTools: @recompile_invalidations
 @recompile_invalidations begin
-  import Plots
   #= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
   using DifferentialEquations
   using DiffEqBase
@@ -53,7 +57,6 @@ end
 #= Utility packages =#
 using ImmutableList
 using MetaModelica
-import Pkg
 
 #= OpenModelica-compatible .mos scripting engine. Kept as a submodule so the
    parser/evaluator can be tested independently from compiler initialization. =#
@@ -119,13 +122,18 @@ Modelica's is an error at the flattening.
 _mslVersion(MSL_Version::Union{Nothing, String})::Union{Nothing, String} =
   MSL_Version !== nothing ? MSL_Version : (OMFrontend.loadedModelica() === nothing ? DEFAULT_MSL_VERSION : nothing)
 
+"""
+    printWelcomeMessage()
+
+Print the banner: the name, the version of OM (`pkgversion`) and where the help is.
+"""
 function printWelcomeMessage()
+  local version::Union{VersionNumber, Nothing} = pkgversion(@__MODULE__)
   printstyled("Open", bold=true, color=:light_blue)
   printstyled("Modelica", bold=true, color=:white)
   printstyled(".jl", bold=false, color=:pink)
   println()
-  print("Running ")
-  Pkg.status("OM")
+  println(version === nothing ? "Running OM" : "Running OM v$(version)")
   println("For help run OM.help(), for examples OM.help(:examples)")
 end
 

@@ -23,8 +23,8 @@ OM_JL_DIR=${OM_JL_DIR:-"$HOME/.julia/dev/OM"}
 OM_JL_URL=${OM_JL_URL:-https://github.com/JKRT/OM.jl.git}
 
 # The package submodules ([sources]); OMLibraryTesting is only for the tests.
-PACKAGES="ImmutableList.jl MetaModelica.jl ArrayUtil.jl
-ListUtil.jl OMParser.jl OMFrontend.jl OMBackend.jl OMRuntimeExternalC.jl"
+PACKAGES="ImmutableList.jl MetaModelica.jl OMParser.jl OMFrontend.jl
+OMBackend.jl OMRuntimeExternalC.jl"
 
 if [ -d "$OM_JL_DIR/.git" ] || [ -f "$OM_JL_DIR/.git" ]; then
   echo "Updating the OM.jl checkout in $OM_JL_DIR..."
@@ -48,9 +48,8 @@ git -C "$OM_JL_DIR" submodule update --init --quiet -- $PACKAGES
 
 echo "Installing OM.jl into Julia's default environment..."
 
-# OMRuntimeExternalC fixes the path of its native library when it precompiles:
-# build it before anything precompiles.
-JULIA_PKG_PRECOMPILE_AUTO=0 OM_JL_DIR="$OM_JL_DIR" julia --startup-file=no -e '
+# Nothing is built: OMRuntimeExternalC's library is an artifact, installed by Pkg.
+OM_JL_DIR="$OM_JL_DIR" julia --startup-file=no -e '
 import Pkg
 
 const OPENMODELICA_REGISTRY_URL = "https://github.com/OpenModelica/OpenModelicaRegistry.git"
@@ -76,7 +75,6 @@ add_registry_if_needed(Pkg.RegistrySpec(url = OPENMODELICA_REGISTRY_URL),
                        "OpenModelicaRegistry")
 
 Pkg.develop(path = ENV["OM_JL_DIR"])
-Pkg.build(["OMRuntimeExternalC"]; verbose = true)
 Pkg.precompile()
 '
 
