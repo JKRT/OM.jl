@@ -57,7 +57,6 @@ end
 #= Utility packages =#
 using ImmutableList
 using MetaModelica
-import Pkg
 
 #= OpenModelica-compatible .mos scripting engine. Kept as a submodule so the
    parser/evaluator can be tested independently from compiler initialization. =#
@@ -123,13 +122,18 @@ Modelica's is an error at the flattening.
 _mslVersion(MSL_Version::Union{Nothing, String})::Union{Nothing, String} =
   MSL_Version !== nothing ? MSL_Version : (OMFrontend.loadedModelica() === nothing ? DEFAULT_MSL_VERSION : nothing)
 
+"""
+    printWelcomeMessage()
+
+Print the banner: the name, the version of OM (`pkgversion`) and where the help is.
+"""
 function printWelcomeMessage()
+  local version::Union{VersionNumber, Nothing} = pkgversion(@__MODULE__)
   printstyled("Open", bold=true, color=:light_blue)
   printstyled("Modelica", bold=true, color=:white)
   printstyled(".jl", bold=false, color=:pink)
   println()
-  print("Running ")
-  Pkg.status("OM")
+  println(version === nothing ? "Running OM" : "Running OM v$(version)")
   println("For help run OM.help(), for examples OM.help(:examples)")
 end
 

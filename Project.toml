@@ -14,10 +14,8 @@ OMBackend = "9400bd5f-7561-42f6-8760-03756753da50"
 OMFrontend = "b10394b5-f439-4073-a0c5-e09cb00cf46c"
 OMParser = "11f87224-cae7-4e99-a924-e50d12f62c59"
 OMRuntimeExternalC = "ada38df0-e20e-11ed-02f3-2b4b19c1ec8a"
-Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
-SymbolicUtils = "d1185830-fcd6-423d-90d6-eec64667417b"
 
 [sources]
 ImmutableList = {path = "ImmutableList.jl"}
@@ -29,7 +27,6 @@ OMRuntimeExternalC = {path = "OMRuntimeExternalC.jl"}
 
 [compat]
 ModelingToolkit = "11.21.0"
-SymbolicUtils = "4.24.1"
 julia = "1.13"
 ImmutableList = "0.6"
 MetaModelica = "0.4.2, 0.5"
