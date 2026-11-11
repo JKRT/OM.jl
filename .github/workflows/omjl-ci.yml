@@ -67,7 +67,7 @@ jobs:
         julia: ${{ fromJSON(inputs.julia-versions) }}
         group: [core, results, events, msl]
     env:
-      # Native libraries first, precompile after (see ci/setup.jl).
+      # One strict precompile, at the end of ci/setup.jl.
       JULIA_PKG_PRECOMPILE_AUTO: "0"
       # Package images for any x86-64 runner with AVX2 instead of the runner's
       # own CPU: the runners are Intel or AMD, and a cache built on the other kind
@@ -112,7 +112,6 @@ jobs:
         if: inputs.package-tests && inputs.package != 'OM' && matrix.group == 'core'
         env:
           PACKAGE: ${{ inputs.package }}
-          LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
         run: julia --color=yes OM.jl/ci/test-package.jl "$PACKAGE"
 
       # Also after failing package tests: whether OM.jl still works is the point.
@@ -122,7 +121,6 @@ jobs:
         if: ${{ !cancelled() && inputs.om-tests && steps.setup.outcome == 'success' }}
         working-directory: OM.jl/test
         env:
-          LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
           OM_TEST_GROUP: ${{ matrix.group }}
         # With threads: OMFrontend's parallel path, as users run it (package tests: ci/test-package.jl).
         run: julia --color=yes --project=.. --threads=auto -e 'include("runtests.jl")'

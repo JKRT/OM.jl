@@ -26,17 +26,15 @@ git submodule update --init --recursive
 ## Instantiate
 
 OM.jl depends on packages registered in the General registry **and** in the
-OpenModelica registry, so add both before instantiating. OMParser and
-OMRuntimeExternalC fix the paths of their native libraries when they
-precompile, so build them before anything precompiles:
+OpenModelica registry, so add both before instantiating. Nothing is built:
+the C library of OMRuntimeExternalC is an artifact, installed by `Pkg.instantiate`.
 
 ```bash
-JULIA_PKG_PRECOMPILE_AUTO=0 julia --project -e '
+julia --project -e '
   import Pkg
   Pkg.Registry.add("General")
   Pkg.Registry.add(Pkg.RegistrySpec(url="https://github.com/OpenModelica/OpenModelicaRegistry.git"))
   Pkg.instantiate()
-  Pkg.build(["OMParser", "OMRuntimeExternalC"]; verbose = true)
   Pkg.precompile()'
 ```
 

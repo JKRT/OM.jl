@@ -48,9 +48,8 @@ git -C "$OM_JL_DIR" submodule update --init --quiet -- $PACKAGES
 
 echo "Installing OM.jl into Julia's default environment..."
 
-# OMRuntimeExternalC fixes the path of its native library when it precompiles:
-# build it before anything precompiles.
-JULIA_PKG_PRECOMPILE_AUTO=0 OM_JL_DIR="$OM_JL_DIR" julia --startup-file=no -e '
+# Nothing is built: OMRuntimeExternalC's library is an artifact, installed by Pkg.
+OM_JL_DIR="$OM_JL_DIR" julia --startup-file=no -e '
 import Pkg
 
 const OPENMODELICA_REGISTRY_URL = "https://github.com/OpenModelica/OpenModelicaRegistry.git"
@@ -76,7 +75,6 @@ add_registry_if_needed(Pkg.RegistrySpec(url = OPENMODELICA_REGISTRY_URL),
                        "OpenModelicaRegistry")
 
 Pkg.develop(path = ENV["OM_JL_DIR"])
-Pkg.build(["OMRuntimeExternalC"]; verbose = true)
 Pkg.precompile()
 '
 

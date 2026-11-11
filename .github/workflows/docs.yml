@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     env:
-      # Native libraries first, precompile after (see ci/setup.jl).
+      # One strict precompile, at the end of ci/setup.jl.
       JULIA_PKG_PRECOMPILE_AUTO: "0"
       # Package images for any x86-64 runner with AVX2, as in omjl-ci.yml.
       JULIA_CPU_TARGET: x86-64-v3
@@ -52,7 +52,6 @@ jobs:
       - name: Build and deploy
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          LD_LIBRARY_PATH: ${{ github.workspace }}/OM.jl/OMRuntimeExternalC.jl/lib/ext/shared/x86_64-linux-gnu
         run: |
           julia --color=yes --project=OM.jl/docs -e 'import Pkg; Pkg.instantiate()'
           julia --color=yes --project=OM.jl/docs OM.jl/docs/make.jl

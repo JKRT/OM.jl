@@ -1,9 +1,8 @@
 @info "External Builtin Function Tests. Testing OMRuntimeExternalC API and external C function calls."
 
 @testset "External Builtin Functions" begin
-  if !(Sys.iswindows() || Sys.islinux())
-    @info "Skipping external builtin tests: only supported on Windows and Linux"
-  else
+  #= libModelicaExternalC is built from the MSL C sources on every platform, macOS included. =#
+  if true
     import OMRuntimeExternalC as ORC
 
     @testset "OMRuntimeExternalC API" begin
