@@ -200,10 +200,23 @@ end
       @test [sol(t; idxs = Symbol(v)) for t in (1.0, 3.0, 6.0)] ≈ [scalarized(t; idxs = Symbol(v)) for t in (1.0, 3.0, 6.0)] rtol = 1e-6
     end
   end
-  @testset "the scalarizing fallback is logged with the arrays-kept path's reasons" begin
-    #= one arrays-kept path (the flat model's array code generation is gone): the array index reduction's reason, then
-       the array code's after it where that was tried =#
-    @test_logs (:info, r"\[translate\] .*arrays not kept, scalarized in the frontend \(fallback\): array index reduction: no for-equations") match_mode = :any OM.translate("IndexReduction.RigidInertias", INDEX_REDUCTION_FILE)
+  @testset "what the array form declines: scalarized by the backend, no second flatten" begin
+    local rigid::String = OMBackend.canonicalName("IndexReduction.RigidInertias")
+    OM.translate("IndexReduction.RigidInertias", INDEX_REDUCTION_FILE)
+    @test rigid in OMBackend.BACKEND_SCALARIZED_MODELS
+    #= the backend's scalarization off: no arrays-kept path takes the model, an error with their reasons in the order
+       they were tried (no second flatten) =#
+    withenv("OMBACKEND_BACKEND_SCALARIZATION" => "false") do
+      local err = try
+        OM.translate("IndexReduction.RigidInertias", INDEX_REDUCTION_FILE)
+        nothing
+      catch e
+        e
+      end
+      @test err isa OM.ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED
+      @test occursin(r"array index reduction: no for-equations.*backend scalarization: switched off", err.reasons)
+      @test !(rigid in OMBackend.BACKEND_SCALARIZED_MODELS)
+    end
   end
   @testset "index 3: a Cartesian pendulum up to its bottom" begin
     #= a static choice (y, vy) holds while x stays away from 0 (omc: dynamic state sets) =#

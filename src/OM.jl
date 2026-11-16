@@ -752,9 +752,10 @@ generates code that keeps the loops (`OMBackend.ARRAY_ODE_GENERATION`): its size
 with the arrays, and every parameter can be changed in `resimulate`. A model of index above one
 whose index OMBackend reduces in array form (`OMBACKEND_ARRAY_INDEX_REDUCTION`) keeps its arrays
 through index reduction and is scalarized after it. Another model outside that code generation's
-scope (algebraic loops, Modelica functions, ...) is flattened again with scalarization and
-translated as with `true` (the reason is logged). `true`: the
-frontend scalarizes, as before.
+scope (algebraic loops, Modelica functions, ...) is scalarized by the backend from the same flat
+model (`OMBACKEND_BACKEND_SCALARIZATION`); only where the backend does not take it either is it
+flattened again with scalarization and translated as with `true` (the reason is logged). `true`:
+the frontend scalarizes, as before.
 `flatten` returns the scalarized flat model unless asked otherwise.
 
 ```julia
@@ -1221,7 +1222,9 @@ function translate(modelName::String,
       withDirectRHS(directRHS) do
         #= Arrays kept (the default mode): the model lowered with its arrays (its index reduced in array
            form, OMBACKEND_ARRAY_INDEX_REDUCTION) to the array code, else its scalarized form, else the
-           scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+           kept arrays scalarized by the backend (OMBACKEND_BACKEND_SCALARIZATION); where none of these takes the
+           model an error (`ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED`), no second flatten. An explicit MTK or DE mode gets
+           that backend. =#
         local keep = !scalarize && mode == OMBackend.IMTK_MODE
         (fm, cache) = flatten(modelName, modelFile;
                               MSL = MSL, MSL_Version = MSL_Version,
@@ -1237,9 +1240,7 @@ function translate(modelName::String,
                                                            warnMissingStartValues, eliminateNonDynamic, observedFilter,
                                                            checkSimCode)
           reduced === nothing || return reduced
-          logScalarizedFallback(fm)
-          (fm, cache) = flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version,
-                                libraries = libraries, scalarize = true)
+          throw(ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED(OMBackend.canonicalName(fm.name)))
         end
         functionList = OMFrontend.cacheToFunctionList(cache)
         OMBackend.translate(fm;
@@ -1310,7 +1311,9 @@ function translate(modelName::String;
       withDirectRHS(directRHS) do
         #= Arrays kept (the default mode): the model lowered with its arrays (its index reduced in array
            form, OMBACKEND_ARRAY_INDEX_REDUCTION) to the array code, else its scalarized form, else the
-           scalarizing flatten. An explicit MTK or DE mode gets that backend. =#
+           kept arrays scalarized by the backend (OMBACKEND_BACKEND_SCALARIZATION); where none of these takes the
+           model an error (`ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED`), no second flatten. An explicit MTK or DE mode gets
+           that backend. =#
         local keep = !scalarize && mode == OMBackend.IMTK_MODE
         (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries,
                               scalarize = !keep)
@@ -1325,8 +1328,7 @@ function translate(modelName::String;
                                                            warnMissingStartValues, eliminateNonDynamic, observedFilter,
                                                            checkSimCode)
           reduced === nothing || return reduced
-          logScalarizedFallback(fm)
-          (fm, cache) = flatten(modelName; MSL_Version = MSL_Version, libraries = libraries, scalarize = true)
+          throw(ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED(OMBackend.canonicalName(fm.name)))
         end
         functionList = OMFrontend.cacheToFunctionList(cache)
         OMBackend.translate(fm;
@@ -1343,16 +1345,24 @@ function translate(modelName::String;
 end
 
 """
-    logScalarizedFallback(fm)
+    ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED(model)
 
-The log line of `translate` falling back to the scalarizing flatten for a model it tried with its
-arrays kept, with the reasons the array index reduction and the array code after it gave.
+The error of `translate` for a model translated with its arrays kept (`scalarize = false`, the default) that none of
+the arrays-kept paths takes (the array code, the backend's scalarization): the model and the reasons each path gave
+(`OMBackend.scalarizedFallbackReason`). The model is not flattened a second time with `scalarize = true`: that does
+not work with the omc route (OMCompiler.jl), which flattens once (JKRT 2026-11-15). `scalarize = true` scalarizes it
+in the frontend from the start.
 """
-function logScalarizedFallback(fm::OMFrontend.Frontend.FlatModel)::Nothing
-  local name = OMBackend.canonicalName(fm.name)
-  @info "[translate] $(name): arrays not kept, scalarized in the frontend (fallback): $(OMBackend.scalarizedFallbackReason(name))"
-  return nothing
+struct ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED <: Exception
+  model::String
+  reasons::String
 end
+ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED(model::String) =
+  ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED(model, OMBackend.scalarizedFallbackReason(model))
+Base.showerror(io::IO, e::ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED) =
+  print(io, "ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED: ", e.model, ": array preserving codegen not supported (",
+        e.reasons,
+        "); translate with scalarize = true to scalarize it in the frontend")
 
 """
     writeModelToFile(modelName, modelFile, filePath; MSL=false, MSL_Version=nothing,
