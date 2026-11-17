@@ -606,7 +606,7 @@ package InitialEquationTests
     y = k * time;
   end IEQ38_AssignedParameterWithoutStates;
 
-  model IEQ39_FreeParameterWithoutStates "no unknowns, a free parameter and a fixed start (OpenModelica keeps k = 1, its start, and y = 1)"
+  model IEQ39_FreeParameterWithoutStates "no unknowns, a free parameter and a fixed start: k = y = 3 (OpenModelica keeps k = 1, its start, and y = 1)"
     parameter Real k(fixed = false, start = 1);
     Real y(start = 3, fixed = true);
   equation
@@ -670,7 +670,7 @@ package InitialEquationTests
     der(y) = -y;
   end IEQ45_DerivativeOfObserved;
 
-  model IEQ46_SecondDerivative "an initial equation on der(der(x)): refused, as by OpenModelica"
+  model IEQ46_SecondDerivative "an initial equation on der(der(x)) = der(v): v(0) = 2 (OpenModelica refuses it)"
     Real x(start = 1, fixed = true), v;
   initial equation
     der(der(x)) = -3;

@@ -17,10 +17,12 @@ const SII = OMBackend.Runtime.ModelingToolkit.SymbolicIndexingInterface
     return OMBackend.DifferentialEquations.solve(prob, sol.alg; abstol = 1e-10, reltol = 1e-8)
   end
 
-  #= Without the option, parameters with constant values are folded away. =#
-  OM.translate("TunableParameters.LotkaVolterra", mo)
-  local folded = OM.simulate("TunableParameters.LotkaVolterra"; MSL = false, tspan = (0.0, 3.0))
+  #= Without the option, the MTK path folds parameters with constant values away; the array code keeps each
+     parameter as data (a value given to simulate needs no option). =#
+  local folded = OM.simulate("TunableParameters.LotkaVolterra", mo; MSL = false, tspan = (0.0, 3.0), scalarize = true)
   @test !SII.is_parameter(folded.prob, :alpha)
+  local kept = OM.simulate("TunableParameters.LotkaVolterra", mo; MSL = false, tspan = (0.0, 3.0))
+  @test SII.is_parameter(kept.prob, :alpha)
 
   OMBackend.withTunableParameters(["alpha", "beta"]) do
     OM.translate("TunableParameters.LotkaVolterra", mo)
@@ -124,12 +126,18 @@ const SII = OMBackend.Runtime.ModelingToolkit.SymbolicIndexingInterface
   end
 
   #= Initial algorithms are evaluated at compile time: a tunable parameter
-     read there would keep its compiled value, so it is an error. =#
-  @test_throws ArgumentError OMBackend.withTunableParameters(["a"]) do
-    OM.translate("TunableParameters.InitialAlgorithm", mo)
-  end
-  @test_throws ArgumentError OMBackend.withTunableParameters(["k"]) do
-    OM.translate("TunableParameters.InitialAlgorithm", mo)
+     read there would keep its compiled value, so it is an error (no route
+     takes the model: ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED, the reason in it). =#
+  for a in ("a", "k")
+    local err = try
+      OMBackend.withTunableParameters([a]) do
+        OM.translate("TunableParameters.InitialAlgorithm", mo)
+      end
+      nothing
+    catch e
+      e
+    end
+    @test err isa OM.ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED && occursin("is read in an initial algorithm", err.reasons)
   end
   OM.translate("TunableParameters.InitialAlgorithm", mo)
   @test OM.simulate("TunableParameters.InitialAlgorithm"; MSL = false, tspan = (0.0, 1.0))(1.0; idxs = :x) == 4.0

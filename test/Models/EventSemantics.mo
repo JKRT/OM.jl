@@ -1094,7 +1094,7 @@ package EventSemantics "Relations, events and noEvent (MLS 8.5); expected values
     end when;
   end SampleOr;
 
-  model TerminalOr "terminal() with another trigger (refused)"
+  model TerminalOr "terminal() with another trigger (refused by the MTK path)"
     Real x(start = 0, fixed = true);
     Integer n(start = 0, fixed = true);
   equation

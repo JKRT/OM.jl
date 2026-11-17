@@ -213,21 +213,12 @@ const IEQ_MSL_MODELS = [
       @test sol !== nothing
       if sol !== nothing
         @test sol.retcode == ReturnCode.Success
-        local sysmod = Base.invokelatest(getfield, OMBackend,
-                                          Symbol("InitialEquationTests_IEQ8a_StandaloneInertiaFixedStart"))
-        local sys = Base.invokelatest(getproperty, sysmod, :LATEST_REDUCED_SYSTEM)
-        local unks = OMBackend.ModelingToolkit.unknowns(sys)
-        local i1w = findfirst(u -> string(u) == "I1_w(t)", unks)
-        local i1phi = findfirst(u -> string(u) == "I1_phi(t)", unks)
-        @test i1w !== nothing && i1phi !== nothing
-        if i1w !== nothing
-          @test isapprox(sol.u[1][i1w], 10.0; atol = 1e-6)
-          @test isapprox(sol.u[end][i1w], 10.0; atol = 1e-6)
-        end
-        if i1phi !== nothing
-          @test isapprox(sol.u[1][i1phi], 0.0; atol = 1e-6)
-          @test isapprox(sol.u[end][i1phi], 10.0; atol = 1e-3)
-        end
+        #= by name, of the array code's solution and the ModelingToolkit path's alike =#
+        local (i1w, i1phi) = (resolveMTKVariable(sol, :I1_w), resolveMTKVariable(sol, :I1_phi))
+        @test isapprox(sol(0.0; idxs = i1w), 10.0; atol = 1e-6)
+        @test isapprox(sol(1.0; idxs = i1w), 10.0; atol = 1e-6)
+        @test isapprox(sol(0.0; idxs = i1phi), 0.0; atol = 1e-6)
+        @test isapprox(sol(1.0; idxs = i1phi), 10.0; atol = 1e-3)
       end
     end
 
@@ -249,21 +240,11 @@ const IEQ_MSL_MODELS = [
       @test sol !== nothing
       if sol !== nothing
         @test sol.retcode == ReturnCode.Success
-        local sysmod = Base.invokelatest(getfield, OMBackend,
-                                          Symbol("InitialEquationTests_IEQ8b_SpringLoopFixedStart"))
-        local sys = Base.invokelatest(getproperty, sysmod, :LATEST_REDUCED_SYSTEM)
-        local unks = OMBackend.ModelingToolkit.unknowns(sys)
-        local i1w = findfirst(u -> string(u) == "I1_w(t)", unks)
-        local i1phi = findfirst(u -> string(u) == "I1_phi(t)", unks)
-        @test i1w !== nothing && i1phi !== nothing
-        if i1w !== nothing
-          @test isapprox(sol.u[1][i1w], 10.0; atol = 1e-6)
-          @test isapprox(sol.u[end][i1w], 10.0; atol = 1e-3)
-        end
-        if i1phi !== nothing
-          @test isapprox(sol.u[1][i1phi], 0.0; atol = 1e-6)
-          @test isapprox(sol.u[end][i1phi], 10.0; atol = 1e-3)
-        end
+        local (i1w, i1phi) = (resolveMTKVariable(sol, :I1_w), resolveMTKVariable(sol, :I1_phi))
+        @test isapprox(sol(0.0; idxs = i1w), 10.0; atol = 1e-6)
+        @test isapprox(sol(1.0; idxs = i1w), 10.0; atol = 1e-3)
+        @test isapprox(sol(0.0; idxs = i1phi), 0.0; atol = 1e-6)
+        @test isapprox(sol(1.0; idxs = i1phi), 10.0; atol = 1e-3)
       end
     end
 
@@ -607,11 +588,12 @@ const IEQ_MSL_MODELS = [
       #= A tuple equation in when initial() was evaluated and dropped (a = b = 0). =#
       local s37 = OM.simulate("InitialEquationTests.IEQ37_TupleInInitialWhen", file; stopTime = 1.0)
       @test [s37(0.5; idxs = :a), s37(0.5; idxs = :b)] ≈ [4.0, 6.0]
-      #= Without unknowns, the initial equations were not applied (k = 1); a
-         free parameter, an unknown of an init solve it does not run, is refused. =#
+      #= Without unknowns, the initial equations were not applied (k = 1). A free
+         parameter without states: y fixed at 3 and y = k give k = 3 (OpenModelica
+         keeps k = 1; the scalar route refused it). =#
       @test OM.simulate("InitialEquationTests.IEQ38_AssignedParameterWithoutStates", file; stopTime = 1.0)(0.5; idxs = :y) ≈ 1.0
-      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ39_FreeParameterWithoutStates", file;
-                                                             stopTime = 1.0)
+      local s39 = OM.simulate("InitialEquationTests.IEQ39_FreeParameterWithoutStates", file; stopTime = 1.0)
+      @test [s39(0.5; idxs = :y), s39.ps[resolveMTKVariable(s39, :k)]] ≈ [3.0, 3.0]
       #= floor(p27) was a symbolic call the start's evaluation did not fold: 0.0 with a
          warning (and integer() rounded where it was evaluated). =#
       @test OM.simulate("InitialEquationTests.IEQ40_IntegerOfParameterStart", file; stopTime = 1.0)(0.5; idxs = :zi) ≈ 2.0
@@ -630,12 +612,21 @@ const IEQ_MSL_MODELS = [
       #= der() of an observed variable: the row was skipped without a word (x(0) = 0). =#
       local s45 = OM.simulate("InitialEquationTests.IEQ45_DerivativeOfObserved", file; stopTime = 1.0)
       @test [s45(0.0; idxs = :x), s45(0.0; idxs = :y)] ≈ [-1.0, 1.0] atol = 1e-8
-      #= der(der(x)) was taken as der(x). =#
-      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ46_SecondDerivative", file; stopTime = 1.0)
+      #= der(der(x)) was taken as der(x). It is der(v) with v = der(x): -x - v = -3,
+         v(0) = 2 (OpenModelica refuses it). =#
+      local s46 = OM.simulate("InitialEquationTests.IEQ46_SecondDerivative", file; stopTime = 1.0)
+      @test [s46(0.0; idxs = :x), s46(0.0; idxs = :v)] ≈ [1.0, 2.0] atol = 1e-8
       #= The init solve freed the fixed v and returned v = 1, without a word. =#
       @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ47_FixedCannotHold", file; stopTime = 1.0)
-      #= An array element's pin did not match (var"x[1]"): x[1] = 0.48 was accepted. =#
-      @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ48_ArrayElementCannotHold", file; stopTime = 1.0)
+      #= An array element's pin did not match (var"x[1]"): x[1] = 0.48 was accepted. With
+         its arrays kept, the array code refuses it; no arrays-kept path takes it. =#
+      local e48 = try
+        OM.simulate("InitialEquationTests.IEQ48_ArrayElementCannotHold", file; stopTime = 1.0)
+        nothing
+      catch e
+        e
+      end
+      @test e48 isa OM.ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED && occursin("cannot hold", e48.reasons)
       #= The initial equation's value was taken without a word. =#
       @test_throws OMBackend.UnsupportedLowering OM.simulate("InitialEquationTests.IEQ49_FixedAndInitialEquation", file; stopTime = 1.0)
       #= A start that reads a free parameter is no user value to hold: not refused. =#
