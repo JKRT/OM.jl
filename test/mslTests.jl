@@ -613,14 +613,8 @@ end
       end
     end
     if sol !== nothing && sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      local sys = OMBackend.Modelica_Blocks_Examples_InverseModel.LATEST_REDUCED_SYSTEM
-      local lookup = Dict{String, Any}()
-      for u in OMBackend.ModelingToolkit.unknowns(sys)
-        lookup[replace(string(u), "(t)" => "")] = u
-      end
-      for eq in OMBackend.ModelingToolkit.observed(sys)
-        lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs
-      end
+      #= a variable by its canonical name, of the array code's solution and the ModelingToolkit path's alike =#
+      local lookup = (name::String) -> resolveMTKVariable(sol, Symbol(name))
       #= OMC reference trajectory captured 2026-05-10 from
          `omc <(echo 'loadModel(Modelica, {"3.2.3+maint.om"}); simulate(...);')`
          and stored as Blocks_Examples_InverseModel.csv. Default solver
@@ -637,7 +631,7 @@ end
                                             1.0 => 0.428623678))
       for (name, points) in refs
         for (t, omcRef) in points
-          @test isapprox(sol(t; idxs = lookup[name]), omcRef; atol = 1e-2)
+          @test isapprox(sol(t; idxs = lookup(name)), omcRef; atol = 1e-2)
         end
       end
       @test begin
@@ -689,10 +683,13 @@ end
            solver tolerance (reltol 1e-3) CL.v at t = 0.3 is off by 1.7 % for
            some of the equivalent systems ModelingToolkit's structural_simplify
            can pick. It picks a different one on Julia 1.13 than on 1.12 from
-           the same generated model code, so solve tighter. =#
+           the same generated model code, so solve tighter. On the array code
+           at reltol 1e-6, CL.v at its zero crossings (t = 0.1, 0.2, 0.3; 310
+           V/s) is 8.6e-6 V from the converged value (2.9e-6 of its 3 V
+           amplitude), over the check's 2.85e-6 there: 1e-8 (1.3e-7 off omc). =#
         sol = OM.simulate("Modelica.Electrical.Analog.Examples.OvervoltageProtection";
                           MSL_Version = "MSL:3.2.3", stopTime = 0.4,
-                          reltol = 1e-6, abstol = 1e-9)
+                          reltol = 1e-8, abstol = 1e-11)
         sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
       catch e
         @info "Failed to simulate MSL OvervoltageProtection" exception=(e, catch_backtrace())
@@ -834,10 +831,7 @@ end
                         MSL_Version = "MSL:3.2.3", stopTime = 1.0,
                         solver = Sundials.IDA())
       @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      local sys = OMBackend.Modelica_Mechanics_MultiBody_Examples_Elementary_Pendulum.LATEST_REDUCED_SYSTEM
-      local lookup = Dict{String, Any}()
-      for u in OMBackend.ModelingToolkit.unknowns(sys); lookup[replace(string(u), "(t)" => "")] = u; end
-      for eq in OMBackend.ModelingToolkit.observed(sys); lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs; end
+      local lookup = (name::String) -> resolveMTKVariable(sol, Symbol(name))
       #= OMC reference values at sample time points. damper.phi_rel and
          damper.w_rel track rev.phi/rev.w because the damper connects
          rev.support↔rev.axis (relative angle = joint angle). =#
@@ -856,8 +850,8 @@ end
          value is 0.2% relative error; 1.5e-2 keeps the assertion meaningful
          while tolerating the post-migration solver behavior. =#
       for (t, ref1, ref2) in refs
-        @test isapprox(sol(t; idxs = lookup[ref1.first]), ref1.second; atol = 1.5e-2)
-        @test isapprox(sol(t; idxs = lookup[ref2.first]), ref2.second; atol = 1.5e-2)
+        @test isapprox(sol(t; idxs = lookup(ref1.first)), ref1.second; atol = 1.5e-2)
+        @test isapprox(sol(t; idxs = lookup(ref2.first)), ref2.second; atol = 1.5e-2)
       end
       #= Keep the existing validateMSLModel sanity check. =#
       passed, details = validateMSLModel(sol,
@@ -896,10 +890,7 @@ end
                         solver = OMBackend.DifferentialEquations.FBDF(),
                         abstol = 1e-8, reltol = 1e-8)
       @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
-      local sys = OMBackend.Modelica_Mechanics_MultiBody_Examples_Elementary_DoublePendulum.LATEST_REDUCED_SYSTEM
-      local lookup = Dict{String, Any}()
-      for u in OMBackend.ModelingToolkit.unknowns(sys); lookup[replace(string(u), "(t)" => "")] = u; end
-      for eq in OMBackend.ModelingToolkit.observed(sys); lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs; end
+      local lookup = (name::String) -> resolveMTKVariable(sol, Symbol(name))
       local refsAt04 = ("revolute1_phi"  => -1.2464780347,
                        "revolute1_w"     => -2.0700326513,
                        "revolute2_phi"   =>  0.2601836221,
@@ -907,7 +898,7 @@ end
                        "damper_phi_rel"  => -1.2464780347,
                        "damper_w_rel"    => -2.0700326513)
       for (name, omcRef) in refsAt04
-        local omjl = sol(0.4; idxs = lookup[name])
+        local omjl = sol(0.4; idxs = lookup(name))
         @test isapprox(omjl, omcRef; atol = 5e-3)
       end
     end
@@ -916,16 +907,13 @@ end
       sol = OM.simulate("Modelica.Mechanics.MultiBody.Examples.Elementary.DoublePendulum";
                         MSL_Version = "MSL:3.2.3", stopTime = 1.0,
                         solver = OMBackend.DifferentialEquations.FBDF())
-      local sys = OMBackend.Modelica_Mechanics_MultiBody_Examples_Elementary_DoublePendulum.LATEST_REDUCED_SYSTEM
-      local lookup = Dict{String, Any}()
-      for u in OMBackend.ModelingToolkit.unknowns(sys); lookup[replace(string(u), "(t)" => "")] = u; end
-      for eq in OMBackend.ModelingToolkit.observed(sys); lookup[replace(string(eq.lhs), "(t)" => "")] = eq.lhs; end
+      local lookup = (name::String) -> resolveMTKVariable(sol, Symbol(name))
       local refsAt10 = ("revolute1_phi"  => -2.9156614600,
                        "revolute1_w"     =>  2.9445463980,
                        "revolute2_phi"   => -0.5152193800,
                        "revolute2_w"     => -7.2490700000)
       for (name, omcRef) in refsAt10
-        @test isapprox(sol(1.0; idxs = lookup[name]), omcRef; atol = 5e-2)
+        @test isapprox(sol(1.0; idxs = lookup(name)), omcRef; atol = 5e-2)
       end
     end
   end
@@ -1058,7 +1046,8 @@ end
                         ("Modelica.Media.Examples.Tests.MediaTestModels.IdealGases.SimpleNaturalGas",
                          ("volume_medium_T" => 350.841499105324, "volume_medium_p" => 111235.333542179)))
     @testset "$(model)" begin
-      local sol = OM.simulate(model; MSL_Version = "MSL:3.2.3", stopTime = 1.0)
+      #= at omc's tolerance: at the default (reltol 1e-3) SimpleNaturalGas's T(0.5) on the array code is 1.3e-6 off =#
+      local sol = OM.simulate(model; MSL_Version = "MSL:3.2.3", stopTime = 1.0, reltol = 1e-6)
       @test sol.retcode == OMBackend.DifferentialEquations.ReturnCode.Success
       for (name, h) in refs
         @test sol(0.5; idxs = Symbol(name)) ≈ h rtol = 1e-6

@@ -2,13 +2,14 @@
       @testset "Static transitions" begin
         @test true == begin
           OM.translate("SimpleTwoModes", "./Models/VSS/SimpleTwoModes.mo");
-          sols = OM.simulate("SimpleTwoModes"; solver = FBDF());
+          sols = OM.simulate("SimpleTwoModes"; solver = FBDF(), reltol = 1.0e-10, abstol = 1.0e-10);
+          #= x carried into the second mode: x(0.7) = 1.5e^1.4 - 0.5, then x(1) = 1 + (x(0.7) - 1)e^0.3 =#
           testResultRetCodeSuccess(sols[2];
-                                   expectedValue = 7.19,
+                                   expectedValue = 1 + (1.5 * exp(1.4) - 1.5) * exp(0.3),
                                    symbol = :secondMode_x,
                                    expectedRetCode = OMBackend.DifferentialEquations.ReturnCode.Success,
-                                   atol = 1.0e-2,
-                                   rtol = 1.0e-2,
+                                   atol = 1.0e-6,
+                                   rtol = 1.0e-6,
                                    )
         end
 

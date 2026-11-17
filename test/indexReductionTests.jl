@@ -22,12 +22,16 @@ _indexReductionSim(model::String; stopTime::Real, sets::Bool = false) =
 "`f()` with the dynamic state sets off (the choice at the start values), whatever the environment says."
 _staticChoice(f::Function) = withenv(f, "OMBACKEND_DYNAMIC_STATE_SETS" => "false")
 
-"The states of a solution: the unknowns of the differential rows of its mass matrix."
+"""
+The states of a solution: the unknowns of the differential rows of its mass matrix (`variable_symbols`: of the
+ModelingToolkit path's system and of the array code's alike), by their canonical names (the array code's
+`\$STATESET1.x[1]` is `\$STATESET1_x[1]`).
+"""
 function _indexReductionStates(sol)::Vector{String}
-  local us = string.(OMBackend.CodeGeneration.ModelingToolkit.unknowns(sol.prob.f.sys))
+  local us = string.(OMBackend.CodeGeneration.ModelingToolkit.SymbolicIndexingInterface.variable_symbols(sol))
   local mm = sol.prob.f.mass_matrix
   local states = mm isa OMBackend.CodeGeneration.LinearAlgebra.UniformScaling ? us : [us[i] for i in eachindex(us) if mm[i, i] != 0]
-  return sort!([replace(s, "(t)" => "", "var\"" => "", "\"" => "") for s in states])
+  return sort!([OMBackend.canonicalName(replace(s, "(t)" => "", "var\"" => "", "\"" => "")) for s in states])
 end
 
 @testset "Index reduction (OMBACKEND_INDEX_REDUCTION)" begin
@@ -200,10 +204,26 @@ end
       @test [sol(t; idxs = Symbol(v)) for t in (1.0, 3.0, 6.0)] ≈ [scalarized(t; idxs = Symbol(v)) for t in (1.0, 3.0, 6.0)] rtol = 1e-6
     end
   end
-  @testset "the scalarizing fallback is logged with the arrays-kept path's reasons" begin
-    #= one arrays-kept path (the flat model's array code generation is gone): the array index reduction's reason, then
-       the array code's after it where that was tried =#
-    @test_logs (:info, r"\[translate\] .*arrays not kept, scalarized in the frontend \(fallback\): array index reduction: no for-equations") match_mode = :any OM.translate("IndexReduction.RigidInertias", INDEX_REDUCTION_FILE)
+  @testset "what the array form declines: scalarized by the backend, no second flatten" begin
+    #= the array code takes RigidInertias (OMBackend 0.11); with the array index reduction off it declines it =#
+    local rigid::String = OMBackend.canonicalName("IndexReduction.RigidInertias")
+    withenv("OMBACKEND_ARRAY_INDEX_REDUCTION" => "false") do
+      OM.translate("IndexReduction.RigidInertias", INDEX_REDUCTION_FILE)
+      @test rigid in OMBackend.BACKEND_SCALARIZED_MODELS
+      #= the backend's scalarization off: no arrays-kept path takes the model, an error with their reasons in the
+         order they were tried (no second flatten) =#
+      withenv("OMBACKEND_BACKEND_SCALARIZATION" => "false") do
+        local err = try
+          OM.translate("IndexReduction.RigidInertias", INDEX_REDUCTION_FILE)
+          nothing
+        catch e
+          e
+        end
+        @test err isa OM.ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED
+        @test occursin(r"array index reduction: switched off.*backend scalarization: switched off", err.reasons)
+        @test !(rigid in OMBackend.BACKEND_SCALARIZED_MODELS)
+      end
+    end
   end
   @testset "index 3: a Cartesian pendulum up to its bottom" begin
     #= a static choice (y, vy) holds while x stays away from 0 (omc: dynamic state sets) =#

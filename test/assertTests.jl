@@ -135,9 +135,12 @@ end
     (warnings, _) = _warningsOf("StringEnumerationInWhen")
     @test any(endswith(": e=  three|"), warnings)
     #= A String variable that changes during the simulation (here through an
-       eliminated variable) is not supported: refused, not an UndefVarError. =#
-    @test _simulateOrError("StringOfEliminated") isa OMBackend.UnsupportedLowering
+       eliminated variable) is not supported: refused, not an UndefVarError (by no
+       arrays-kept path, ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED, with the reason). =#
+    err = _simulateOrError("StringOfEliminated")
+    @test err isa OM.ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED && occursin("a String variable that reads an eliminated variable", err.reasons)
     #= Set by an equation, it was assigned nowhere: an UndefVarError at module load. =#
-    @test _simulateOrError("StringByEquation") isa OMBackend.UnsupportedLowering
+    err = _simulateOrError("StringByEquation")
+    @test err isa OM.ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED && occursin("a String variable set by an equation", err.reasons)
   end
 end

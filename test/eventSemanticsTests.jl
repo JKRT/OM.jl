@@ -495,7 +495,11 @@ _continuousCallbacks(sol) = (c = get(sol.prob.kwargs, :callback, nothing); c ===
     @test_throws OMBackend.UnsupportedLowering _eventSim("SampleOr"; stopTime = 1.0, scalarize = true)
     local sampleOr = _eventSim("SampleOr"; stopTime = 1.0)
     @test [sampleOr(t; idxs = :n) for t in (0.1, 0.3, 0.55, 0.65, 1.0)] == [1, 2, 3, 4, 4]
-    @test_throws OMBackend.UnsupportedLowering _eventSim("TerminalOr"; stopTime = 1.0)
+    #= terminal() under or: refused by the MTK path. The array path: OpenModelica's n = 0, 1, 1 at
+       0.4, 0.6, 1 (x > 0.5 holds at the end already: terminal() makes no rising edge). =#
+    @test_throws OMBackend.UnsupportedLowering _eventSim("TerminalOr"; stopTime = 1.0, scalarize = true)
+    local terminalOr = _eventSim("TerminalOr"; stopTime = 1.0)
+    @test [terminalOr(t; idxs = :n) for t in (0.4, 0.6, 1.0)] == [0, 1, 1]
   end
   @testset "vectors of triggers, initial() bodies, sample starts (B3 review)" begin
     local at(sol, v) = [sol(t; idxs = v) for t in (0.1, 0.45, 0.7, 0.95)]

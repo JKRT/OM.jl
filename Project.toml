@@ -1,6 +1,6 @@
 name = "OM"
 uuid = "2f925a0b-2436-437b-858e-49aee461894b"
-version = "0.10.1"
+version = "0.11.0"
 authors = ["John Tinnerholm <john.tinnerholm@liu.se>"]
 
 [deps]
@@ -30,9 +30,9 @@ ModelingToolkit = "11.21.0"
 julia = "1.13"
 ImmutableList = "0.6"
 MetaModelica = "0.4.2, 0.5"
-OMBackend = "0.9, 0.10"
+OMBackend = "0.11.1"
 JuliaFormatter = "2"
-OMFrontend = "2"
+OMFrontend = "2.2.2"
 OMParser = "1"
 OMRuntimeExternalC = "1"
 DiffEqBase = "7"
