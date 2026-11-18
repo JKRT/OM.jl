@@ -144,6 +144,14 @@ PrecompileTools.@compile_workload begin
   # invalid during package image generation, and the iMTK build's Core.eval is
   # skipped under precompile (see generateIMTKCode), so this warms the iMTK codegen
   # path without the in-backend build+solve.
+  #= An MSL model translated as `simulate` translates it (the default MSL, the array code; its module's evaluation is
+     rejected here): the frontend's library paths compiled in this image, the last one loaded, where the methods of
+     the packages loaded before OMFrontend's dependents cannot invalidate them (2026-11-18 experiment). =#
+  timedPrecompileStep("MSL translate warmup") do
+    translate("Modelica.Mechanics.Rotational.Examples.First")
+    nothing
+  end
+
   timedPrecompileStep("iMTK translate warmup") do
     translate("HelloWorld", helloWorldPath; mode = OMBackend.IMTK_MODE)
     nothing
