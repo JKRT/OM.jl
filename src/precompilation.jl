@@ -42,17 +42,33 @@ end
    changes (a renamed function, a uniontype variant that became a constructor
    function). They are only hints, so evaluate each one on its own and skip
    the ones that no longer resolve instead of failing the whole precompile. =#
-let hintsFile = joinpath(@__DIR__, "precompile_statements.jl")
+"""
+Where the precompile hints are evaluated: every loaded package's module bound by its name (the extensions' too),
+so that a hint names the types of the solver packages and of OMBackend's extension as a trace prints them. OM's
+image is the last one loaded: code compiled here is not invalidated by the packages loaded before it (the same
+signatures precompiled in OMBackend's extension lost 174 of 437 at `using OM`, 2026-11-18).
+"""
+module PrecompileHints
+for (id::Base.PkgId, m::Module) in Base.loaded_modules
+  local name::Symbol = Symbol(id.name)
+  isdefined(@__MODULE__, name) || Core.eval(@__MODULE__, Expr(:const, Expr(:(=), name, m)))
+end
+end
+
+#= precompile_statements.jl: curated; precompile_statements_arrays.jl: generated (the array code's translate, build
+   and simulate of MSL EngineV6 and FullRobot, `om-hints.py` in the work report 2026-11-18-precompile-ttfs). =#
+for hintsName::String in ("precompile_statements.jl", "precompile_statements_arrays.jl")
+  local hintsFile::String = joinpath(@__DIR__, hintsName)
   include_dependency(hintsFile)
-  local total = 0
-  local stale = 0
-  local notCompiled = 0
+  local total::Int = 0
+  local stale::Int = 0
+  local notCompiled::Int = 0
   for hint in Meta.parseall(read(hintsFile, String); filename = hintsFile).args
     hint isa Expr || continue
     total += 1
     try
       #= precompile(...) returns false for a signature that no longer compiles. =#
-      Core.eval(@__MODULE__, hint) === false && (notCompiled += 1)
+      Core.eval(PrecompileHints, hint) === false && (notCompiled += 1)
     catch err
       stale += 1
       @debug "Skipping stale precompile hint" hint exception = err
@@ -60,7 +76,7 @@ let hintsFile = joinpath(@__DIR__, "precompile_statements.jl")
   end
   #= One line, so a stale hints file is noticed (efficiency review 2026-09-29). =#
   (stale + notCompiled) > 0 &&
-    @info "OM precompile hints: $stale of $total no longer resolve, $notCompiled do not compile; regenerate precompile_statements.jl"
+    @info "OM precompile hints: $stale of $total no longer resolve, $notCompiled do not compile; regenerate $(hintsName)"
 end
 
 PrecompileTools.@compile_workload begin
