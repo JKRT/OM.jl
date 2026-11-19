@@ -98,12 +98,11 @@ const ObservedFilter = Union{Nothing, Vector{String}, Vector{Regex}}
 """
 The backend modes the `mode` keyword of `translate` and `simulate` takes: `IMTK_MODE` (the default:
 the ModelingToolkit system built and simplified at translate time, its build kept for every
-simulation), `MTK_MODE` (built at each simulate), `DE_MODE` (DifferentialEquations.jl directly,
-pure ODEs).
+simulation), `MTK_MODE` (built at each simulate). A model translated with its arrays kept (`scalarize = false`, the
+default) that arrayPreserveDE takes runs its own DifferentialEquations.jl module, whatever the mode.
 """
 const IMTK_MODE = OMBackend.IMTK_MODE
 @doc (@doc IMTK_MODE) const MTK_MODE = OMBackend.MTK_MODE
-@doc (@doc IMTK_MODE) const DE_MODE = OMBackend.DEMode
 
 """
 The error a simulation throws when a Modelica `assert` of level error fails (its time, message and
@@ -342,7 +341,7 @@ directory. Returns the path written.
 To view the result in OMEdit, choose `File > Open Result(s) file`.
 """
 function exportCSV(modelName, sol; filePath = nothing)
-  sol.prob.p isa OMBackend.CodeGeneration.ArrayODEGen.ArrayModelParameters &&
+  sol.prob.p isa OMBackend.CodeGeneration.ArrayPreserveDE.ArrayModelParameters &&
     return _exportCSVArrayModel(modelName, sol, filePath)
   local (names::Vector{String}, columns::Vector{AbstractVector}) = _stateColumns(sol)
   local vals::Vector{Pair{String, AbstractVector}} = Pair{String, AbstractVector}[]
@@ -392,7 +391,7 @@ function exportCSV(modelName, sol; filePath = nothing)
 end
 
 """
-exportCSV for a solution of the array path (OMBackend.ArrayODEGen): time, then the states, algebraic and discrete
+exportCSV for a solution of the array path (OMBackend.ArrayPreserveDE): time, then the states, algebraic and discrete
 variables by their Modelica names.
 """
 function _exportCSVArrayModel(modelName, sol, filePath)
@@ -754,7 +753,7 @@ end
 
 Default for the `scalarize` keyword of `translate` and `simulate`. `false` (the default): the
 flat model keeps its array variables, array equations and for-equations, and the backend
-generates code that keeps the loops (`OMBackend.ARRAY_ODE_GENERATION`): its size does not grow
+generates code that keeps the loops (`OMBackend.ARRAY_PRESERVE_DE_GENERATION`): its size does not grow
 with the arrays, and every parameter can be changed in `resimulate`. A model of index above one
 whose index OMBackend reduces in array form (`OMBACKEND_ARRAY_INDEX_REDUCTION`) keeps its arrays
 through index reduction and is scalarized after it. Another model outside that code generation's
@@ -837,7 +836,7 @@ recorded them.
 """
 function _reusableTranslation(internalName::String, scalarize::Bool, MSL_Version::Union{Nothing, String},
                               libraries::Vector{String}, settings::TranslationSettings)::Bool
-  (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_ODE_MODELS) || return false
+  (haskey(OMBackend.COMPILED_MODELS_MTK, internalName) || internalName in OMBackend.ARRAY_PRESERVE_DE_MODELS) || return false
   get(SCALARIZED_AT_TRANSLATE, internalName, true) == scalarize || return false
   get(SETTINGS_AT_TRANSLATE, internalName, settings) == settings || return false
   local key::Tuple{Union{Nothing, String}, Vector{String}, Vector{String}} = (MSL_Version, libraries, loadedLibraries())

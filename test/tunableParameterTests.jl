@@ -283,5 +283,5 @@ end
   OM.translate("TunableParameters.Switched", mo)
   @test OM.eventCount("TunableParameters.Switched") >= 1
   @test OM.canonicalName("body.m") == "body_m" && OM.canonicalName("der(a.b)") == "der(a_b)"
-  @test OM.IMTK_MODE === OMBackend.IMTK_MODE && OM.DE_MODE === OMBackend.DEMode
+  @test OM.IMTK_MODE === OMBackend.IMTK_MODE && OM.MTK_MODE === OMBackend.MTK_MODE
 end
