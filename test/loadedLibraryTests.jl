@@ -23,7 +23,7 @@
   #= unloaded: its parse and the model translated with it are forgotten =#
   @test OM.loadedLibraries() == loaded
   @test !haskey(OMFrontend.LIBRARY_CACHE, v1)
-  @test !haskey(OMBackend.COMPILED_MODELS_MTK, "UsesLib") && !("UsesLib" in OMBackend.ARRAY_ODE_MODELS)
+  @test !haskey(OMBackend.COMPILED_MODELS_MTK, "UsesLib") && !("UsesLib" in OMBackend.ARRAY_PRESERVE_DE_MODELS)
   @test_throws ErrorException OM.unloadLibrary(v1)
   local v2 = OM.loadInstalledLibrary("Lib"; version = "2.0.0", installDir = dir)
   try

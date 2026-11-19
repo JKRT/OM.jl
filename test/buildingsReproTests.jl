@@ -20,7 +20,7 @@ catch
   false
 end
 #= Whether the last translation of the model went the array path (arrays kept). =#
-brArrayPath(model) = OMBackend.canonicalName("BuildingsRepro." * model) in OMBackend.ARRAY_ODE_MODELS
+brArrayPath(model) = OMBackend.canonicalName("BuildingsRepro." * model) in OMBackend.ARRAY_PRESERVE_DE_MODELS
 
 #= A variable's value at time t (away from events): the solution's interpolation, or for a
    variable it does not interpolate, linear between the saved values around t. =#
