@@ -16,15 +16,15 @@ const ARRAY_MODELS = joinpath(@__DIR__, "Models", "Arrays")
     local kept = OM.simulate("Rod1000", rod; scalarize = false, stopTime = 0.1)
     @test kept.retcode == ReturnCode.Success
     @test "Rod1000" in OMBackend.ARRAY_PRESERVE_DE_MODELS
-    local a = OMBackend.getVariableValues(kept, "s[400].T")[end]
+    local a = OMBackend.variableValues(kept, "s[400].T")[end]
     local scal = OM.simulate("Rod1000", rod; scalarize = true, stopTime = 0.1)
     @test !("Rod1000" in OMBackend.ARRAY_PRESERVE_DE_MODELS)
-    @test a ≈ OMBackend.getVariableValues(scal, "s[400].T")[end] atol = 1e-6
+    @test a ≈ OMBackend.variableValues(scal, "s[400].T")[end] atol = 1e-6
     #= algebraic variables by name, a parameter changed without translating again =#
     kept = OM.simulate("Rod1000", rod; scalarize = false, stopTime = 0.1)
     @test kept(0.05; idxs = Symbol("c[1].a.Q")) isa Real
     local faster = OM.resimulate("Rod1000"; stopTime = 0.1, parameters = Dict("k" => 2.0))
-    @test OMBackend.getVariableValues(faster, "s[400].T")[end] < a
+    @test OMBackend.variableValues(faster, "s[400].T")[end] < a
   end
 
   @testset "BouncingBalls: when-equations in a loop" begin

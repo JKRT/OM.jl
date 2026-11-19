@@ -155,7 +155,7 @@ Returns `nothing`.
 """
 function listAvailableModels()
   println("Lists currently compiled modules...")
-  println(OMBackend.availableModels())
+  foreach(println, OMBackend.availableModels())
 end
 
 include("help.jl")
@@ -354,7 +354,7 @@ function exportCSV(modelName, sol; filePath = nothing)
     local directFailed::Bool = false
     for v in observed
       local name::String = string(v.lhs)
-      local valVec::Union{Nothing, AbstractVector} = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
+      local valVec::Union{Nothing, AbstractVector} = OMBackend.variableValues(sol, replace(name, "(t)" => ""))
       if valVec === nothing
         directFailed = true
         break
@@ -400,7 +400,7 @@ function _exportCSVArrayModel(modelName, sol, filePath)
   local columns::Vector{AbstractVector} = AbstractVector[sol.t]
   for name in Base.invokelatest(() -> vcat(m.STATE_NAMES, m.ALGEBRAIC_NAMES, m.DISCRETE_NAMES))
     push!(names, name)
-    push!(columns, OMBackend.getVariableValues(sol, name))
+    push!(columns, OMBackend.variableValues(sol, name))
   end
   local finalFileName::String = filePath === nothing ? string(replace(modelName, "." => "_"), "_res.csv") : filePath
   return _writeCSV(finalFileName, names, columns)
@@ -479,8 +479,8 @@ function exportCSV(modelName, sols::Vector; filePath = nothing, coalesce = false
     local observed = OMBackend.MTK_getObserved(sol, modelName)
     for v in observed
       local name::String = string(v.lhs)
-      local valVec::Union{Nothing, AbstractVector} = OMBackend.getVariableValues(sol, replace(name, "(t)" => ""))
-      #= one getVariableValues did not find (it warned) is left out =#
+      local valVec::Union{Nothing, AbstractVector} = OMBackend.variableValues(sol, replace(name, "(t)" => ""))
+      #= one variableValues did not find (it warned) is left out =#
       valVec === nothing && continue
       push!(names, name)
       push!(columns, valVec)
@@ -890,7 +890,7 @@ _withSimulationSettings(f::Function, directRHS::Bool, startTime::Real) =
 
 Translate and simulate a file-based Modelica model in one step. Equivalent
 to `translate(modelName, modelFile; ...)` followed by
-`OMBackend.simulateModel(modelName; ...)`. Returns the simulation result.
+`OMBackend.simulate(modelName; ...)`. Returns the simulation result.
 
 # Keyword arguments
 - `startTime`, `stopTime`: simulation time span (default 0.0 to 1.0).
@@ -923,7 +923,7 @@ to `translate(modelName, modelFile; ...)` followed by
 - `overwriteCache`: force re-evaluation of generated code even if the
   model is already compiled (default `false`).
 
-Additional keyword arguments are forwarded to `OMBackend.simulateModel`.
+Additional keyword arguments are forwarded to `OMBackend.simulate`.
 """
 function simulate(modelName::String,
                   modelFile::String;
@@ -953,17 +953,17 @@ function simulate(modelName::String,
               observedFilter = observedFilter,
               scalarize = scalarize)
     rebuilt = rebuilt && _builtAtTranslate(modelName)
-    OMBackend.simulateModel(modelName;
-                            MODE = mode, tspan = (startTime, stopTime),
-                            solver = solver, overwriteCache = overwriteCache && !rebuilt,
-                            kwargs...)
+    OMBackend.simulate(modelName;
+                       mode = mode, tspan = (startTime, stopTime),
+                       solver = solver, overwriteCache = overwriteCache && !rebuilt,
+                       kwargs...)
   end
 end
 
 #= `overwriteCache` asks for a fresh build. In IMTK mode the translate of the
    same call builds the problem (IMTKGen._buildAndCache), reusing a cached
    build whose generated code is unchanged: forgetting that build first makes
-   the translate's build fresh, and simulateModel then must not build it a
+   the translate's build fresh, and OMBackend.simulate then must not build it a
    second time (MSL EngineV6_analytic: 70 s and 16 GB of allocations, twice).
    A translate that throws leaves no cached build to answer for the model.
    Returns whether the translate is to provide the fresh build. =#
@@ -974,7 +974,7 @@ function _freshBuildAtTranslate!(modelName::String, mode, overwriteCache::Bool):
 end
 
 #= Whether the translate cached a build. The structural / sub-model /
-   flat-model path (and a failed build) caches none: simulateModel's forced
+   flat-model path (and a failed build) caches none: OMBackend.simulate's forced
    rebuild then evaluates the module again, as before. =#
 _builtAtTranslate(modelName::String)::Bool =
   haskey(OMBackend.IMTKGen.BUILT, OMBackend.canonicalName(modelName))
@@ -1065,10 +1065,10 @@ function simulate(modelName::String;
                 scalarize = scalarize)
       rebuilt = rebuilt && _builtAtTranslate(modelName)
     end
-    OMBackend.simulateModel(modelName;
-                            MODE = mode, tspan = (startTime, stopTime),
-                            solver = solver, overwriteCache = overwriteCache && !rebuilt,
-                            kwargs...)
+    OMBackend.simulate(modelName;
+                       mode = mode, tspan = (startTime, stopTime),
+                       solver = solver, overwriteCache = overwriteCache && !rebuilt,
+                       kwargs...)
   end
 end
 
@@ -1242,21 +1242,21 @@ function translate(modelName::String,
         _recordLoadedLibraries(modelName)
         if keep
           local keptFunctions = OMFrontend.cacheToFunctionList(cache)
-          local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
-                                                           warnMissingStartValues, eliminateNonDynamic, observedFilter,
-                                                           checkSimCode)
+          local reduced = OMBackend.translate(fm; functionList = keptFunctions, mode, scalarize = false,
+                                              warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                              checkSimCode)
           reduced === nothing || return reduced
           throw(ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED(OMBackend.canonicalName(fm.name)))
         end
         functionList = OMFrontend.cacheToFunctionList(cache)
         OMBackend.translate(fm;
                             functionList = functionList,
-                            BackendMode = mode,
+                            mode = mode,
                             warnMissingStartValues = warnMissingStartValues,
                             eliminateNonDynamic = eliminateNonDynamic,
                             observedFilter = observedFilter,
                             checkSimCode = checkSimCode,
-                            scalarized = true)
+                            scalarize = true)
       end
     end
   end
@@ -1330,21 +1330,21 @@ function translate(modelName::String;
         _recordLoadedLibraries(modelName)
         if keep
           local keptFunctions = OMFrontend.cacheToFunctionList(cache)
-          local reduced = OMBackend.translateReducedArrays(fm; functionList = keptFunctions, BackendMode = mode,
-                                                           warnMissingStartValues, eliminateNonDynamic, observedFilter,
-                                                           checkSimCode)
+          local reduced = OMBackend.translate(fm; functionList = keptFunctions, mode, scalarize = false,
+                                              warnMissingStartValues, eliminateNonDynamic, observedFilter,
+                                              checkSimCode)
           reduced === nothing || return reduced
           throw(ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED(OMBackend.canonicalName(fm.name)))
         end
         functionList = OMFrontend.cacheToFunctionList(cache)
         OMBackend.translate(fm;
                             functionList = functionList,
-                            BackendMode = mode,
+                            mode = mode,
                             warnMissingStartValues = warnMissingStartValues,
                             eliminateNonDynamic = eliminateNonDynamic,
                             observedFilter = observedFilter,
                             checkSimCode = checkSimCode,
-                            scalarized = true)
+                            scalarize = true)
       end
     end
   end
@@ -1439,12 +1439,12 @@ and the underlying error is logged.
 function resimulate(modelName; startTime = 0.0,  stopTime = 1.0, solver = OMBackend.defaultSolver(),
                     mode = OMBackend.DEFAULT_BACKEND_MODE[], parameters::AbstractDict = Dict(), kwargs...)
   try
-    OMBackend.resimulateModel(modelName; tspan = (startTime, stopTime), solver = solver, MODE = mode,
-                              parameters = parameters, kwargs...)
+    OMBackend.resimulate(modelName; tspan = (startTime, stopTime), solver = solver, mode = mode,
+                         parameters = parameters, kwargs...)
   catch e
     @error "Failed to resimulate '$(modelName)'. Make sure the model is compiled by calling 'translate'." exception=(e, catch_backtrace())
     println("Available models are:\n")
-    println(OMBackend.availableModels())
+    foreach(println, OMBackend.availableModels())
   end
 end
 

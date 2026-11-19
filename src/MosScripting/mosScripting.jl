@@ -1142,7 +1142,7 @@ function _command_val(context::ScriptContext, positional, keywords)
   context.lastSolution === nothing && error("val requires a prior simulation")
   variable = _name(positional[1])
   time = Float64(positional[2])
-  values = context.api.OMBackend.getVariableValues(context.lastSolution, variable)
+  values = context.api.OMBackend.variableValues(context.lastSolution, variable)
   times = context.lastSolution.t
   isempty(times) && error("simulation result has no saved times")
   index = argmin(abs.(times .- time))
