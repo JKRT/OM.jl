@@ -1148,7 +1148,8 @@ canonicalName(name::AbstractString)::String = OMBackend.canonicalName(name)
 
 The number of event callbacks of the compiled `modelName`: of its build (a problem built for `tspan`
 without one), or of `problem`'s own callbacks (`problem.kwargs[:callback]`), whichever is larger.
-OMBackend's step control of algebraic variables only limits steps: no event.
+Only events count (`OMBackend.isEventCallback`): not the step control of algebraic variables, the assert
+checks or a run's bookkeeping callbacks. 0: the model has no events.
 """
 function eventCount(modelName::String; problem::Union{Nothing, DiffEqBase.AbstractDEProblem} = nothing,
                     tspan::Tuple{Real, Real} = (0.0, 1.0))::Int
@@ -1162,8 +1163,8 @@ end
 "The event callbacks of a callback, a set or a collection of them (eventCount)."
 _eventCount(::Nothing)::Int = 0
 _eventCount(cb::DiffEqBase.CallbackSet)::Int =
-  length(cb.continuous_callbacks) + count(c -> !OMBackend.CodeGeneration.isStepControl(c), cb.discrete_callbacks)
-_eventCount(cb::DiffEqBase.DECallback)::Int = OMBackend.CodeGeneration.isStepControl(cb) ? 0 : 1
+  count(OMBackend.isEventCallback, cb.continuous_callbacks) + count(OMBackend.isEventCallback, cb.discrete_callbacks)
+_eventCount(cb::DiffEqBase.DECallback)::Int = OMBackend.isEventCallback(cb) ? 1 : 0
 _eventCount(cbs::Union{Tuple, AbstractVector})::Int = sum(_eventCount, cbs; init = 0)
 
 """
