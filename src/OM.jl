@@ -38,17 +38,23 @@ module OM
    OMBackendJuliaFormatterExt load with Plots and JuliaFormatter), so OM does, before it. =#
 import Plots
 import JuliaFormatter
+using PrecompileTools: @recompile_invalidations
 import OMBackend
-import OMParser.Absyn
-import OMFrontend.SCode
-import OMFrontend.DAE
-#= Frontend Components =#
-import OMFrontend
+#= OMFrontend's image is compiled without Symbolics and SymbolicUtils, which OMBackend loads before it: their methods
+   of != and convert (on Any) fail the verification of its code at load, and MSL EngineV6's cold run compiled 3.3 s of
+   it again (checkBinaryOperation, evalCref, instComponent, ...). Loaded under @recompile_invalidations, that code is
+   compiled into OM's image. =#
+@recompile_invalidations begin
+  import OMParser.Absyn
+  import OMFrontend.SCode
+  import OMFrontend.DAE
+  #= Frontend Components =#
+  import OMFrontend
+end
 #= The packages loaded after OMBackend may define methods that invalidate the code compiled into OMBackend's and
    OMFrontend's images, which every session would then compile again at its first model. Loaded under
    @recompile_invalidations, the invalidated code is compiled again into OM's image. (CSV and DataFrames, 50k
    invalidated method instances through CSV's Durations and DataStrings, are not loaded: exportCSV writes its file.) =#
-using PrecompileTools: @recompile_invalidations
 @recompile_invalidations begin
   #= Use DifferentialEquations s.t solvers can be passed in a sensible way=#
   using DifferentialEquations
