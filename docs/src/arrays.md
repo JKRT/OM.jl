@@ -83,7 +83,7 @@ the first run also compiles.)
 Variables are read by their Modelica names, states and algebraic variables alike:
 
 ```julia
-OM.OMBackend.getVariableValues(sol, "s[5000].T")
+OM.OMBackend.variableValues(sol, "s[5000].T")
 sol(0.05; idxs = Symbol("c[1].a.Q"))
 ```
 
@@ -98,7 +98,7 @@ it: the conductances `G = k / dx` below.
 p = plot(; xlabel = "time", ylabel = "temperature at x = 0.4")
 for k in (0.5, 1.0, 2.0)
   s = OM.resimulate("Rod"; stopTime = 0.1, saveat = 0.001, parameters = Dict("k" => k))
-  plot!(p, s.t, OM.OMBackend.getVariableValues(s, "s[4000].T"); label = "k = $k")
+  plot!(p, s.t, OM.OMBackend.variableValues(s, "s[4000].T"); label = "k = $k")
 end
 p
 ```
@@ -139,7 +139,7 @@ end BouncingBalls;
 sol = OM.simulate("BouncingBalls", "BouncingBalls.mo"; stopTime = 1.7, saveat = 0.002)
 p = plot(; xlabel = "time [s]", ylabel = "height [m]")
 for i in (1, 50, 100)
-  plot!(p, sol.t, OM.OMBackend.getVariableValues(sol, "h[$i]"); label = "ball $i")
+  plot!(p, sol.t, OM.OMBackend.variableValues(sol, "h[$i]"); label = "ball $i")
 end
 p
 sol(1.7; idxs = Symbol("bounces[1]"))   # 5.0

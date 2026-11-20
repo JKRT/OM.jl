@@ -20,7 +20,7 @@ end
 @testset "MSL 4.1.0 by default:" begin
   @test OM.DEFAULT_MSL_VERSION == "MSL:4.1.0"
   local sol = OM.simulate("MSL4Units", "./Models/MSL/MSL4Units.mo"; MSL = true, stopTime = 1.0)
-  @test isapprox(OMBackend.getVariableValues(sol, "T")[end], 290 + 10 * exp(-0.1); atol = 1e-3)
+  @test isapprox(OMBackend.variableValues(sol, "T")[end], 290 + 10 * exp(-0.1); atol = 1e-3)
   @test OM.exportModelica("MSL4Units", "./Models/MSL/MSL4Units.mo"; MSL = true) isa String
   @test OM.flatten("Modelica.Electrical.Polyphase.Examples.TransformerYY") isa Tuple
 end

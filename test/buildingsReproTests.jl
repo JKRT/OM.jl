@@ -20,7 +20,7 @@ catch
   false
 end
 #= Whether the last translation of the model went the array path (arrays kept). =#
-brArrayPath(model) = OMBackend.canonicalName("BuildingsRepro." * model) in OMBackend.ARRAY_ODE_MODELS
+brArrayPath(model) = OMBackend.canonicalName("BuildingsRepro." * model) in OMBackend.ARRAY_PRESERVE_DE_MODELS
 
 #= A variable's value at time t (away from events): the solution's interpolation, or for a
    variable it does not interpolate, linear between the saved values around t. =#
@@ -28,7 +28,7 @@ function brValue(sol, name::String, t::Real)
   try
     return sol(t; idxs = Symbol(name))
   catch
-    local vals = OMBackend.getVariableValues(sol, name)
+    local vals = OMBackend.variableValues(sol, name)
     local i = searchsortedlast(sol.t, t)
     (i == length(sol.t) || sol.t[i] == t) && return vals[i]
     local w = (t - sol.t[i]) / (sol.t[i + 1] - sol.t[i])

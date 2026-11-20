@@ -14,7 +14,7 @@ const HELP_SECTIONS = [
     "...; solver = Tsit5(), reltol = 1e-8, saveat = 0.01" => "a SciML solver; the rest goes to solve",
   ],
   "Results" => [
-    "OM.OMBackend.getVariableValues(sol, \"body.v\")" => "a variable's values, Modelica name",
+    "OM.OMBackend.variableValues(sol, \"body.v\")" => "a variable's values, Modelica name",
     "sol.t, sol.retcode" => "time points, solver status",
     "OM.exportCSV(name, sol)" => "a CSV file for OMEdit",
     "OM.getMTKProblem(name; tspan = (0.0, 10.0))" => "ODEProblem and callbacks, to solve",
@@ -61,7 +61,7 @@ ex(file) = joinpath(pkgdir(OM), "examples", "Libraries", file)
 
 # A model of the MSL by name: the bundled MSL 4.1.0, or 3.2.3 with MSL_Version
 sol = OM.simulate("Modelica.Blocks.Examples.PID_Controller"; stopTime = 4.0)
-OM.OMBackend.getVariableValues(sol, "inertia1.w")
+OM.OMBackend.variableValues(sol, "inertia1.w")
 sol = OM.simulate("Modelica.Blocks.Examples.PID_Controller"; MSL_Version = "MSL:3.2.3",
                   stopTime = 4.0)
 

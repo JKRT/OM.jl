@@ -43,7 +43,7 @@ const SII = OMBackend.Runtime.ModelingToolkit.SymbolicIndexingInterface
   @test isapprox(viaOM(3.0; idxs = :x), ref(3.0; idxs = :x); rtol = 1e-4)
   @test isapprox(OM.resimulate("TunableParameters.LotkaVolterra"; stopTime = 3.0, parameters = Dict(:alpha => 1.0),
                                abstol = 1e-10, reltol = 1e-8)(3.0; idxs = :x), ref(3.0; idxs = :x); rtol = 1e-4)
-  @test_throws ArgumentError OMBackend.simulateModel("TunableParameters.LotkaVolterra"; tspan = (0.0, 3.0),
+  @test_throws ArgumentError OMBackend.simulate("TunableParameters.LotkaVolterra"; tspan = (0.0, 3.0),
                                                      parameters = Dict("gamma" => 1.0))
 
   #= A parameter bound to a tunable one follows it. =#
@@ -277,11 +277,14 @@ end
   @test isapprox(sol(3.0; idxs = :x), ref(3.0; idxs = :x); rtol = 1e-4)
   @test OM.eventCount("TunableParameters.LotkaVolterra") == 0
   @test OM.eventCount("TunableParameters.LotkaVolterra"; problem = sol.prob) == 0
-  #= translated again without them: folded, not tunable =#
+  #= translated again without them: with its arrays kept (the default) the array code sets any parameter at simulate;
+     scalarized, they are folded, not tunable =#
   OM.translate("TunableParameters.LotkaVolterra", mo)
+  @test OM.isTunable("TunableParameters.LotkaVolterra", ["alpha", "beta"])
+  OM.translate("TunableParameters.LotkaVolterra", mo; scalarize = true)
   @test !OM.isTunable("TunableParameters.LotkaVolterra", ["alpha", "beta"])
   OM.translate("TunableParameters.Switched", mo)
   @test OM.eventCount("TunableParameters.Switched") >= 1
   @test OM.canonicalName("body.m") == "body_m" && OM.canonicalName("der(a.b)") == "der(a_b)"
-  @test OM.IMTK_MODE === OMBackend.IMTK_MODE && OM.DE_MODE === OMBackend.DEMode
+  @test OM.IMTK_MODE === OMBackend.IMTK_MODE && OM.MTK_MODE === OMBackend.MTK_MODE
 end

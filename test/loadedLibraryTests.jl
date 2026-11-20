@@ -10,7 +10,7 @@
     @test OM.loadedLibraries() == vcat(loaded, v1)
     #= used without `libraries`: a file's model, a library model by name =#
     local sol = OM.simulate("UsesLib", model; stopTime = 1.0)
-    @test isapprox(OMBackend.getVariableValues(sol, "x")[end], 1.0; atol = 1e-6)
+    @test isapprox(OMBackend.variableValues(sol, "x")[end], 1.0; atol = 1e-6)
     @test OM.flatten("Lib.Growth") isa Tuple
     #= the other version: an error naming both, at the load and in `libraries` =#
     local e = try OM.loadInstalledLibrary("Lib"; version = "2.0.0", installDir = dir); nothing catch err; err end
@@ -23,12 +23,12 @@
   #= unloaded: its parse and the model translated with it are forgotten =#
   @test OM.loadedLibraries() == loaded
   @test !haskey(OMFrontend.LIBRARY_CACHE, v1)
-  @test !haskey(OMBackend.COMPILED_MODELS_MTK, "UsesLib") && !("UsesLib" in OMBackend.ARRAY_ODE_MODELS)
+  @test !haskey(OMBackend.COMPILED_MODELS_MTK, "UsesLib") && !("UsesLib" in OMBackend.ARRAY_PRESERVE_DE_MODELS)
   @test_throws ErrorException OM.unloadLibrary(v1)
   local v2 = OM.loadInstalledLibrary("Lib"; version = "2.0.0", installDir = dir)
   try
     local sol = OM.simulate("UsesLib", model; stopTime = 1.0)
-    @test isapprox(OMBackend.getVariableValues(sol, "x")[end], 2.0; atol = 1e-6)
+    @test isapprox(OMBackend.variableValues(sol, "x")[end], 2.0; atol = 1e-6)
   finally
     OM.unloadLibrary(v2)
   end
