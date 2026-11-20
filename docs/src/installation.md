@@ -1,7 +1,7 @@
 # Installation
 
 OM.jl is a multi-package project: the compiler stages live in sibling
-sub-packages (`OMFrontend.jl`, `OMBackend.jl`, `OMParser.jl`, …) that the
+sub-packages (`OMFrontend.jl`, `OMBackend.jl`, `OpenModelicaParser.jl`, …) that the
 top-level `OM` package references through `Project.toml` `[sources]` paths.
 Those sub-packages are git **submodules**, so they must be checked out.
 

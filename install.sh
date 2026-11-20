@@ -23,7 +23,7 @@ OM_JL_DIR=${OM_JL_DIR:-"$HOME/.julia/dev/OM"}
 OM_JL_URL=${OM_JL_URL:-https://github.com/JKRT/OM.jl.git}
 
 # The package submodules ([sources]); OMLibraryTesting is only for the tests.
-PACKAGES="ImmutableList.jl MetaModelica.jl OMParser.jl OMFrontend.jl
+PACKAGES="ImmutableList.jl MetaModelica.jl OpenModelicaParser.jl OMFrontend.jl
 OMBackend.jl OMRuntimeExternalC.jl"
 
 if [ -d "$OM_JL_DIR/.git" ] || [ -f "$OM_JL_DIR/.git" ]; then
