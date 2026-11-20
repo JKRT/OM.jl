@@ -5,8 +5,32 @@ name: CI
 # call; see omjl-ci.yml).
 on:
   pull_request:
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE*'
+      - 'COPYING'
+      - 'CITATION.bib'
+      - '.gitignore'
+      - '.github/workflows/docs.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/installer.yml'
+      - '.github/workflows/update-submodules.yml'
+      - '.github/workflows/committed-files.yml'
   push:
     branches: [master, "1.13"]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - 'LICENSE*'
+      - 'COPYING'
+      - 'CITATION.bib'
+      - '.gitignore'
+      - '.github/workflows/docs.yml'
+      - '.github/workflows/release.yml'
+      - '.github/workflows/installer.yml'
+      - '.github/workflows/update-submodules.yml'
+      - '.github/workflows/committed-files.yml'
   workflow_dispatch:
 
 permissions:
