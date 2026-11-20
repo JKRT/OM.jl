@@ -3,7 +3,7 @@ CI setup for OM.jl with its sibling packages checked out inside the OM.jl
 directory (the layout of the submodules; see
 .github/actions/checkout-siblings). Run as `julia --project=OM.jl ci/setup.jl`.
 Nothing is built: OMRuntimeExternalC's library is an artifact, which Pkg
-installs with the packages (OMParser has no native code since 1.0).
+installs with the packages (the parser, OpenModelicaParser, has no native code).
 =#
 import Pkg
 

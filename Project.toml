@@ -12,7 +12,7 @@ MetaModelica = "9d7f2a79-07b5-5542-8b19-c0100dda6b06"
 ModelingToolkit = "961ee093-0014-501f-94e3-6117800e7a78"
 OMBackend = "9400bd5f-7561-42f6-8760-03756753da50"
 OMFrontend = "b10394b5-f439-4073-a0c5-e09cb00cf46c"
-OMParser = "11f87224-cae7-4e99-a924-e50d12f62c59"
+OpenModelicaParser = "93103b3a-abeb-4d26-8089-9ec101bd0c3c"
 OMRuntimeExternalC = "ada38df0-e20e-11ed-02f3-2b4b19c1ec8a"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PrecompileTools = "aea7be01-6a6a-4083-8856-8a6e6704d82a"
@@ -22,18 +22,18 @@ ImmutableList = {path = "ImmutableList.jl"}
 MetaModelica = {path = "MetaModelica.jl"}
 OMBackend = {path = "OMBackend.jl"}
 OMFrontend = {path = "OMFrontend.jl"}
-OMParser = {path = "OMParser.jl"}
+OpenModelicaParser = {path = "OpenModelicaParser.jl"}
 OMRuntimeExternalC = {path = "OMRuntimeExternalC.jl"}
 
 [compat]
 ModelingToolkit = "11.21.0"
 julia = "1.13"
 ImmutableList = "0.6"
-MetaModelica = "0.5, 1"
-OMBackend = "1"
+MetaModelica = "2"
+OMBackend = "1.1"
 JuliaFormatter = "2"
-OMFrontend = "2.2.5"
-OMParser = "1"
+OMFrontend = "3"
+OpenModelicaParser = "1"
 OMRuntimeExternalC = "1"
 DiffEqBase = "7"
 DifferentialEquations = "8"

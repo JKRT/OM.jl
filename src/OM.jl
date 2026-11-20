@@ -45,7 +45,7 @@ import OMBackend
    it again (checkBinaryOperation, evalCref, instComponent, ...). Loaded under @recompile_invalidations, that code is
    compiled into OM's image. =#
 @recompile_invalidations begin
-  import OMParser.Absyn
+  import OpenModelicaParser.Absyn
   import OMFrontend.SCode
   import OMFrontend.DAE
   #= Frontend Components =#
@@ -671,7 +671,7 @@ _classPath(node::OMFrontend.Frontend.InstNode)::String =
     OMFrontend.Frontend.component(node)); includeRoot = true))
 
 "A source position as a plain named tuple (`fileName`, line and column of its start and end)."
-_sourceSpan(info::MetaModelica.SourceInfo)::NamedTuple =
+_sourceSpan(info::Absyn.SourceInfo)::NamedTuple =
   (fileName = String(info.fileName), lineNumberStart = Int(info.lineNumberStart),
    columnNumberStart = Int(info.columnNumberStart), lineNumberEnd = Int(info.lineNumberEnd),
    columnNumberEnd = Int(info.columnNumberEnd))
