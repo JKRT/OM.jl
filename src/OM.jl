@@ -45,7 +45,7 @@ import OMBackend
    it again (checkBinaryOperation, evalCref, instComponent, ...). Loaded under @recompile_invalidations, that code is
    compiled into OM's image. =#
 @recompile_invalidations begin
-  import OMParser.Absyn
+  import OpenModelicaParser.Absyn
   import OMFrontend.SCode
   import OMFrontend.DAE
   #= Frontend Components =#
