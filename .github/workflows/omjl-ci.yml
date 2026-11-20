@@ -9,8 +9,7 @@ name: OM.jl integration
 #    exists in that repository, else the PR base branch or `line`, e.g. 1.13,
 #    else master; after a merge the merged PR's branch first), in the layout of
 #    OM.jl's submodules, with the package under test in its place.
-# 2. Build the native libraries (OMParser from source when no release exists
-#    for the Julia version), set up and precompile OM.jl (ci/setup.jl).
+# 2. Set up and precompile OM.jl (ci/setup.jl).
 # 3. Run the package's own tests against the checked-out siblings
 #    (ci/test-package.jl), then OM.jl's test suite (test/runtests.jl), also
 #    when the package's own tests fail. The suite runs as parallel jobs, one
