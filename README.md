@@ -1,4 +1,4 @@
-# OpenModelicaJL (OM.jl) [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://jkrt.github.io/OM.jl/dev/) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
+# OpenModelicaJL (OM.jl) [![CI](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml) [![Coverage](https://img.shields.io/endpoint?url=https://jkrt.github.io/OM.jl/coverage.json)](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml?query=branch%3Amaster) [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://jkrt.github.io/OM.jl/dev/) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
 A Modelica Environment in Julia.
 
 Documentation: <https://jkrt.github.io/OM.jl/dev/> (installation, examples, [Modelica libraries](https://jkrt.github.io/OM.jl/dev/libraries/), large array models, [scripting in Julia](https://jkrt.github.io/OM.jl/dev/julia/) and with `.mos`, [coverage](https://jkrt.github.io/OM.jl/dev/coverage/), [troubleshooting](https://jkrt.github.io/OM.jl/dev/troubleshooting/), API).
