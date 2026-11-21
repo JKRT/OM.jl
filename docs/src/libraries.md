@@ -188,7 +188,7 @@ end HeatedMass;
 
 ```julia
 sol = OM.simulate("HeatedMass", "HeatedMass.mo"; stopTime = 1000.0)
-OM.OMBackend.getVariableValues(sol, "mass.T")[end]   # 342.234 = 293.15 + 50 (1 - exp(-1000 / 250))
+OM.OMBackend.variableValues(sol, "mass.T")[end]   # 342.234 = 293.15 + 50 (1 - exp(-1000 / 250))
 sol = OM.simulate("HeatedMass", "HeatedMass.mo"; MSL = true, MSL_Version = "MSL:3.2.3", stopTime = 1000.0)
 ```
 
@@ -207,8 +207,8 @@ end MoreTorque;
 ```
 
 ```julia
-speedError(sol) = maximum(abs.(OM.OMBackend.getVariableValues(sol, "PI.u_s") .-
-                               OM.OMBackend.getVariableValues(sol, "PI.u_m")))
+speedError(sol) = maximum(abs.(OM.OMBackend.variableValues(sol, "PI.u_s") .-
+                               OM.OMBackend.variableValues(sol, "PI.u_m")))
 speedError(OM.simulate("Modelica.Blocks.Examples.PID_Controller"; MSL_Version = "MSL:4.1.0", stopTime = 4.0))  # 0.343
 speedError(OM.simulate("MoreTorque", "MoreTorque.mo"; stopTime = 4.0))                                         # 0.0221
 ```
@@ -247,7 +247,7 @@ end TankLevel;
 
 ```julia
 sol = OM.simulate("TankLevel", "TankLevel.mo"; libraries = ["Controllers.mo"], stopTime = 30.0)
-OM.OMBackend.getVariableValues(sol, "h")[end]        # 1.0002: the level overshoots to 1.113, then settles
+OM.OMBackend.variableValues(sol, "h")[end]        # 1.0002: the level overshoots to 1.113, then settles
 OM.loadLibrary("Controllers.mo")                     # "Controllers": loaded for the session
 sol = OM.simulate("TankLevel", "TankLevel.mo"; stopTime = 30.0)
 ```
@@ -294,7 +294,7 @@ end Room;
 
 ```julia
 sol = OM.simulate("Heating.Room"; libraries = ["Heating"], stopTime = 21600.0, saveat = 10.0)
-T = OM.OMBackend.getVariableValues(sol, "air.T")
+T = OM.OMBackend.variableValues(sol, "air.T")
 extrema(T[sol.t .> 6000.0])                          # (293.65, 294.65): T_set +- 0.5 K once warm
 ```
 
@@ -313,7 +313,7 @@ name = "Modelica.Mechanics.Rotational.Examples.First"
 OM.translate(name; MSL_Version = "MSL:4.1.0", tunableParameters = ["damping"])
 for d in (2.0, 10.0, 50.0)
   sol = OM.resimulate(name; saveat = 0.001, parameters = Dict("damping" => d))
-  w = OM.OMBackend.getVariableValues(sol, "inertia3.w")
+  w = OM.OMBackend.variableValues(sol, "inertia3.w")
   println(d, ": ", maximum(w[sol.t .>= 0.5]))        # 0.526, 0.472, 0.343: the load swings less
 end
 ```
@@ -351,7 +351,7 @@ end Smoothing;
 ```julia
 msl = OM.loadInstalledLibrary("Modelica"; version = "4.1.0")   # with ModelicaServices and Complex
 sol = OM.simulate("Smoothing", "Smoothing.mo"; stopTime = 1.0)
-OM.OMBackend.getVariableValues(sol, "lag.y")[end]               # 0.9179 = 1 - exp(-0.5 / 0.2)
+OM.OMBackend.variableValues(sol, "lag.y")[end]               # 0.9179 = 1 - exp(-0.5 / 0.2)
 OM.unloadLibrary(msl)                                           # the bundled MSL again
 ```
 
@@ -360,7 +360,7 @@ OM.unloadLibrary(msl)                                           # the bundled MS
 ```julia
 key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")  # with the Modelica 4.1.0 it uses
 sol = OM.simulate("Buildings.Controls.OBC.CDL.Reals.Validation.Add")
-OM.OMBackend.getVariableValues(sol, "add1.y")[end]              # 3.0: add1.u1 (2.0) + add1.u2 (1.0)
+OM.OMBackend.variableValues(sol, "add1.y")[end]              # 3.0: add1.u1 (2.0) + add1.u2 (1.0)
 ```
 
 ### A library from GitHub, into a project folder
@@ -409,7 +409,7 @@ end Plant;
 ```julia
 key = OM.loadInstalledLibrary("Plant"; installDir = "mylibs")   # "Plant_1_0_0", Sources loaded with it
 sol = OM.simulate("Plant.Tank"; libraries = [key], stopTime = 2.0)
-OM.OMBackend.getVariableValues(sol, "level")[end]               # 2.0 = 1.0 + 0.5 * 2.0
+OM.OMBackend.variableValues(sol, "level")[end]               # 2.0 = 1.0 + 0.5 * 2.0
 ```
 
 ### When a library it uses is missing

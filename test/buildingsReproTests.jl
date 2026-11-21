@@ -28,7 +28,7 @@ function brValue(sol, name::String, t::Real)
   try
     return sol(t; idxs = Symbol(name))
   catch
-    local vals = OMBackend.getVariableValues(sol, name)
+    local vals = OMBackend.variableValues(sol, name)
     local i = searchsortedlast(sol.t, t)
     (i == length(sol.t) || sol.t[i] == t) && return vals[i]
     local w = (t - sol.t[i]) / (sol.t[i + 1] - sol.t[i])

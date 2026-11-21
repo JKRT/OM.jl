@@ -36,7 +36,7 @@ end BouncingBall;
 ```julia
 using OM, Plots
 sol = OM.simulate("BouncingBall", "BouncingBall.mo"; stopTime = 3.0, saveat = 0.01)
-h = OM.OMBackend.getVariableValues(sol, "h")
+h = OM.OMBackend.variableValues(sol, "h")
 plot(sol.t, h; xlabel = "time [s]", ylabel = "height [m]", label = "h")
 ```
 
@@ -82,7 +82,7 @@ p = plot(; xlabel = "time", ylabel = "prey x")
 for alpha in (0.8, 1.1, 1.4)
   s = OM.resimulate("LotkaVolterra"; stopTime = 30.0, saveat = 0.05,
                     parameters = Dict("alpha" => alpha))
-  plot!(p, s.t, OM.OMBackend.getVariableValues(s, "x"); label = "alpha = $alpha")
+  plot!(p, s.t, OM.OMBackend.variableValues(s, "x"); label = "alpha = $alpha")
 end
 p
 ```
@@ -130,7 +130,7 @@ cc = OM.simulate(name; MSL_Version = "MSL:4.1.0", stopTime = 1.5)
 
 p = plot(; xlabel = "time [s]", ylabel = "angular velocity [rad/s]")
 for n in ("J1.w", "J2.w", "J3.w", "J4.w")
-  plot!(p, cc.t, OM.OMBackend.getVariableValues(cc, n); label = n)
+  plot!(p, cc.t, OM.OMBackend.variableValues(cc, n); label = n)
 end
 p
 
@@ -147,7 +147,7 @@ double-scroll attractor.
 ```julia
 name = "Modelica.Electrical.Analog.Examples.ChuaCircuit"
 chua = OM.simulate(name; MSL_Version = "MSL:4.1.0", stopTime = 5000.0, saveat = 1.0)
-plot(OM.OMBackend.getVariableValues(chua, "C1.v"), OM.OMBackend.getVariableValues(chua, "C2.v");
+plot(OM.OMBackend.variableValues(chua, "C1.v"), OM.OMBackend.variableValues(chua, "C2.v");
      xlabel = "C1.v [V]", ylabel = "C2.v [V]", label = "")
 ```
 
@@ -165,7 +165,7 @@ OM.installLibrary("Buildings"; version = "13.0.0")   # once
 key = OM.loadInstalledLibrary("Buildings"; version = "13.0.0")
 name = "Buildings.Examples.Tutorial.SpaceCooling.System1"
 sol = OM.simulate(name; libraries = [key], stopTime = 10800.0, saveat = 60.0)
-T = OM.OMBackend.getVariableValues(sol, "vol.T")
+T = OM.OMBackend.variableValues(sol, "vol.T")
 plot(sol.t ./ 3600, T .- 273.15; xlabel = "time [h]", ylabel = "room air temperature [°C]")
 ```
 
