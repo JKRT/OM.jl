@@ -1,0 +1,97 @@
+name: Coverage summary and badge
+description: >
+  Merge a package's lcov files (one per CI job or test shard, from
+  julia-actions/julia-processcoverage), write the coverage to the job summary
+  (in all and per file) and, with `publish`, the total as coverage.json on the
+  repository's gh-pages branch, which the README's shields.io badge reads. No
+  external service. Needs Julia on the PATH; publishing needs
+  `permissions: contents: write` and a checkout with its credentials.
+
+inputs:
+  lcov:
+    description: Space-separated lcov files or glob patterns (files that are missing are skipped)
+    required: false
+    default: lcov.info
+  name:
+    description: What was measured, for the summary's heading (e.g. OMFrontend.jl/src)
+    required: true
+  label:
+    description: The badge's label
+    required: false
+    default: coverage
+  publish:
+    description: >
+      "true" to commit coverage.json to gh-pages (created if missing). Callers
+      pass true for master pushes whose tests all passed: the coverage of a
+      partial run is not the package's.
+    required: false
+    default: "false"
+  path:
+    description: The repository's checkout, for publishing
+    required: false
+    default: "."
+
+outputs:
+  lcov:
+    description: The merged lcov file (empty if there was no lcov file)
+    value: ${{ steps.merge.outputs.lcov }}
+  coverage:
+    description: The total, as on the badge (e.g. 81.3%)
+    value: ${{ steps.merge.outputs.coverage }}
+
+runs:
+  using: composite
+  steps:
+    - name: Merge and summarize
+      id: merge
+      shell: bash
+      env:
+        LCOV: ${{ inputs.lcov }}
+        NAME: ${{ inputs.name }}
+        LABEL: ${{ inputs.label }}
+      run: |
+        shopt -s nullglob
+        files=()
+        for pattern in $LCOV; do
+          for f in $pattern; do [ -f "$f" ] && files+=("$f"); done
+        done
+        if [ ${#files[@]} -eq 0 ]; then
+          echo "No lcov file ($LCOV): no coverage." | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "lcov=" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
+        out="$RUNNER_TEMP/coverage"
+        mkdir -p "$out"
+        julia --startup-file=no "$GITHUB_ACTION_PATH/coverageSummary.jl" --name "$NAME" --label "$LABEL" \
+          --badge "$out/coverage.json" "$out/lcov.info" "${files[@]}" >> "$GITHUB_STEP_SUMMARY"
+        echo "lcov=$out/lcov.info" >> "$GITHUB_OUTPUT"
+        echo "coverage=$(sed -n 's/.*"message": "\([^"]*\)".*/\1/p' "$out/coverage.json")" >> "$GITHUB_OUTPUT"
+
+    # Documenter and other workflows deploy to the same branch (their own
+    # files): a rejected push starts again from the branch's new tip.
+    - name: Publish the badge on gh-pages
+      if: inputs.publish == 'true' && steps.merge.outputs.lcov != ''
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      env:
+        BADGE: ${{ runner.temp }}/coverage/coverage.json
+        MESSAGE: ${{ steps.merge.outputs.coverage }}
+      run: |
+        pages="$RUNNER_TEMP/coverage-pages"
+        for attempt in 1 2 3; do
+          rm -rf "$pages" && git worktree prune
+          if git fetch --depth=1 origin gh-pages; then
+            git worktree add --detach "$pages" FETCH_HEAD
+          else
+            git worktree add --orphan -b "coverage-pages-$attempt" "$pages"
+          fi
+          cp "$BADGE" "$pages/coverage.json"
+          git -C "$pages" add coverage.json
+          if git -C "$pages" diff --cached --quiet; then echo "coverage unchanged: $MESSAGE"; exit 0; fi
+          git -C "$pages" -c user.name="github-actions[bot]" \
+            -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -q -m "Coverage badge: $MESSAGE (${GITHUB_SHA::8})"
+          git -C "$pages" push origin HEAD:refs/heads/gh-pages && exit 0
+          sleep $((attempt * 10))
+        done
+        exit 1

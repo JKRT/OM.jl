@@ -48,3 +48,44 @@ jobs:
     with:
       package: OM
       julia-versions: '["1.13"]'  # OM.jl's packages require Julia 1.13
+      coverage: true
+
+  # The groups' coverage of OM.jl/src merged: the percentage and a table per file in the job summary, the merged lcov
+  # file an artifact; on master, when every group passed, coverage.json on gh-pages for the README's badge
+  # (.github/actions/coverage; no external service).
+  coverage:
+    name: Coverage
+    needs: omjl
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write  # the badge file on gh-pages
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download the groups' coverage
+        uses: actions/download-artifact@v4
+        with:
+          pattern: coverage-*
+          path: groups
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1.13'
+
+      - name: Summary and badge
+        id: coverage
+        uses: ./.github/actions/coverage
+        with:
+          lcov: groups/*/lcov.info
+          name: OM.jl/src
+          publish: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' && needs.omjl.result == 'success' }}
+
+      - name: Upload the merged coverage
+        if: steps.coverage.outputs.lcov != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-merged
+          path: ${{ steps.coverage.outputs.lcov }}
+          retention-days: 30

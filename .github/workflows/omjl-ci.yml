@@ -19,7 +19,7 @@ name: OM.jl integration
 #
 # The ci/ scripts come from the OM.jl checkout, so each OM.jl line (master,
 # 1.13, ...) defines how it is tested. The checkout-siblings action is used
-# from OM.jl's master branch.
+# from OM.jl's master branch, in OM.jl's own runs from the checked-out change.
 
 on:
   workflow_call:
@@ -55,6 +55,14 @@ on:
         required: false
         type: string
         default: ""
+      coverage:
+        description: >
+          Measure the coverage of OM.jl/src in OM.jl's tests and upload each
+          group's lcov file (artifact coverage-<group>) for the caller's
+          coverage job (OM.jl's CI.yml)
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -88,7 +96,19 @@ jobs:
         with:
           path: ${{ inputs.package == 'OM' && 'OM.jl' || format('OM.jl/{0}.jl', inputs.package) }}
 
+      # OM.jl's own runs use the action of the checked-out change, so a pull
+      # request that changes it tests it; the other packages use master's.
+      - name: Check out the other packages (OM.jl's action under test)
+        if: inputs.package == 'OM'
+        uses: ./OM.jl/.github/actions/checkout-siblings
+        with:
+          path: OM.jl
+          exclude: ${{ inputs.package }}
+          om-repository: ${{ inputs.om-repository }}
+          line: ${{ inputs.line }}
+
       - name: Check out the other packages
+        if: inputs.package != 'OM'
         uses: JKRT/OM.jl/.github/actions/checkout-siblings@master
         with:
           path: OM.jl
@@ -122,5 +142,22 @@ jobs:
         working-directory: OM.jl/test
         env:
           OM_TEST_GROUP: ${{ matrix.group }}
+          # OM.jl/src only: the siblings keep their cached package images
+          COVERAGE_FLAG: ${{ inputs.coverage && format('--code-coverage=@{0}/OM.jl/src', github.workspace) || '' }}
         # With threads: OMFrontend's parallel path, as users run it (package tests: ci/test-package.jl).
-        run: julia --color=yes --project=.. --threads=auto -e 'include("runtests.jl")'
+        run: julia --color=yes --project=.. --threads=auto $COVERAGE_FLAG -e 'include("runtests.jl")'
+
+      - name: Process coverage
+        if: ${{ !cancelled() && inputs.coverage && steps.setup.outcome == 'success' }}
+        uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: OM.jl/src
+
+      - name: Upload the group's coverage
+        if: ${{ !cancelled() && inputs.coverage && steps.setup.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.group }}-julia${{ matrix.julia }}
+          path: lcov.info
+          retention-days: 14
+          if-no-files-found: ignore

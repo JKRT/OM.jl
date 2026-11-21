@@ -5,7 +5,7 @@
 #
 # Each package (ImmutableList, OMParser, ..., or OM for OM.jl itself) is cloned into
 # <dest dir>/<Package>.jl. The ref is the first branch that exists of
-#   pull request: <PR head branch> in the PR author's fork (fork PRs only),
+#   pull request: <PR head branch> in the PR head repository owner's fork,
 #                 <PR head branch>, <line>, master
 #   push:         <PUSH_HEAD>, <line>, master
 # where <line> is LINE if set, else the PR base branch or the pushed branch.
@@ -64,7 +64,9 @@ pr=""; fork=""; line=""
 if [ "$EVENT_NAME" = pull_request ] || [ "$EVENT_NAME" = pull_request_target ]; then
   pr=1
   line=${LINE:-${BASE_REF:-}}
-  [ -n "${HEAD_REPO:-}" ] && [ "$HEAD_REPO" != "${BASE_REPO:-}" ] && fork=${HEAD_REPO%%/*}
+  # The owner of the PR's head repository: a fork of the package under test, or
+  # the repository itself (OM.jl, whose siblings' branches are in its owner's forks).
+  [ -n "${HEAD_REPO:-}" ] && fork=${HEAD_REPO%%/*}
 else
   line=${LINE:-${REF_NAME:-}}
 fi
