@@ -62,14 +62,14 @@ end
       @test columns["time"] == sol.t
       if m == "Scalar"
         #= a state and an observed variable, as the solution holds them =#
-        @test columns[names[2]] == OMBackend.getVariableValues(sol, "x")
+        @test columns[names[2]] == OMBackend.variableValues(sol, "x")
         @test columns[names[4]] ≈ columns[names[2]] .^ 2 .+ columns[names[3]] .^ 2
       elseif m == "Algebraic"
         @test columns["z(t)"] ≈ 2 .* columns["y(t)"]
         @test columns["y(t)"] ≈ sin.(sol.t) atol = 1e-12
       else
         @test occursin("\"m[1,2]\"", first(readlines(path)))
-        @test columns["m[1,2]"] == OMBackend.getVariableValues(sol, "m[1,2]")
+        @test columns["m[1,2]"] == OMBackend.variableValues(sol, "m[1,2]")
       end
       if m == "Scalar" && scalarize
         #= a vector of solutions (variable structure systems): one file per part, and the parts coalesced =#
