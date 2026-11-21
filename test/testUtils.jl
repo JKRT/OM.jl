@@ -17,7 +17,6 @@ import JuliaFormatter
 import OMBackend
 import OpenModelicaParser.Absyn
 import OMFrontend.SCode
-import OMFrontend.DAE
 import OpenModelicaParser
 import OMFrontend
 import OM

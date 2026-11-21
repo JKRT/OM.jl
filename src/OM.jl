@@ -47,7 +47,6 @@ import OMBackend
 @recompile_invalidations begin
   import OpenModelicaParser.Absyn
   import OMFrontend.SCode
-  import OMFrontend.DAE
   #= Frontend Components =#
   import OMFrontend
 end
@@ -543,16 +542,14 @@ function _resolveLibraries(libraries::Vector{String})::Vector{String}
 end
 
 """
-    flatten(modelName, modelFile; repr=:FM, scalarize=true, MSL=false,
+    flatten(modelName, modelFile; scalarize=true, MSL=false,
             MSL_Version=nothing, libraries=String[])
 
-Flatten a Modelica model from a file. Returns a Tuple of the flattened
-representation and the function cache.
+Flatten a Modelica model from a file. Returns a Tuple of the flat model and the function cache.
 
 # Keyword arguments
-- `repr`: output representation, `:FM` (FlatModel, default) or `:DAE`
 - `scalarize`: scalarize arrays (default `true`; `false` keeps array variables, array
-  equations and for-equations, as omc's `-d=-nfScalarize`; only applies to `:FM`)
+  equations and for-equations, as omc's `-d=-nfScalarize`)
 - `MSL`: load the Modelica Standard Library alongside the model file
 - `MSL_Version`: MSL version string (default: a loaded library with the package Modelica, else
   `DEFAULT_MSL_VERSION`, `"MSL:4.1.0"`; another version than a loaded one is an error)
@@ -561,13 +558,11 @@ representation and the function cache.
 # Examples
 ```julia
 OM.flatten("HelloWorld", "HelloWorld.mo")
-OM.flatten("HelloWorld", "HelloWorld.mo"; repr=:DAE)
 OM.flatten("MyModel", "model.mo"; MSL=true)
 OM.flatten("MyModel", "model.mo"; libraries=["MyLib"])
 ```
 """
 function flatten(modelName::String, modelFile::String;
-                 repr::Symbol = :FM,
                  scalarize::Bool = true,
                  MSL = false,
                  MSL_Version::Union{Nothing, String} = nothing,
@@ -581,13 +576,7 @@ function flatten(modelName::String, modelFile::String;
   end
   p = OMFrontend.parseFile(modelFile)
   scodeProgram = OMFrontend.withLoadedLibraries(OMFrontend.translateToSCode(p))
-  if repr == :DAE
-    return OMFrontend.instantiateSCodeToDAE(modelName, scodeProgram)
-  elseif repr == :FM
-    return OMFrontend.instantiateSCodeToFM(modelName, scodeProgram, scalarize = scalarize)
-  else
-    error("Unknown representation: $repr. Use :FM or :DAE.")
-  end
+  return OMFrontend.instantiateSCodeToFM(modelName, scodeProgram, scalarize = scalarize)
 end
 
 """
@@ -647,7 +636,7 @@ OM.componentInterface("Modelica.Mechanics.Rotational.Examples.First"; component 
 function componentInterface(modelName::String, modelFile::Union{Nothing, String} = nothing; component::String,
                             MSL::Bool = modelFile === nothing, MSL_Version::Union{Nothing, String} = nothing,
                             libraries::Vector{String} = String[])::NamedTuple
-  local fm::OMFrontend.Frontend.FlatModel = modelFile === nothing ?
+  local fm::OMFrontend.Frontend.FLAT_MODEL = modelFile === nothing ?
     first(flatten(modelName; MSL_Version = MSL_Version, libraries = libraries)) :
     first(flatten(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, libraries = libraries))
   return _componentInterface(fm, component)
@@ -677,7 +666,7 @@ _sourceSpan(info::Absyn.SourceInfo)::NamedTuple =
    columnNumberEnd = Int(info.columnNumberEnd))
 
 "The interface of `component` in the flat model `fm` (`componentInterface`)."
-function _componentInterface(fm::OMFrontend.Frontend.FlatModel, component::String)::NamedTuple
+function _componentInterface(fm::OMFrontend.Frontend.FLAT_MODEL, component::String)::NamedTuple
   local F::Module = OMFrontend.Frontend
   local depth::Int = count(==('.'), component) + 1
   local connectors::Dict{String, Tuple{String, Vector{Tuple{String, Symbol}}}} =
@@ -1453,12 +1442,12 @@ end
     translateModelFromSCode(modelName, scodeProgram)
 
 Instantiate `modelName` against the supplied SCode `scodeProgram` and return
-the resulting DAE representation together with its function cache as a tuple
-`(dae, cache)`. Useful when an SCode program has already been built (for
-example via `translateToSCode`) and you want to skip parsing.
+the flat model together with its function cache as a tuple `(flatModel, cache)`.
+Useful when an SCode program has already been built (for example via
+`translateToSCode`) and you want to skip parsing.
 """
-function translateModelFromSCode(modelName, scodeProgram::SCode.Program)
-  (dae, cache) = OMFrontend.instantiateSCodeToDAE(modelName, scodeProgram)
+function translateModelFromSCode(modelName::String, scodeProgram::SCode.Program)::Tuple
+  return OMFrontend.instantiateSCodeToFM(modelName, scodeProgram)
 end
 
 """
@@ -1526,14 +1515,14 @@ function exportModelica(modelName::String,
                         scalarize = false)
   local fmStr::String
   try
-    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, scalarize)
+    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.FRONTEND_SCALARIZE, scalarize)
     fmAndFuncs = flatten(modelName, file;
                          MSL = MSL, MSL_Version = MSL_Version,
                          libraries = libraries, scalarize = scalarize)
     fmStr = OMFrontend.toFlatModelica(fmAndFuncs,
                                       printBindingTypes = printBindingTypes)
   finally
-    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
+    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.FRONTEND_SCALARIZE, true)
   end
   return fmStr
 end
@@ -1554,12 +1543,12 @@ function exportModelica(modelName::String;
                         scalarize = false)
   local fmStr::String
   try
-    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, scalarize)
+    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.FRONTEND_SCALARIZE, scalarize)
     fmAndFuncs = flatten(modelName; MSL_Version = MSL_Version)
     fmStr = OMFrontend.toFlatModelica(fmAndFuncs,
                                       printBindingTypes = printBindingTypes)
   finally
-    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.NF_SCALARIZE, true)
+    OMFrontend.Frontend.FlagsUtil.set(OMFrontend.Frontend.Flags.FRONTEND_SCALARIZE, true)
   end
   return fmStr
 end

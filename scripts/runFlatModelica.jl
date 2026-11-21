@@ -21,7 +21,7 @@ function flatten_to_flat_model(model::AbstractString,
                                file::AbstractString = flat_modelica_example_file(model);
                                scalarize = true,
                                kwargs...)
-  return OM.flatten(model, file; repr = :FM, scalarize = scalarize, kwargs...)
+  return OM.flatten(model, file; scalarize = scalarize, kwargs...)
 end
 
 function export_flat_modelica(model::AbstractString,
