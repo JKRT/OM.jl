@@ -55,6 +55,14 @@ on:
         required: false
         type: string
         default: ""
+      coverage:
+        description: >
+          Measure the coverage of OM.jl/src in OM.jl's tests and upload each
+          group's lcov file (artifact coverage-<group>) for the caller's
+          coverage job (OM.jl's CI.yml)
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   test:
@@ -134,5 +142,22 @@ jobs:
         working-directory: OM.jl/test
         env:
           OM_TEST_GROUP: ${{ matrix.group }}
+          # OM.jl/src only: the siblings keep their cached package images
+          COVERAGE_FLAG: ${{ inputs.coverage && format('--code-coverage=@{0}/OM.jl/src', github.workspace) || '' }}
         # With threads: OMFrontend's parallel path, as users run it (package tests: ci/test-package.jl).
-        run: julia --color=yes --project=.. --threads=auto -e 'include("runtests.jl")'
+        run: julia --color=yes --project=.. --threads=auto $COVERAGE_FLAG -e 'include("runtests.jl")'
+
+      - name: Process coverage
+        if: ${{ !cancelled() && inputs.coverage && steps.setup.outcome == 'success' }}
+        uses: julia-actions/julia-processcoverage@v1
+        with:
+          directories: OM.jl/src
+
+      - name: Upload the group's coverage
+        if: ${{ !cancelled() && inputs.coverage && steps.setup.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.group }}-julia${{ matrix.julia }}
+          path: lcov.info
+          retention-days: 14
+          if-no-files-found: ignore
