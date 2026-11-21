@@ -562,20 +562,18 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
 
   @testset verbose=true "MultiBody" begin
 
-    #= PointGravity: DAE_identifierToString unsupported DAE.ARRAY regression.
+    #= PointGravity: `der` of an array argument, an "unsupported argument" regression.
 
        `Modelica.Mechanics.MultiBody.Parts.Body` has a Real[4] quaternion
        state `Q`. Equations like
          frame_a.R = Frames.from_Q(Q, Frames.Quaternions.angularVelocity2(Q, der(Q)))
-       expose `der(Q)` as a DAE.ARRAY of element CREFs to the der-handler
-       in `DAECallExpressionToMTKCallExpression`. Before the fix the
-       handler called `DAE_identifierToString(listHead(expLst))` on the
-       DAE.ARRAY and threw
-         "DAE_identifierToString: unsupported argument of type DAE.ARRAY ..."
+       pass `der(Q)` as an array of element crefs to the der-handler of the
+       code generation. Before the fix the handler read one identifier from
+       that array and threw an "unsupported argument" error.
        Surfaced in the 2026-04-23 Mechanics coverage run on PointGravity,
        HeatLosses, PointGravityWithPointMasses2, and PrismaticConstraint.
 
-       The fix extends the der/pre arms to scalarize DAE.ARRAY of CREFs
+       The fix extends the der/pre arms to scalarize an array of crefs
        into `[der(e1), der(e2), ...]`. Here we only assert translate
        succeeds; full simulation of PointGravity is a separate concern
        (downstream Pantelides / init issues). =#
@@ -599,15 +597,16 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
   end
 
   @testset verbose=true "Spice3 record lowering" begin
-    #= Spice3.Inverter: DAE.RECORD(Modelica.Electrical.Spice3.Internal.Mosfet.Mosfet)
+    #= Spice3.Inverter: the record expression of
+       Modelica.Electrical.Spice3.Internal.Mosfet.Mosfet
        is a many-field parameter record passed as a function argument. Before
-       the fix, only `DAE.RECORD(IDENT("Complex"), …)` had an arm in
+       the fix, only the `Complex` record had an arm in
        expToJuliaExpMTK; qualified-path records fell through to the generic
        "not yet supported" error. The fix adds a generic fallback that
        emits a NamedTuple keyed by field names. Regression path of concern
-       (FilterWithDifferentiation hitting DAE.ARRAY via
-       DAECallExpressionToMTKCallExpression) is itself guarded by the B4 fix
-       which scalarizes DAE.ARRAY in der/pre arms. =#
+       (FilterWithDifferentiation passing an array to the der-handler of the
+       code generation) is itself guarded by the B4 fix
+       which scalarizes arrays in der/pre arms. =#
     for modelName in ["Modelica.Electrical.Spice3.Examples.Inverter",
                       "Modelica.Electrical.Spice3.Examples.Nor",
                       "Modelica.Electrical.Spice3.Examples.Nand",
@@ -633,7 +632,7 @@ const _SUCCESS = OMBackend.DifferentialEquations.ReturnCode.Success
   end
 
   #= Spice3.Graetz: the diodes' c2 = diodeCalcTempDependencies(...) leaves m_tBrkdwnV
-     unassigned (#EMPTY# reached the DAE), `(cc, m_dCap) = diodeNoBypassCode(...)` has a
+     unassigned (#EMPTY# reached the flat model), `(cc, m_dCap) = diodeNoBypassCode(...)` has a
      record in the tuple (D1_cc did not resolve, then the tuple residual had no lowering),
      and a folded record parameter went to the function as a NamedTuple. omc 1.27.1 with
      tolerance 1e-8: D2.icap(0.0003) = 2.5674459e-5, compared at that tolerance, relative and absolute

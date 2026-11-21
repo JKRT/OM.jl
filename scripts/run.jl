@@ -22,22 +22,22 @@ const SIMPLE_MECHANICAL_MODELS = ["SimpleMechanicalSystem"]
 const SIMPLE_HYBRID_MODELS = ["BouncingBallReals", "IfEquationDer", "BouncingBallsReal"]
 const PACKAGE_MODELS = ["Models.ManyEvents", "Models.ManyEventsManyConditions"]
 
-function flatten_models(models::AbstractVector{<:AbstractString}; repr::Symbol = :FM)
+function flatten_models(models::AbstractVector{<:AbstractString})
   results = Dict{String, Tuple}()
   for model in models
     file = run_example_model_file(model)
-    @info "Flattening model" model file repr
-    results[model] = @time OM.flatten(model, file; repr = repr)
+    @info "Flattening model" model file
+    results[model] = @time OM.flatten(model, file)
   end
   return results
 end
 
-function flatten_models(models::AbstractVector{<:AbstractString}, package_file::AbstractString; repr::Symbol = :FM)
+function flatten_models(models::AbstractVector{<:AbstractString}, package_file::AbstractString)
   file = run_example_model_file(package_file)
   results = Dict{String, Tuple}()
   for model in models
-    @info "Flattening package model" model file repr
-    results[model] = @time OM.flatten(model, file; repr = repr)
+    @info "Flattening package model" model file
+    results[model] = @time OM.flatten(model, file)
   end
   return results
 end

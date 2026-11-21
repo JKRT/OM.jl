@@ -29,8 +29,8 @@
     @test isapprox(sol(1.0; idxs = :w), 10.0; atol = 1e-4)
   end
 
-  #= Nested / second-order derivative der(der(x)). Used to error in
-     DAE_identifierToString; simulates since the 1.13 working line. =#
+  #= Nested / second-order derivative der(der(x)). Used to error in the
+     code generation's identifier handling; simulates since the 1.13 working line. =#
   @testset "nested der (der(der(x)))" begin
     @test begin
       local sol = try

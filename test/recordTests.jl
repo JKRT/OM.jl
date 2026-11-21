@@ -195,7 +195,7 @@
 
   @testset "Matrix Array Equations" begin
     @test true == begin
-      #= Test 2D matrix array equation expansion (nested DAE.ARRAY flattening) =#
+      #= Test 2D matrix array equation expansion (nested array flattening) =#
       sol = OM.simulate("RecordFunctionTest.MatrixArrayEquation", "./Models/RecordFunctionTest.mo"; startTime = 0.0, stopTime = 1.0)
       #= T_param is identity matrix, T[2,2] = 1.0, so der(x) = 1.0 and x(1) = 1.0 =#
       testResultRetCodeSuccess(sol; symbol = :x, expectedValue = 1.0)

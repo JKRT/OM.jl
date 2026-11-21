@@ -325,7 +325,7 @@ OM.jl is composed of several submodules, each in its own directory:
 | Submodule | Description |
 |-----------|-------------|
 | **OpenModelicaParser.jl** | Modelica parser (`OpenModelicaParser.Parser`) and the abstract syntax tree it produces (`OpenModelicaParser.Absyn`); formerly OMParser.jl and the package Absyn.jl |
-| **OMFrontend.jl** | The new frontend (NF) that performs instantiation, typing, flattening, and simplification; holds the SCode (`OMFrontend.SCode`) and DAE (`OMFrontend.DAE`) data structures, and the list and array utilities `OMFrontend.ListUtil` and `OMFrontend.ArrayUtil`; formerly the packages SCode.jl, DAE.jl, ListUtil.jl and ArrayUtil.jl |
+| **OMFrontend.jl** | The new frontend (NF) that performs instantiation, typing, flattening, and simplification; holds the SCode (`OMFrontend.SCode`) data structures, and the list and array utilities `OMFrontend.ListUtil` and `OMFrontend.ArrayUtil`; formerly the packages SCode.jl, ListUtil.jl and ArrayUtil.jl |
 | **OMBackend.jl** | Backend that lowers the flat model to its own IR (OMJLIR), runs its passes, matches and sorts it into the simulation code, and generates and simulates the system via ModelingToolkit.jl |
 | **MetaModelica.jl** | Julia implementation of MetaModelica language constructs (uniontypes, pattern matching, immutable lists) |
 | **ImmutableList.jl** | Immutable cons-list implementation used throughout the compiler |
