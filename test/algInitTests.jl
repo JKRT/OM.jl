@@ -1,8 +1,7 @@
 #=
   Light-regression coverage of the constructs that can appear in a Modelica
-  `initial algorithm` body. Exercises OMBackend's DAE.Statement →
-  `AlgorithmicCodeGeneration.generateStatements` lowering path (carried on
-  `INITIAL_ALGORITHM.daeStatements` via the BDAECreate side-channel).
+  `initial algorithm` body. Exercises the lowering of the flat model's initial
+  algorithm statements through OMBackend's code generation.
 
   Each model has `der(<state>) = 0` so the t=stopTime value equals the t=0
   procedural-execution result; the assertion exercises whether the init body

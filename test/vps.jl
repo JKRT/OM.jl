@@ -1,4 +1,3 @@
-    import OMFrontend.DAE
     import DataStructures.OrderedCollections
     import OMFrontend.SCode
     import OMBackend

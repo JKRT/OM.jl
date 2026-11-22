@@ -14,9 +14,9 @@
 	path = OMFrontend.jl
 	url = https://github.com/OpenModelica/OMFrontend.jl.git
 	branch = master
-[submodule "OMParser.jl"]
-	path = OMParser.jl
-	url = https://github.com/OpenModelica/OMParser.jl.git
+[submodule "OpenModelicaParser.jl"]
+	path = OpenModelicaParser.jl
+	url = https://github.com/OpenModelica/OpenModelicaParser.jl.git
 	branch = master
 [submodule "OMRuntimeExternalC.jl"]
 	path = OMRuntimeExternalC.jl

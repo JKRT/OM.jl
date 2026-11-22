@@ -15,10 +15,9 @@ using Logging
 import Plots
 import JuliaFormatter
 import OMBackend
-import OMParser.Absyn
+import OpenModelicaParser.Absyn
 import OMFrontend.SCode
-import OMFrontend.DAE
-import OMParser
+import OpenModelicaParser
 import OMFrontend
 import OM
 

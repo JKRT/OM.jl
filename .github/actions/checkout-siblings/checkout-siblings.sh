@@ -3,7 +3,7 @@
 #
 #   checkout-siblings.sh <dest dir> <package...>
 #
-# Each package (ImmutableList, OMParser, ..., or OM for OM.jl itself) is cloned into
+# Each package (ImmutableList, OpenModelicaParser, ..., or OM for OM.jl itself) is cloned into
 # <dest dir>/<Package>.jl. The ref is the first branch that exists of
 #   pull request: <PR head branch> in the PR head repository owner's fork,
 #                 <PR head branch>, <line>, master

@@ -12,7 +12,7 @@ const OPENMODELICA_REGISTRY_URL = "https://github.com/OpenModelica/OpenModelicaR
 const REQUIRED_SUBMODULES = [
   "ImmutableList.jl",
   "MetaModelica.jl",
-  "OMParser.jl",
+  "OpenModelicaParser.jl",
   "OMFrontend.jl",
   "OMBackend.jl",
   "OMRuntimeExternalC.jl",
