@@ -9,6 +9,7 @@ e.g. `OM.simulate`).
 OM.simulate
 OM.translate
 OM.flatten
+OM.ModelicaSource
 OM.getMTKProblem
 OM.resimulate
 ```

@@ -46,6 +46,8 @@ import OMBackend
    compiled into OM's image. =#
 @recompile_invalidations begin
   import OpenModelicaParser.Absyn
+  #= Modelica"""...""" (a model written in Julia, parsed when the code is loaded): `using OM: @Modelica_str`. =#
+  import OpenModelicaParser: @Modelica_str
   import OMFrontend.SCode
   #= Frontend Components =#
   import OMFrontend
@@ -542,10 +544,22 @@ function _resolveLibraries(libraries::Vector{String})::Vector{String}
 end
 
 """
+    ModelicaSource
+
+The Modelica code of a model for `flatten`, `translate` and `simulate`: the path of a file (`String`), or a parsed
+program (`Absyn.Program`), such as one written in Julia with `Modelica\"\"\"...\"\"\"`
+(`using OM: @Modelica_str`).
+"""
+const ModelicaSource = Union{String, Absyn.Program}
+
+"""
     flatten(modelName, modelFile; scalarize=true, MSL=false,
             MSL_Version=nothing, libraries=String[])
+    flatten(modelName, program::Absyn.Program; scalarize=true)
 
-Flatten a Modelica model from a file. Returns a Tuple of the flat model and the function cache.
+Flatten a Modelica model from a file or a parsed program. Returns a Tuple of the flat model and the function cache.
+A program is flattened with the libraries loaded in the session (`loadLibrary`, `loadInstalledLibrary`); `MSL` and
+`libraries` take a file.
 
 # Keyword arguments
 - `scalarize`: scalarize arrays (default `true`; `false` keeps array variables, array
@@ -560,6 +574,15 @@ Flatten a Modelica model from a file. Returns a Tuple of the flat model and the 
 OM.flatten("HelloWorld", "HelloWorld.mo")
 OM.flatten("MyModel", "model.mo"; MSL=true)
 OM.flatten("MyModel", "model.mo"; libraries=["MyLib"])
+
+using OM: @Modelica_str
+OM.flatten("Decay", Modelica\"\"\"
+  model Decay
+    Real x(start = 1);
+  equation
+    der(x) = -x;
+  end Decay;
+  \"\"\")
 ```
 """
 function flatten(modelName::String, modelFile::String;
@@ -574,8 +597,18 @@ function flatten(modelName::String, modelFile::String;
                                                 MSL = MSL, MSL_Version = _mslVersion(MSL_Version),
                                                 scalarize = scalarize)
   end
-  p = OMFrontend.parseFile(modelFile)
-  scodeProgram = OMFrontend.withLoadedLibraries(OMFrontend.translateToSCode(p))
+  return flatten(modelName, OMFrontend.parseFile(modelFile); scalarize = scalarize)
+end
+
+function flatten(modelName::String, program::Absyn.Program;
+                 scalarize::Bool = true,
+                 MSL::Bool = false,
+                 MSL_Version::Union{Nothing, String} = nothing,
+                 libraries::Vector{String} = String[])::Tuple
+  (MSL || !isempty(libraries)) &&
+    throw(ArgumentError("flatten($(modelName)): MSL and libraries take the model as a file; with a program, " *
+                        "load the library in the session first (loadLibrary, loadInstalledLibrary)"))
+  local scodeProgram::SCode.Program = OMFrontend.withLoadedLibraries(OMFrontend.translateToSCode(program))
   return OMFrontend.instantiateSCodeToFM(modelName, scodeProgram, scalarize = scalarize)
 end
 
@@ -877,7 +910,7 @@ _withSimulationSettings(f::Function, directRHS::Bool, startTime::Real) =
     simulate(modelName, modelFile; startTime=0.0, stopTime=1.0, MSL=false,
              libraries=String[], solver=OMBackend.defaultSolver(), mode=OMBackend.DEFAULT_BACKEND_MODE[], ...)
 
-Translate and simulate a file-based Modelica model in one step. Equivalent
+Translate and simulate a Modelica model of a file, or of a parsed program (`ModelicaSource`), in one step. Equivalent
 to `translate(modelName, modelFile; ...)` followed by
 `OMBackend.simulate(modelName; ...)`. Returns the simulation result.
 
@@ -915,7 +948,7 @@ to `translate(modelName, modelFile; ...)` followed by
 Additional keyword arguments are forwarded to `OMBackend.simulate`.
 """
 function simulate(modelName::String,
-                  modelFile::String;
+                  modelFile::ModelicaSource;
                   startTime= 0.0,
                   stopTime= 1.0,
                   MSL = false,
@@ -1159,7 +1192,8 @@ _eventCount(cbs::Union{Tuple, AbstractVector})::Int = sum(_eventCount, cbs; init
 """
     translate(modelName, modelFile; MSL=false, libraries=String[], ...)
 
-Translate a Modelica model from a file and load it in memory.
+Translate a Modelica model from a file, or from a parsed program (`ModelicaSource`: `Modelica\"\"\"...\"\"\"`, with
+the libraries loaded in the session; `MSL` and `libraries` take a file), and load it in memory.
 The model can be simulated at a later stage by calling `simulate` with the name of the model.
 
 If `MSL = true` the compiler will use the Modelica Standard Library (MSL) version 4.1.0 by default.
@@ -1200,7 +1234,7 @@ OM.translate("MyModel", "model.mo"; eliminateNonDynamic=false)
 ```
 """
 function translate(modelName::String,
-                   modelFile::String;
+                   modelFile::ModelicaSource;
                    MSL = false,
                    MSL_Version::Union{Nothing, String} = nothing,
                    libraries::Vector{String} = String[],
@@ -1458,15 +1492,17 @@ end
 
 """
     translateToSCode(modelFile) -> SCode.Program
+    translateToSCode(program::Absyn.Program) -> SCode.Program
 
 Parse `modelFile` and convert the resulting Absyn tree to its SCode
-representation. SCode is the intermediate form consumed by the frontend
-instantiation passes.
+representation, or convert a parsed `program` (`Modelica\"\"\"...\"\"\"`). SCode is the intermediate form consumed by
+the frontend instantiation passes.
 """
-function translateToSCode(modelFile::String)
-  p = OMFrontend.parseFile(modelFile)
-  scodeProgram = OMFrontend.translateToSCode(p)
+function translateToSCode(modelFile::String)::SCode.Program
+  return translateToSCode(OMFrontend.parseFile(modelFile))
 end
+
+translateToSCode(program::Absyn.Program)::SCode.Program = OMFrontend.translateToSCode(program)
 
 """
     toString(flatModel) -> String

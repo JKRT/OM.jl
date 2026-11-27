@@ -18,9 +18,17 @@
     end
   end
   @testset "Test models that do not have any differential equations" begin
+    local program::Absyn.Program = Modelica"""
+      /* The solution should be 0*/
+      model HelloWorldWithoutDer
+        Real x(start = 0, fixed = true );
+        parameter Real a = 1;
+      equation
+        x = -a * x;
+      end HelloWorldWithoutDer;
+      """
     @test true == begin
-      systemsWithoutDifferentials = ["HelloWorldWithoutDer"]
-      runModelsMTK(systemsWithoutDifferentials)
+      runModelMTK("HelloWorldWithoutDer", program)
       true
     end
   end

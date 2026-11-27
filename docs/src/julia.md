@@ -43,6 +43,30 @@ OM.translate("LotkaVolterra", "LotkaVolterra.mo")
 sol = OM.simulate("LotkaVolterra"; MSL = false, stopTime = 30.0)
 ```
 
+## A model written in Julia
+
+`flatten`, `translate` and `simulate` also take the model as a parsed program in place of a file:
+`Modelica"""..."""` parses its text when the Julia code is loaded (a syntax error is reported then,
+with the Julia file and line).
+
+```julia
+using OM
+using OM: @Modelica_str
+
+decay = Modelica"""
+  model Decay
+    parameter Real k = 2;
+    Real x(start = 1, fixed = true);
+  equation
+    der(x) = -k*x;
+  end Decay;
+  """
+sol = OM.simulate("Decay", decay; stopTime = 1.0)
+```
+
+The libraries loaded in the session (`OM.loadLibrary`, `OM.loadInstalledLibrary`) are used with such a
+program; `MSL = true` and `libraries` take the model as a file.
+
 ## The `.mos` commands in Julia
 
 | `.mos` | Julia |

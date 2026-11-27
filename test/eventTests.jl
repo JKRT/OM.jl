@@ -261,6 +261,23 @@
     end
 
     @testset "IntegerStepHold (resolveIntegers + when regression)" begin
+      local program::Absyn.Program = Modelica"""
+        /*
+        Integer-valued discrete variable test. Mirrors BooleanStepHold.mo but
+        uses an Integer enum index (like Modelica 9-value Logic integers 1..9).
+        */
+
+        model IntegerStepHold
+          "Integer `mode` stepped from 3 to 1 at time=0.5"
+          Real x(start = 0.0);
+          Integer mode(start = 3);
+        equation
+          der(x) = 1.0;
+          when time > 0.5 then
+            mode = 1;
+          end when;
+        end IntegerStepHold;
+        """
       # Regression for 2026-04-23: Causalize.jl `_resolveIntVarsInSystem!`
       # used to unconditionally reclassify every Integer VARIABLE as a
       # PARAM. It ignored BDAE.WHEN_EQUATION, so a when-driven discrete
@@ -268,7 +285,7 @@
       # returned `KeyError: key :mode not found`. The fix teaches the pass
       # to detect Integer LHSs inside when-clauses and keep them as VARIABLEs.
       @test begin
-        sol = OM.simulate("IntegerStepHold", "./Models/IntegerStepHold.mo";
+        sol = OM.simulate("IntegerStepHold", program;
                           startTime = 0.0, stopTime = 1.0)
         local ok = sol.retcode == ReturnCode.Success
         ok &&
@@ -280,6 +297,40 @@
     end
 
     @testset "EnumLiteralAlias (Causalize enum reclassification regression)" begin
+      local program::Absyn.Program = Modelica"""
+        /*
+        Enum-literal alias chain test. Mirrors the auxiliary-array pattern from
+        Modelica.Electrical.Digital.Gates (Logic 9-value enumeration with constant
+        'U' bindings forwarded through alias chains).
+
+        Without Fix A in `_resolveIntVarsInSystem!`:
+          - `_isIntegerVarType` only matched T_INTEGER, not T_ENUMERATION
+          - `auxLit` and `auxAlias` stay as BDAE.VARIABLE → DISCRETE in SimCode
+          - Each gets a `der(d) ~ 0` dummy AND a defining equation in residuals
+          - Result: 5 equations / 3 variables → ExtraEquationsSystemException
+
+        With Fix A:
+          - `_isIntOrEnumVarType` catches both
+          - Pass 1 drops `auxLit = Logic.'U'` (literal RHS), reclassifies auxLit as PARAM
+          - Fixpoint pass drops `auxAlias = auxLit` (RHS in removedDefiners),
+            reclassifies auxAlias as PARAM with the same value
+          - Result: 1 equation / 1 variable (the Real state) — balanced
+        */
+
+        model EnumLiteralAlias
+          "Causalize enum-VARIABLE → PARAM reclassification regression"
+
+          type Logic = enumeration('U', 'X', '0', '1');
+
+          Real x(start = 0.0);
+          Logic auxLit;
+          Logic auxAlias;
+        equation
+          der(x) = 1.0;
+          auxLit = Logic.'U';
+          auxAlias = auxLit;
+        end EnumLiteralAlias;
+        """
       # Regression for 2026-05-04: Causalize.jl `_resolveIntVarsInSystem!`
       # only matched T_INTEGER, not T_ENUMERATION. As a result the
       # auxiliary-array pattern in Modelica.Electrical.Digital gates
@@ -293,7 +344,7 @@
       # collapse to PARAM bindings. Without the fix the model below
       # would be over-determined (5 equations / 3 variables).
       @test begin
-        sol = OM.simulate("EnumLiteralAlias", "./Models/EnumLiteralAlias.mo";
+        sol = OM.simulate("EnumLiteralAlias", program;
                           startTime = 0.0, stopTime = 1.0)
         sol.retcode == ReturnCode.Success &&
           isapprox(sol(0.5, idxs = :x), 0.5; atol = 1e-6) &&
@@ -320,11 +371,36 @@
     end
 
     @testset "EnumForTableLookup (OMFrontend constant-table eager fold)" begin
+      local program::Absyn.Program = Modelica"""
+        model EnumForTableLookup
+          "Reproducer: enum-table lookup `AndTable[cref,cref]` should stay symbolic, currently folded to first element."
+
+          type Logic = enumeration('U', 'X', '0', '1');
+          constant Logic AndTable[Logic, Logic] = [
+            Logic.'U', Logic.'U', Logic.'0', Logic.'U';
+            Logic.'U', Logic.'X', Logic.'0', Logic.'X';
+            Logic.'0', Logic.'0', Logic.'0', Logic.'0';
+            Logic.'U', Logic.'X', Logic.'0', Logic.'1'
+          ];
+          Logic in1;
+          Logic in2;
+          Logic auxiliary[2](each start = Logic.'U');
+          Real t(start = 0.0);
+        equation
+          in1 = Logic.'1';
+          in2 = Logic.'1';
+          auxiliary[1] = in1;
+          for i in 1:1 loop
+            auxiliary[i + 1] = AndTable[auxiliary[i], in2];
+          end for;
+          der(t) = 1.0;
+        end EnumForTableLookup;
+        """
       # auxiliary[2] = AndTable[auxiliary[1], in2] stays symbolic via a Real-typed
       # ConstTableLookupFn; the model variable `t` is renamed away from MTK's iv.
       # in1=in2=Logic.'1' → auxiliary[2] = AndTable[1,1] = Logic.'1' (idx 4).
       @test begin
-        sol = OM.simulate("EnumForTableLookup", "./Models/EnumForTableLookup.mo";
+        sol = OM.simulate("EnumForTableLookup", program;
                           startTime = 0.0, stopTime = 1.0)
         sol.retcode == ReturnCode.Success &&
           sol(0.5, idxs = Symbol("auxiliary[2]")) == 4
@@ -494,6 +570,20 @@
   end
 
   @testset "noEvent saturation feedback oscillator" begin
+    local program::Absyn.Program = Modelica"""
+      model NoEventSatOsc "noEvent saturation in a Schmitt-trigger feedback loop"
+        parameter Real Vps = 1.0;
+        parameter Real Vns = -1.0;
+        parameter Real V0 = 1e4;
+        Real y "saturated output";
+        Real c(start = 0.3, fixed = true) "feedback state";
+        Real vin "differential input";
+      equation
+        vin = 0.5 * y - c;
+        y = noEvent(if V0 * vin > Vps then Vps else if V0 * vin < Vns then Vns else V0 * vin);
+        der(c) = y - c;
+      end NoEventSatOsc;
+      """
     # Schmitt-trigger relaxation oscillator (minimal Multivibrator):
     #   y = noEvent(if V0*vin>Vps then Vps elseif V0*vin<Vns then Vns else V0*vin)
     #   vin = 0.5*y - c ;  der(c) = y - c.
@@ -505,7 +595,7 @@
     # to the other branch and the loop oscillates; a DAE solver cannot continue
     # the algebraic unknown y past the fold (Rodas5 used to step over it by
     # chance; Rodas5P and FBDF stop there).
-    local sol = runModelMTK("NoEventSatOsc", "Models/NoEventSatOsc.mo"; timeSpan = (0.0, 0.45))
+    local sol = runModelMTK("NoEventSatOsc", program; timeSpan = (0.0, 0.45))
     @test sol.retcode == ReturnCode.Success
     local cbs = get(sol.prob.kwargs, :callback, nothing)
     @test cbs === nothing || isempty(cbs.continuous_callbacks)

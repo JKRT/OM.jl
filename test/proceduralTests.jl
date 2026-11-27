@@ -26,10 +26,59 @@
   end
 
   @testset "if/elseif on package constants in a redeclare function extends" begin
+    local program::Absyn.Program = Modelica"""
+      package FunctionExtendsConstIf "A `redeclare function extends` whose if/elseif branches on package constants (MSL ReferenceAir's specificEntropy): the selected branch must be kept"
+        partial package Base
+          constant Boolean useA;
+          constant Boolean useB;
+          replaceable partial function f
+            input Real x;
+            output Real y;
+          end f;
+        end Base;
+
+        partial package Impl
+          extends Base;
+          redeclare function extends f
+          algorithm
+            if useA then
+              y := 2*x;
+            elseif useB then
+              y := 3*x;
+            else
+              y := 4*x;
+            end if;
+            y := y + 1;
+          end f;
+        end Impl;
+
+        package PA
+          extends Impl(final useA = true, final useB = false);
+        end PA;
+
+        package PB
+          extends Impl(final useA = false, final useB = true);
+        end PB;
+
+        package PC
+          extends Impl(final useA = false, final useB = false);
+        end PC;
+
+        model Test "der(za) = 2 (t + 1) + 1, der(zb) = 3 (t + 1) + 1, der(zc) = 4 (t + 1) + 1: za(1) = 4, zb(1) = 5.5, zc(1) = 7"
+          Real za(start = 0, fixed = true);
+          Real zb(start = 0, fixed = true);
+          Real zc(start = 0, fixed = true);
+        equation
+          der(za) = PA.f(time + 1);
+          der(zb) = PB.f(time + 1);
+          der(zc) = PC.f(time + 1);
+        end Test;
+      end FunctionExtendsConstIf;
+      """
     #= The frontend drops the branches whose constant condition is false and keeps the first
        true one's body; that body was appended to a throwaway vector, so the function lost it
        (the MSL ReferenceAir's specificEntropy returned 0). Values from OpenModelica 1.27.1. =#
-    local sol = OM.simulate("FunctionExtendsConstIf.Test", "./Models/FunctionExtendsConstIf.mo"; startTime = 0.0, stopTime = 1.0)
+    local sol = OM.simulate("FunctionExtendsConstIf.Test", program; startTime = 0.0, stopTime = 1.0)
     @test sol.retcode == ReturnCode.Success
     @test [sol(1.0; idxs = :za), sol(1.0; idxs = :zb), sol(1.0; idxs = :zc)] ≈ [4.0, 5.5, 7.0] atol = 1e-6
   end
@@ -148,7 +197,63 @@
        system. The section runs in order; a variable assigned under a condition
        only keeps its start value (GuardedStart). Expected values are OpenModelica
        1.27.1's at t = 0, 0.5, 1. =#
-    local file = "./Models/AlgorithmRealTargets.mo"
+    local program::Absyn.Program = Modelica"""
+      package AlgorithmRealTargets
+        model Single "a continuous assignment in an algorithm"
+          Real x(start = 1, fixed = true);
+          Real y;
+        equation
+          der(x) = -x;
+        algorithm
+          y := 2 * x;
+        end Single;
+        model Multi "statements in order, a local temporary, an if"
+          Real x(start = 1, fixed = true);
+          Real a;
+          Real y;
+        equation
+          der(x) = -x;
+        algorithm
+          a := x + 1;
+          y := a * a;
+          if x < 0.5 then
+            y := -y;
+          end if;
+        end Multi;
+        model GuardedStart "assigned under a condition only: the start value otherwise"
+          Real x(start = 1, fixed = true);
+          Real z(start = 5);
+        equation
+          der(x) = -x;
+        algorithm
+          if x < 0.5 then
+            z := 1;
+          end if;
+        end GuardedStart;
+        model ForLoop "an array assigned in a loop, then read element by element"
+          Real x(start = 1, fixed = true);
+          Real v[3];
+          Real s;
+        equation
+          der(x) = -x;
+        algorithm
+          for i in 1:3 loop
+            v[i] := i * x;
+          end for;
+          s := v[1] + v[2] + v[3];
+        end ForLoop;
+        model Mixed "Real and Integer targets in one section"
+          Real x(start = 1, fixed = true);
+          Integer k;
+          Real y;
+        equation
+          der(x) = -x;
+        algorithm
+          k := if x > 0.5 then 1 else 2;
+          y := k * x;
+        end Mixed;
+      end AlgorithmRealTargets;
+      """
     local expected = ("Single" => (:y => [2.0, 1.21306, 0.73576],),
                       "Multi" => (:a => [2.0, 1.60653, 1.36788], :y => [4.0, 2.58094, -1.87109]),
                       "GuardedStart" => (:z => [5.0, 5.0, 1.0],),
@@ -156,7 +261,7 @@
                                     :s => [6.0, 3.63919, 2.20728]),
                       "Mixed" => (:k => [1.0, 1.0, 2.0], :y => [1.0, 0.60653, 0.73576]))
     for (model, values) in expected
-      local sol = OM.simulate("AlgorithmRealTargets." * model, file; stopTime = 1.0)
+      local sol = OM.simulate("AlgorithmRealTargets." * model, program; stopTime = 1.0)
       for (v, vs) in values
         @test [sol(t; idxs = v) for t in (0.0, 0.5, 1.0)] ≈ vs atol = 1e-4
       end

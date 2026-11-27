@@ -22,13 +22,47 @@
     end
   end
   @testset "inner/outer modifier propagation through short-function alias" begin
+    local program::Absyn.Program = Modelica"""
+      package ShortFuncInnerOuter
+        type GType = enumeration(A, B, C);
+
+        function baseFunc
+          input Real r;
+          input GType kind;
+          input Real x;
+          output Real y;
+        algorithm
+          y := if kind == GType.A then r
+               elseif kind == GType.B then 100.0 * r
+               else 1000.0 * r;
+        end baseFunc;
+
+        model Holder
+          parameter GType kind = GType.A;
+          parameter Real scale = 1.0;
+          replaceable function f = baseFunc(kind = kind, x = scale);
+        end Holder;
+
+        model Body
+          outer Holder h;
+          Real g_0;
+        equation
+          g_0 = h.f(time);
+        end Body;
+
+        model Test
+          inner Holder h(kind = GType.B, scale = 2.0);
+          Body b1;
+          annotation(experiment(StopTime = 0.01));
+        end Test;
+      end ShortFuncInnerOuter;
+      """
     #= Guards against the OMFrontend regression where a `outer Holder h`
        component lost the modifiers of the matching `inner Holder h(...)` in the
        enclosing scope because `lookupInner` either self-shadowed isInner/isOuter
        or called resolveOuter with wrong arity, causing the outer component to
        synthesise a fresh inner with class defaults. =#
-    local (fm, _) = OMFrontend.flattenModel("ShortFuncInnerOuter.Test",
-                                            "Models/ShortFuncInnerOuter.mo")
+    local (fm, _) = OM.flatten("ShortFuncInnerOuter.Test", program)
     local flatVarStrs = [OMFrontend.Frontend.toFlatString(v) for v in fm.variables]
     @test length(flatVarStrs) == 3
     @test any(s -> occursin("'h.kind'", s) && occursin("GType'.B", s), flatVarStrs)
