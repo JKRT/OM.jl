@@ -30,7 +30,7 @@ const OUT   = joinpath(@__DIR__, "robot.gif")
 # stiff Rodas5 dense interpolant is unreliable across the friction-mode events,
 # so saved steps are sampled instead.
 function simulate_robot(; stopTime = 1.85)
-  OM.simulate(MODEL; stopTime = stopTime, reltol = 0.3, abstol = 0.5, dense = false)
+  OM.simulate(MODEL; MSL_Version = "MSL:3.2.3", stopTime = stopTime, reltol = 0.3, abstol = 0.5, dense = false)
 end
 
 # --- 2. Forward kinematics -------------------------------------------------
@@ -82,8 +82,9 @@ function render(sol; nframes = 150, fps = 20)
                  lw = 4, color = :steelblue, marker = :circle, ms = 5, mc = :orange,
                  xlims = lh, ylims = lh, zlims = lu,
                  xlabel = "x", ylabel = "z", zlabel = "y (up)",
-                 title = "Manutec r3  (RobotR3.fullRobot)   t = $(round(times[i], digits = 2)) s",
-                 camera = (35, 22), legend = false, size = (720, 640), framestyle = :box)
+                 title = "Manutec r3 (fullRobot)   t = $(round(times[i], digits = 2)) s", titlefontsize = 9,
+                 guidefontsize = 7, tickfontsize = 6, top_margin = 2Plots.mm,
+                 camera = (35, 22), legend = false, size = (360, 320), dpi = 200, framestyle = :box)
     scatter3d!(plt, [0.0], [0.0], [0.0]; ms = 7, mc = :black)
     plot3d!(plt, tipx, tipy, tipz; lw = 2, color = :red, ls = :dash)
     scatter3d!(plt, [V[end][1]], [V[end][3]], [V[end][2]]; ms = 7, mc = :red)

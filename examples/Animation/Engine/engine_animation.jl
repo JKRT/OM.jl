@@ -6,7 +6,7 @@
 # the motion), and OM.jl solves the planar closed-loop constraint numerically.
 #
 # The mechanism has a single degree of freedom: given the crankshaft angle
-# theta = Inertia.phi, the crank pin and piston follow from the slider-crank
+# theta = inertia.phi, the crank pin and piston follow from the slider-crank
 # relation with crank radius R and connecting-rod length L taken from the model
 # (Crank2.r = {0, 0.1, 0} and Rod.r = {0, -0.2, 0}). The revolute axes are
 # n = {1, 0, 0}, so the mechanism moves in the y-z plane.
@@ -25,7 +25,7 @@ const L = 0.2   # connecting-rod length (m)
 
 # --- 1. Simulate -----------------------------------------------------------
 function simulate_engine(; stopTime = 2.0)
-  OM.simulate(MODEL; stopTime = stopTime, reltol = 0.05, abstol = 0.1, dense = false)
+  OM.simulate(MODEL; stopTime = stopTime, reltol = 0.05, abstol = 0.1, dense = false, saveat = 0.005)
 end
 
 # --- 2. Slider-crank geometry ----------------------------------------------
@@ -38,7 +38,7 @@ piston(th)   = (0.0, R * cos(th) + sqrt(L^2 - (R * sin(th))^2))
 function render(sol; nframes = 220, fps = 25)
   tEnd  = sol.t[end]
   times = range(0.0, tEnd; length = nframes)
-  phi   = [sol(t, idxs = Symbol("Inertia_phi")) for t in times]
+  phi   = [sol(t, idxs = Symbol("inertia.phi")) for t in times]
 
   ymax = R + L + 0.05
   pw   = 0.05               # piston / cylinder half-width
@@ -52,8 +52,9 @@ function render(sol; nframes = 220, fps = 25)
     (qx, qy) = piston(th)
     plt = plot(circ_x, circ_y; lw = 1, color = :gray, ls = :dot,
                xlims = (-0.16, 0.16), ylims = (-0.15, ymax), aspect_ratio = :equal,
-               title = "Engine1a slider-crank   t = $(round(times[i], digits = 3)) s",
-               legend = false, size = (520, 720), framestyle = :box)
+               title = "Engine1a   t = $(round(times[i], digits = 2)) s", titlefontsize = 9,
+               tickfontsize = 6, top_margin = 2Plots.mm, legend = false,
+               size = (260, 360), dpi = 200, framestyle = :box)
     plot!(plt, [-pw, -pw], [R, ymax]; color = :gray, lw = 2)      # cylinder walls
     plot!(plt, [pw, pw], [R, ymax]; color = :gray, lw = 2)
     plot!(plt, [0.0, px], [0.0, py]; lw = 5, color = :steelblue)  # crank

@@ -1,0 +1,3 @@
+/* The showcase animations are drawn at twice their size (dpi 200): show them at half, as the README does. */
+img[src$="showcase/robot.gif"] { width: 360px; }
+img[src$="showcase/engine.gif"] { width: 260px; }

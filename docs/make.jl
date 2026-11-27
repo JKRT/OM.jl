@@ -11,6 +11,7 @@ makedocs(
         canonical = "https://JKRT.github.io/OM.jl",
         edit_link = "master",
         repolink = "https://github.com/JKRT/OM.jl",
+        assets = ["assets/showcase.css"],
     ),
     pages = [
         "Home" => "index.md",
