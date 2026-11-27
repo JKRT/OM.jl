@@ -299,9 +299,9 @@ end
 #Lists compiled models
 OM.OMBackend.availableModels()
 #Prints a compiled model
-OM.OMBackend.printModel(<model name>)
-#Write a model to file with redundant begin blocks and comments removed.
-OM.OMBackend.writeModelToFile("model", "model.jl"; keepComments = true, keepBeginBlocks=false)
+OM.OMBackend.exportModel(stdout, <model name>)
+#Write a model to file as Julia source
+OM.OMBackend.exportModel("model.jl", <model name>)
 # Plotting a specific variable from an obtained solution if you are using Plots.jl
 using Plots
 plot(sol[:t], sol[:x])

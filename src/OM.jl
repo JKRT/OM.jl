@@ -1361,16 +1361,15 @@ Base.showerror(io::IO, e::ARRAY_PRESERVING_CODEGEN_NOT_SUPPORTED) =
 
 """
     writeModelToFile(modelName, modelFile, filePath; MSL=false, MSL_Version=nothing,
-                     mode=OMBackend.DEFAULT_BACKEND_MODE[], keepComments=true, keepBeginBlocks=true)
+                     mode=OMBackend.DEFAULT_BACKEND_MODE[], comments=false) -> String
 
 Translate a file-based Modelica model and write the generated Julia code to
-`filePath` for inspection or debugging. Equivalent to calling `translate`
-followed by `OMBackend.writeModelToFile`.
+`filePath` for inspection or debugging; returns `filePath`. Equivalent to calling `translate`
+followed by `OMBackend.exportModel(filePath, modelName, OMBackend.JuliaSource(; comments))`.
 
 # Keyword arguments
 - `MSL`, `MSL_Version`, `mode`: forwarded to `translate`.
-- `keepComments`: keep `# ...` comments in the emitted code.
-- `keepBeginBlocks`: keep redundant `begin ... end` blocks in the emitted code.
+- `comments`: each line keeps its comment `#= <file>:<line> =#`, where in OMBackend's source it was generated.
 
 # Example
 ```julia
@@ -1381,19 +1380,17 @@ function writeModelToFile(modelName::String, modelFile::String, filePath::String
                           MSL = false,
                           MSL_Version::Union{Nothing, String} = nothing,
                           mode = OMBackend.DEFAULT_BACKEND_MODE[],
-                          keepComments = true,
-                          keepBeginBlocks = true)
+                          comments::Bool = false)::String
   translate(modelName, modelFile; MSL = MSL, MSL_Version = MSL_Version, mode = mode)
-  internalName = OMBackend.canonicalName(modelName)
-  OMBackend.writeModelToFile(internalName, filePath; keepComments = keepComments, keepBeginBlocks = keepBeginBlocks)
+  return OMBackend.exportModel(filePath, modelName, OMBackend.JuliaSource(; comments))
 end
 
 """
     writeModelToFile(modelName, filePath; MSL_Version=nothing,
-                     mode=OMBackend.DEFAULT_BACKEND_MODE[], keepComments=true, keepBeginBlocks=true)
+                     mode=OMBackend.DEFAULT_BACKEND_MODE[], comments=false) -> String
 
 Translate an MSL model by name and write the generated Julia code to
-`filePath`. See `writeModelToFile(modelName, modelFile, filePath; ...)` for
+`filePath`; returns `filePath`. See `writeModelToFile(modelName, modelFile, filePath; ...)` for
 the file-based form.
 
 # Example
@@ -1405,11 +1402,9 @@ OM.writeModelToFile("Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum",
 function writeModelToFile(modelName::String, filePath::String;
                           MSL_Version::Union{Nothing, String} = nothing,
                           mode = OMBackend.DEFAULT_BACKEND_MODE[],
-                          keepComments = true,
-                          keepBeginBlocks = true)
+                          comments::Bool = false)::String
   translate(modelName; MSL_Version = MSL_Version, mode = mode)
-  internalName = OMBackend.canonicalName(modelName)
-  OMBackend.writeModelToFile(internalName, filePath; keepComments = keepComments, keepBeginBlocks = keepBeginBlocks)
+  return OMBackend.exportModel(filePath, modelName, OMBackend.JuliaSource(; comments))
 end
 
 """

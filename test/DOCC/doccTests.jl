@@ -63,7 +63,7 @@ const DOCC_SYSTEMS = ["DynamicOverconstrainedConnectors.System$i" for i in 1:5]
   @testset "Generated code dump" begin
     local dumpPath = joinpath(mktempdir(), "DOCC_System1_generated.jl")
     @test begin
-      OMBackend.writeModelToFile("DynamicOverconstrainedConnectors_System1", dumpPath)
+      OMBackend.exportModel(dumpPath, "DynamicOverconstrainedConnectors_System1")
       isfile(dumpPath)
     end
     @info "DOCC System1 generated code dumped to $dumpPath"
