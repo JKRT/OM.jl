@@ -57,9 +57,25 @@ end
 
 #= precompile_statements.jl: curated; precompile_statements_arrays.jl: generated (the array code's translate, build
    and simulate of MSL EngineV6 and FullRobot, `om-hints.py` in the work report 2026-11-18-precompile-ttfs). =#
+"""
+What the hints of one file did: the file's name, the hints, those that no longer resolve, those that do not compile,
+and the time they took (ns). The precompile display shows one line per file.
+"""
+struct PrecompileHintsResult
+  name::String
+  total::Int
+  stale::Int
+  notCompiled::Int
+  ns::UInt64
+end
+
+"""The hints of the files below, evaluated when the package image is made, for the precompile display."""
+const PRECOMPILE_HINTS_RESULTS = PrecompileHintsResult[]
+
 for hintsName::String in ("precompile_statements.jl", "precompile_statements_arrays.jl")
   local hintsFile::String = joinpath(@__DIR__, hintsName)
   include_dependency(hintsFile)
+  local t0::UInt64 = time_ns()
   local total::Int = 0
   local stale::Int = 0
   local notCompiled::Int = 0
@@ -74,25 +90,86 @@ for hintsName::String in ("precompile_statements.jl", "precompile_statements_arr
       @debug "Skipping stale precompile hint" hint exception = err
     end
   end
-  #= One line, so a stale hints file is noticed (efficiency review 2026-09-29). =#
-  (stale + notCompiled) > 0 &&
-    @info "OM precompile hints: $stale of $total no longer resolve, $notCompiled do not compile; regenerate $(hintsName)"
+  push!(PRECOMPILE_HINTS_RESULTS, PrecompileHintsResult(hintsName, total, stale, notCompiled, time_ns() - t0))
+end
+
+#= ---------------------------------------------------------------------------------------------------------------
+   The precompile display, as OMFrontend's and OMBackend's: a header, one line per workload step (a mark, the step,
+   its time), the total; in color when Julia has color. What a step prints is dropped; its warnings still show.
+   --------------------------------------------------------------------------------------------------------------- =#
+
+"""The stream of the display: stdout, in color when Julia runs with color (`--color`, passed on to precompilation)."""
+_precompileIO()::IOContext = IOContext(stdout, :color => Base.get_have_color())
+
+"""`ns` nanoseconds as `850 ms` or `1.9 s`."""
+function _precompileDuration(ns::UInt64)::String
+  local s::Float64 = ns / 1e9
+  return s < 1 ? string(round(Int, 1000 * s), " ms") : string(round(s; digits = 1), " s")
+end
+
+"""
+The display's header: OM.jl's version, Julia's version and the pipeline the workload compiles. Returns the time it
+started (`time_ns`), for `_precompileDone`.
+"""
+function _precompileHeader(io::IOContext)::UInt64
+  local version::String = string(something(pkgversion(@__MODULE__), "dev"))
+  println(io)
+  printstyled(io, "  OM.jl ", version; bold = true, color = :blue)
+  printstyled(io, "   precompiling with Julia ", VERSION, "\n"; color = :light_black)
+  printstyled(io, "  Modelica ▸ OMFrontend ▸ OMBackend ▸ Simulation code ▸ SciML solve\n"; color = :blue)
+  return time_ns()
+end
+
+"""
+Runs `f` as a step of the display: `✓ <label>  <time>`, or `✗ <label>  failed` and the error as a warning (the
+workload goes on). What `f` prints to stdout and stderr is dropped, and of its log messages only the warnings show.
+Returns whether `f` ran without an error.
+"""
+function _precompileStep(f::F, io::IOContext, label::String)::Bool where {F <: Function}
+  local logger::Base.CoreLogging.AbstractLogger = Base.CoreLogging.SimpleLogger(stderr, Base.CoreLogging.Warn)
+  local t0::UInt64 = time_ns()
+  local err::Any = nothing
+  try
+    redirect_stdout(devnull) do
+      redirect_stderr(() -> Base.CoreLogging.with_logger(f, logger), devnull)
+    end
+  catch e
+    err = (e, catch_backtrace())
+  end
+  local failed::Bool = err !== nothing
+  printstyled(io, failed ? "  ✗ " : "  ✓ "; color = failed ? :red : :green, bold = failed)
+  print(io, rpad(label, 60))
+  printstyled(io, failed ? "failed" : _precompileDuration(time_ns() - t0), "\n"; color = failed ? :red : :light_black)
+  failed && @warn "[OM] precompile workload: $(label) failed" exception = err
+  return !failed
+end
+
+"""
+The line of one hints file: `✓ Hints <file>: <used>/<total>  <time>`, and below it the stale ones
+and those that do not compile, so a stale file is noticed (efficiency review 2026-09-29).
+"""
+function _precompileHintsLine(io::IOContext, r::PrecompileHintsResult)::Nothing
+  local used::Int = r.total - r.stale - r.notCompiled
+  printstyled(io, "  ✓ "; color = :green)
+  print(io, rpad(string("Hints ", r.name, ": ", used, "/", r.total), 60))
+  printstyled(io, _precompileDuration(r.ns), "\n"; color = :light_black)
+  (r.stale + r.notCompiled) > 0 &&
+    printstyled(io, "    ", r.stale, " no longer resolve, ", r.notCompiled, " do not compile: regenerate ", r.name, "\n";
+                color = :yellow)
+  return nothing
+end
+
+"""The display's last line: the time since `t0` (`_precompileHeader`)."""
+function _precompileDone(io::IOContext, t0::UInt64)::Nothing
+  printstyled(io, "  Workload done in ", _precompileDuration(time_ns() - t0), "\n"; bold = true, color = :blue)
+  return nothing
 end
 
 PrecompileTools.@compile_workload begin
-  @info "Precompiling OM.jl..."
-
-  function timedPrecompileStep(f, label::String)
-    @info label
-    local t0 = time()
-    try
-      local result = f()
-      @info "$(label) done" elapsed_s = round(time() - t0, digits = 2)
-      result
-    catch e
-      @warn "$(label) failed (non-fatal)" exception = (e, catch_backtrace())
-      nothing
-    end
+  local io::IOContext = _precompileIO()
+  local t0::UInt64 = _precompileHeader(io)
+  for r::PrecompileHintsResult in PRECOMPILE_HINTS_RESULTS
+    _precompileHintsLine(io, r)
   end
 
   function flattenModelInMSL_TST(modelName::String; MSL_V)
@@ -110,7 +187,7 @@ PrecompileTools.@compile_workload begin
   local modelsDir = joinpath(@__DIR__, "..", "test", "Models")
   local helloWorldPath = joinpath(modelsDir, "HelloWorld.mo")
 
-  timedPrecompileStep("Root API warmup") do
+  _precompileStep(io, "Parse, SCode, flatten: HelloWorld") do
     parseFile(helloWorldPath)
     translateToSCode(helloWorldPath)
     flatten("HelloWorld", helloWorldPath)
@@ -127,11 +204,10 @@ PrecompileTools.@compile_workload begin
   fullPrecompile && push!(frontendModels,
     "Modelica.Mechanics.MultiBody.Examples.Elementary.Pendulum")
   for model in frontendModels
-    timedPrecompileStep("Frontend MSL warmup: $(model)") do
+    _precompileStep(io, "Flatten: $(model)") do
       flattenModelInMSL_TST(model; MSL_V = mslVersion)
     end
   end
-  @info "Frontend precompilation done."
 
   # Full backend translation still emits large MTK model modules and dominates
   # cold precompile time. Use it only when explicitly asking for broader native
@@ -150,11 +226,10 @@ PrecompileTools.@compile_workload begin
   ])
   for (modelName, modelFile) in backendModels
     local modelPath = joinpath(modelsDir, modelFile)
-    timedPrecompileStep("Backend translate warmup: $(modelName)") do
+    _precompileStep(io, "Translate: $(modelName)") do
       translate(modelName, modelPath)
     end
   end
-  @info "Backend precompilation done."
 
   # iMTK mode (IMTK_MODE, default). Translate only: generated model-module eval is
   # invalid during package image generation, and the iMTK build's Core.eval is
@@ -163,18 +238,17 @@ PrecompileTools.@compile_workload begin
   #= An MSL model translated as `simulate` translates it (the default MSL, the array code; its module's evaluation is
      rejected here): the frontend's library paths compiled in this image, the last one loaded, where the methods of
      the packages loaded before OMFrontend's dependents cannot invalidate them (2026-11-18 experiment). =#
-  timedPrecompileStep("MSL translate warmup") do
+  _precompileStep(io, "Translate: Modelica.Mechanics.Rotational.Examples.First") do
     translate("Modelica.Mechanics.Rotational.Examples.First")
     nothing
   end
 
-  timedPrecompileStep("iMTK translate warmup") do
+  _precompileStep(io, "Translate (iMTK): HelloWorld") do
     translate("HelloWorld", helloWorldPath; mode = OMBackend.IMTK_MODE)
     nothing
   end
-  @info "iMTK precompilation done."
 
-  timedPrecompileStep("MTK symbolic construction warmup") do
+  _precompileStep(io, "ModelingToolkit system") do
     ModelingToolkit.@independent_variables t
     local D = ModelingToolkit.Differential(t)
     ModelingToolkit.@variables x(t)
@@ -184,7 +258,7 @@ PrecompileTools.@compile_workload begin
     nothing
   end
 
-  timedPrecompileStep("SciML solve warmup") do
+  _precompileStep(io, "Solve an ODE, with an event") do
     local ode! = function (du, u, p, t)
       du[1] = -u[1]
       nothing
@@ -202,7 +276,7 @@ PrecompileTools.@compile_workload begin
     nothing
   end
 
-  timedPrecompileStep("SciML mass-matrix warmup") do
+  _precompileStep(io, "Solve a DAE (mass matrix)") do
     local dae! = function (du, u, p, t)
       du[1] = -u[1] + u[2]
       du[2] = u[1] + u[2] - 1.0
@@ -222,7 +296,7 @@ PrecompileTools.@compile_workload begin
      pipeline can be exercised end to end. The cubic residual cannot be torn
      symbolically, which keeps a genuine algebraic unknown and therefore a
      nontrivial mass matrix. =#
-  timedPrecompileStep("DirectRHS sparse-W warmup") do
+  _precompileStep(io, "Direct right-hand side, sparse Jacobian") do
     ModelingToolkit.@independent_variables t
     local D = ModelingToolkit.Differential(t)
     ModelingToolkit.@variables x(t) y(t)
@@ -241,7 +315,7 @@ PrecompileTools.@compile_workload begin
   end
 
   if extendedPrecompile
-    timedPrecompileStep("MTK structural warmup") do
+    _precompileStep(io, "ModelingToolkit structural_simplify") do
       ModelingToolkit.@independent_variables t
       local D = ModelingToolkit.Differential(t)
       ModelingToolkit.@variables x(t)
@@ -253,7 +327,7 @@ PrecompileTools.@compile_workload begin
   end
 
   if fullPrecompile
-    timedPrecompileStep("Full MTK / DAE solve warmup") do
+    _precompileStep(io, "ModelingToolkit solve, DAE solve") do
       ModelingToolkit.@independent_variables t
       local D = ModelingToolkit.Differential(t)
       ModelingToolkit.@variables x(t)
@@ -276,7 +350,5 @@ PrecompileTools.@compile_workload begin
                                   abstol = 1e-3, reltol = 1e-3)
     end
   end
-  @info "MTK / SciML warmup done."
-
-  @info "Precompilation finished."
+  _precompileDone(io, t0)
 end
