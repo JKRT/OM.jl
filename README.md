@@ -1,4 +1,4 @@
-# OpenModelicaJL (OMJL) [![CI](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml) [![Coverage](https://img.shields.io/endpoint?url=https://jkrt.github.io/OM.jl/coverage.json)](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml?query=branch%3Amaster) [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://jkrt.github.io/OM.jl/dev/) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
+# OpenModelicaJL (OMJL) [![CI](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml/badge.svg?branch=master)](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml) [![Coverage](https://img.shields.io/endpoint?url=https://jkrt.github.io/OM.jl/coverage.json)](https://github.com/JKRT/OM.jl/actions/workflows/CI.yml?query=branch%3Amaster) [![MSL 4.1.0 coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fopenmodelica.github.io%2FOMLibraryTesting.jl%2Fmsl-4.1.0%2Fbadge.json)](https://openmodelica.github.io/OMLibraryTesting.jl/msl-4.1.0/) [![Docs](https://img.shields.io/badge/docs-dev-blue.svg)](https://jkrt.github.io/OM.jl/dev/) [![License: OSMC-PL](https://img.shields.io/badge/license-OSMC--PL-lightgrey.svg)](OSMC-License.txt)
 A Modelica Environment in Julia.
 
 OMJL is a Modelica compiler written in Julia. It allows users to mix Modelica and Julia for modeling and simulation, so it is a Modelica environment with access to all tooling for symbolic-numeric computing in Julia. 
@@ -22,7 +22,7 @@ Please leave a star or make an issue to support the repository!
 The Manutec r3 robot (`Modelica.Mechanics.MultiBody.Examples.Systems.RobotR3.fullRobot`)
 simulated end-to-end with OM.jl and animated from the resulting joint angles:
 
-![Manutec r3 animation](examples/Animation/Robot/robot.gif)
+<img src="examples/Animation/Robot/robot.gif" width="360" alt="Manutec r3 animation">
 
 This is a full electro-mechanical model: six motor drives with gear friction and
 PI controllers, a path planner, and the multibody mechanics. See
@@ -32,7 +32,7 @@ the forward-kinematics walkthrough.
 The one-cylinder engine (`Modelica.Mechanics.MultiBody.Examples.Loops.Engine1a`),
 a planar slider-crank loop solved by OM.jl and animated from the crankshaft angle:
 
-![Engine1a slider-crank animation](examples/Animation/Engine/engine.gif)
+<img src="examples/Animation/Engine/engine.gif" width="260" alt="Engine1a slider-crank animation">
 
 See [`examples/Animation/Engine`](examples/Animation/Engine) for the runnable
 example and the slider-crank walkthrough.
