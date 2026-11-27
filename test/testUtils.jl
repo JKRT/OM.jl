@@ -20,6 +20,8 @@ import OMFrontend.SCode
 import OpenModelicaParser
 import OMFrontend
 import OM
+#= Modelica"""...""": a test's model written beside its assertions, parsed when the file is loaded. =#
+import OM: @Modelica_str
 
 using DifferentialEquations: ReturnCode, Rodas5P
 import Sundials

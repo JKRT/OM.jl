@@ -36,9 +36,54 @@
 
 @testset "Complex Records" begin
   @testset "Operator-record call on LHS (getComplexType regression)" begin
+    local program::Absyn.Program = Modelica"""
+      /*
+      Minimal reproducer for the `decomposeComplexEquation: getComplexType returned
+      nothing` warning that surfaced during the 2026-04-23 Magnetic run on the
+      AIMC_DOL family.
+
+      Shape that triggers it:
+        operator_record_call(a, b) = record_expr
+      where LHS is a DAE.CALL to an operator-record function (like '+' / '-')
+      returning a record type, and RHS is a record CREF or RECORD literal.
+      */
+
+      package OperatorRecordLhsCall
+
+        operator record Pair
+          Real x;
+          Real y;
+
+          encapsulated operator '+'
+            function add
+              import OperatorRecordLhsCall.Pair;
+              input Pair a;
+              input Pair b;
+              output Pair c;
+            algorithm
+              c := Pair(a.x + b.x, a.y + b.y);
+            end add;
+          end '+';
+        end Pair;
+
+        model Case
+          "The call `a + b` on the LHS stays as a DAE.CALL returning Pair."
+          Pair a;
+          Pair b;
+          Pair sum;
+          Real t(start = 0);
+        equation
+          der(t) = 1.0;
+          a = Pair(t, -t);
+          b = Pair(0.5 * t, 0.5 * t);
+          a + b = sum;
+        end Case;
+
+      end OperatorRecordLhsCall;
+      """
     @test true == begin
       try
-        OM.translate("OperatorRecordLhsCall.Case", "./Models/OperatorRecordLhsCall.mo")
+        OM.translate("OperatorRecordLhsCall.Case", program)
         true
       catch e
         @error "OperatorRecordLhsCall translate failed" exception=(e, catch_backtrace())
@@ -133,8 +178,68 @@
 
   #= ComplexRecord1: R2 contains R1[2] (array of records inside a record). =#
   @testset "Basic Record Access" begin
+    local program::Absyn.Program = Modelica"""
+      /*
+      Models that demonstrate complex record types in Modelica.
+      */
+
+      package ComplexRecords
+
+      // A model demonstrating nested records and arrays.
+      model ComplexRecord1
+
+        record R1
+          Real x;
+          Real y;
+        end R1;
+
+        record R2
+          R1[2] innerRecords;
+          Real z(start = 0);
+        end R2;
+
+        // Instance of the complex record
+        R2 myRecord;
+      equation
+          // Example equations using the record fields
+          myRecord.innerRecords[1].x = 1.0;
+          myRecord.innerRecords[1].y = 2.0;
+          myRecord.innerRecords[2].x = 3.0;
+          myRecord.innerRecords[2].y = 4.0;
+          der(myRecord.z) = 5.0 + time;
+      end ComplexRecord1;
+
+
+      model ComplexRecord2
+          record MixedRecord
+            Integer id;
+            Real values[3];
+            Boolean flag;
+            String description;
+          end MixedRecord;
+
+        // Instance of the mixed record
+        MixedRecord dataRecord1;
+        MixedRecord dataRecord2;
+      equation
+          // Example equations using the record fields
+          dataRecord1.id = 1;
+          dataRecord1.values = {1.0, 2.0, 3.0};
+          dataRecord1.flag = true;
+          dataRecord1.description = "First record";
+
+          dataRecord2.id = 2;
+          dataRecord2.values = {4.0, 5.0, 6.0};
+          dataRecord2.flag = false;
+          dataRecord2.description = "Second record";
+
+      end ComplexRecord2;
+
+
+      end ComplexRecords;
+      """
     @test begin
-      OM.translate("ComplexRecords.ComplexRecord1", "./Models/ComplexRecords.mo")
+      OM.translate("ComplexRecords.ComplexRecord1", program)
       sol = OM.simulate("ComplexRecords.ComplexRecord1"; startTime = 0.0, stopTime = 10.0)
       testResultRetCodeSuccess(sol; symbol = :myRecord_z, expectedValue = 100.0)
     end
